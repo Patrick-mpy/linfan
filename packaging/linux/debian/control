@@ -1,0 +1,15 @@
+Package: linfan
+Version: @VERSION@
+Architecture: amd64
+Maintainer: LinFan <ci@linfan.local>
+Section: utils
+Priority: optional
+Depends: libc6
+Recommends: libfontconfig1, libx11-6, libice6, libsm6
+Description: Cross-platform fan control (systemd daemon + Avalonia GUI)
+ LinFan drives fan curves from temperature sensors via a privileged systemd
+ daemon; the unprivileged GUI connects over a local socket. This package ships
+ a self-contained build, so no .NET runtime is required on the target.
+ .
+ Note: writing PWM needs hardware support (e.g. thinkpad_acpi fan_control=1 on
+ ThinkPads); otherwise the daemon runs read-only.

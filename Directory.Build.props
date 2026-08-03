@@ -1,0 +1,22 @@
+<Project>
+
+  <!--
+    Gilt für alle Projekte. Wir zielen weiterhin auf net8.0 (LTS, Konventionen in AGENTS.md),
+    erlauben aber das Ausführen auf einer neueren Major-Runtime (z. B. .NET 10), falls keine
+    net8-Runtime installiert ist. Build funktioniert mit SDK 8 oder 10.
+  -->
+  <PropertyGroup>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <!--
+    Single Source of Truth für die Version. Der '-dev'-Suffix markiert lokale/Dev-Builds als
+    Vor-Release; bei Release setzt die Pipeline aus dem Git-Tag -p:Version=X.Y.Z und überschreibt
+    diesen Wert. AssemblyInformationalVersion wird "X.Y.Z+<sha>" — ein späterer Update-Check
+    parst den Teil vor '+'.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0-dev</Version>
+  </PropertyGroup>
+
+</Project>

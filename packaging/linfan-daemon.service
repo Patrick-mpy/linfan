@@ -1,0 +1,47 @@
+# systemd unit for the privileged LinFan daemon (control loop + IPC server).
+# Template — adjust the paths to your installation, then:
+#   sudo cp packaging/linfan-daemon.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now linfan-daemon
+#
+# Linux/ThinkPad prerequisite: thinkpad_acpi with fan_control=1 (see README).
+#
+# IPC access control: the root daemon restricts its socket to the `linfan` group (mode 0660). Create the
+# group once and add each user who should run the GUI — otherwise the socket stays root-only and the GUI
+# cannot connect:
+#   sudo groupadd --system linfan
+#   sudo usermod -aG linfan <your-user>   # then re-login for the group to take effect
+
+[Unit]
+Description=LinFan fan control daemon
+After=multi-user.target
+
+[Service]
+Type=simple
+# Writing PWM (sysfs) requires root.
+User=root
+
+# Put the published daemon here (e.g. `dotnet publish -c Release -o /opt/linfan src/LinFan.Daemon`).
+ExecStart=/usr/bin/dotnet /opt/linfan/LinFan.Daemon.dll run
+WorkingDirectory=/opt/linfan
+
+# systemd creates /run/linfan (0755, root) and cleans it up on stop — the socket lives there.
+RuntimeDirectory=linfan
+Environment=LINFAN_SOCKET=/run/linfan/linfan.sock
+# systemd creates /etc/linfan (0755, root) — the configuration lives there, used by the GUI (via the
+# daemon) and the CLI (init/calibrate) too. One shared path instead of /root/.config.
+ConfigurationDirectory=linfan
+Environment=LINFAN_CONFIG=/etc/linfan/config.json
+# Run the net8.0 target on a newer runtime (see Directory.Build.props).
+Environment=DOTNET_ROLL_FORWARD=Major
+
+Restart=on-failure
+RestartSec=3
+
+# Fail-Safe: beim Stop stellt der Daemon den sicheren Hardware-Auto-Zustand wieder her
+# (RestoreDefaults im finally). Genug Zeit vor einem SIGKILL lassen, damit das garantiert läuft —
+# der StopAsync-Pfad selbst ist bereits eng begrenzt (Coordinator-Stops je ~3 s). Ohne diese Zeile
+# gilt der systemd-Default (90 s), was den Stop unnötig lange offen hielte, falls doch etwas hängt.
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

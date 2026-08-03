@@ -1,0 +1,35 @@
+# systemd unit for the privileged LinFan daemon — SELF-CONTAINED build variant.
+# Unlike packaging/linfan-daemon.service (which runs the framework-dependent build via
+# `dotnet LinFan.Daemon.dll`), this one launches the self-contained single-file executable
+# directly, so NO .NET runtime is required on the target. Shipped by the .deb, the .run and the
+# binary-mode of install.sh. Linux/ThinkPad prerequisite: thinkpad_acpi with fan_control=1 (README).
+
+[Unit]
+Description=LinFan fan control daemon
+After=multi-user.target
+
+[Service]
+Type=simple
+# Writing PWM (sysfs) requires root.
+User=root
+
+# Self-contained executable placed by the installer.
+ExecStart=/opt/linfan/LinFan.Daemon run
+WorkingDirectory=/opt/linfan
+
+# systemd creates /run/linfan (0755, root) and cleans it up on stop — the socket lives there.
+RuntimeDirectory=linfan
+Environment=LINFAN_SOCKET=/run/linfan/linfan.sock
+# systemd creates /etc/linfan (0755, root) — the shared configuration used by the daemon and CLI.
+ConfigurationDirectory=linfan
+Environment=LINFAN_CONFIG=/etc/linfan/config.json
+
+Restart=on-failure
+RestartSec=3
+
+# Fail-Safe: der Daemon stellt beim Stop den sicheren Hardware-Auto-Zustand wieder her
+# (RestoreDefaults im finally). Genug Zeit vor einem SIGKILL lassen, damit das garantiert läuft.
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

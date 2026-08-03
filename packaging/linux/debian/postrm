@@ -1,0 +1,16 @@
+#!/bin/sh
+# Post-remove: reload systemd. On purge, drop the machine-wide config and the IPC group too.
+set -e
+
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload 2>/dev/null || true
+fi
+
+case "$1" in
+  purge)
+    rm -rf /etc/linfan
+    getent group linfan >/dev/null 2>&1 && groupdel linfan 2>/dev/null || true
+    ;;
+esac
+
+exit 0

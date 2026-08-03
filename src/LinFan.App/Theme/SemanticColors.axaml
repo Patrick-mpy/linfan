@@ -1,0 +1,84 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Semantische Farb-Tokens für hell/dunkel. Views referenzieren ausschließlich diese Keys per
+        {DynamicResource …}; nie wieder Hex-Literale in der View. ThemeVariant.Default (System-Modus)
+        braucht kein eigenes Dictionary — Avalonia löst dann auf die OS-Variante (Light/Dark) auf.
+        Die *Color*-Keys am Ende sind für die selbstgezeichneten Controls (CurveChart baut daraus Pens).
+    -->
+    <ResourceDictionary.ThemeDictionaries>
+
+        <ResourceDictionary x:Key="{x:Static ThemeVariant.Dark}">
+            <SolidColorBrush x:Key="BgWindow" Color="#0E0E11" />
+            <SolidColorBrush x:Key="BgCard" Color="#16161A" />
+            <SolidColorBrush x:Key="BgCardAlt" Color="#1E1E24" />
+            <SolidColorBrush x:Key="BgInset" Color="#0E0E11" />
+            <SolidColorBrush x:Key="Divider" Color="#2E2E38" />
+            <SolidColorBrush x:Key="TextPrimary" Color="#FAFAFA" />
+            <SolidColorBrush x:Key="TextHeading" Color="#E4E4E7" />
+            <SolidColorBrush x:Key="TextSecondary" Color="#C7C7CC" />
+            <SolidColorBrush x:Key="TextMuted" Color="#A1A1AA" />
+            <SolidColorBrush x:Key="TextFaint" Color="#71717A" />
+            <SolidColorBrush x:Key="TextFaintest" Color="#52525B" />
+            <SolidColorBrush x:Key="Accent" Color="#38BDF8" />
+            <SolidColorBrush x:Key="Success" Color="#22C55E" />
+            <SolidColorBrush x:Key="Warning" Color="#F59E0B" />
+            <SolidColorBrush x:Key="WarningText" Color="#FBBF24" />
+            <SolidColorBrush x:Key="DangerBg" Color="#7F1D1D" />
+            <SolidColorBrush x:Key="DangerText" Color="#FECACA" />
+            <SolidColorBrush x:Key="DangerAccent" Color="#F87171" />
+            <SolidColorBrush x:Key="InfoBg" Color="#1E3A5F" />
+            <SolidColorBrush x:Key="InfoText" Color="#BFDBFE" />
+            <SolidColorBrush x:Key="InfoAccent" Color="#93C5FD" />
+
+            <Color x:Key="GridColor">#26262E</Color>
+            <Color x:Key="AxisColor">#71717A</Color>
+            <Color x:Key="HandleColor">#FAFAFA</Color>
+            <Color x:Key="AccentColor">#38BDF8</Color>
+            <Color x:Key="ClampColor">#356C82</Color>
+            <Color x:Key="LiveColor">#F59E0B</Color>
+
+            <!-- Luftrichtung der Gehäuse-Vorschau (FanLocationDiagram): Einlass kühl, Auslass warm, intern neutral. -->
+            <Color x:Key="IntakeColor">#38BDF8</Color>
+            <Color x:Key="ExhaustColor">#F59E0B</Color>
+            <Color x:Key="InternalColor">#6B7280</Color>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="{x:Static ThemeVariant.Light}">
+            <SolidColorBrush x:Key="BgWindow" Color="#F7F7FA" />
+            <SolidColorBrush x:Key="BgCard" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="BgCardAlt" Color="#EFEFF3" />
+            <SolidColorBrush x:Key="BgInset" Color="#ECECF1" />
+            <SolidColorBrush x:Key="Divider" Color="#D9D9DF" />
+            <SolidColorBrush x:Key="TextPrimary" Color="#18181B" />
+            <SolidColorBrush x:Key="TextHeading" Color="#27272A" />
+            <SolidColorBrush x:Key="TextSecondary" Color="#3F3F46" />
+            <SolidColorBrush x:Key="TextMuted" Color="#52525B" />
+            <SolidColorBrush x:Key="TextFaint" Color="#71717A" />
+            <SolidColorBrush x:Key="TextFaintest" Color="#A1A1AA" />
+            <SolidColorBrush x:Key="Accent" Color="#0284C7" />
+            <SolidColorBrush x:Key="Success" Color="#16A34A" />
+            <SolidColorBrush x:Key="Warning" Color="#D97706" />
+            <SolidColorBrush x:Key="WarningText" Color="#B45309" />
+            <SolidColorBrush x:Key="DangerBg" Color="#FEE2E2" />
+            <SolidColorBrush x:Key="DangerText" Color="#B91C1C" />
+            <SolidColorBrush x:Key="DangerAccent" Color="#DC2626" />
+            <SolidColorBrush x:Key="InfoBg" Color="#DBEAFE" />
+            <SolidColorBrush x:Key="InfoText" Color="#1E40AF" />
+            <SolidColorBrush x:Key="InfoAccent" Color="#2563EB" />
+
+            <Color x:Key="GridColor">#D4D4D8</Color>
+            <Color x:Key="AxisColor">#71717A</Color>
+            <Color x:Key="HandleColor">#18181B</Color>
+            <Color x:Key="AccentColor">#0284C7</Color>
+            <Color x:Key="ClampColor">#7DD3FC</Color>
+            <Color x:Key="LiveColor">#D97706</Color>
+
+            <!-- Luftrichtung der Gehäuse-Vorschau (FanLocationDiagram): Einlass kühl, Auslass warm, intern neutral. -->
+            <Color x:Key="IntakeColor">#0284C7</Color>
+            <Color x:Key="ExhaustColor">#D97706</Color>
+            <Color x:Key="InternalColor">#9CA3AF</Color>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

@@ -1,0 +1,63 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LinFan.Core\LinFan.Core.csproj" />
+    <ProjectReference Include="..\LinFan.Ipc\LinFan.Ipc.csproj" />
+  </ItemGroup>
+
+  <!-- Plattform-Backend je ZIEL-OS wählen: alle BackendFactory.<OS>.cs aushängen, dann genau die
+       passende einhängen und nur das zugehörige Hardware-Projekt referenzieren. So zieht der
+       Linux-Build nie die Windows-only-NuGet (LibreHardwareMonitorLib) und umgekehrt.
+       Ziel-OS = das Publish-RID, wenn gesetzt (ermöglicht Cross-Publish, z. B. `publish -r win-x64`
+       von Linux aus), sonst das Host-OS (plain `dotnet build`/Tests ohne RID). -->
+  <PropertyGroup>
+    <BackendOS Condition="'$(RuntimeIdentifier)' != '' And $(RuntimeIdentifier.StartsWith('win'))">Windows</BackendOS>
+    <BackendOS Condition="'$(RuntimeIdentifier)' != '' And $(RuntimeIdentifier.StartsWith('linux'))">Linux</BackendOS>
+    <BackendOS Condition="'$(RuntimeIdentifier)' != '' And $(RuntimeIdentifier.StartsWith('osx'))">OSX</BackendOS>
+    <BackendOS Condition="'$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">Windows</BackendOS>
+    <BackendOS Condition="'$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">Linux</BackendOS>
+    <BackendOS Condition="'$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">OSX</BackendOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="BackendFactory.*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BackendOS)' == 'Linux'">
+    <ProjectReference Include="..\LinFan.Hardware.Linux\LinFan.Hardware.Linux.csproj" />
+    <Compile Include="BackendFactory.Linux.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BackendOS)' == 'Windows'">
+    <ProjectReference Include="..\LinFan.Hardware.Windows\LinFan.Hardware.Windows.csproj" />
+    <Compile Include="BackendFactory.Windows.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BackendOS)' == 'OSX'">
+    <ProjectReference Include="..\LinFan.Hardware.Mac\LinFan.Hardware.Mac.csproj" />
+    <Compile Include="BackendFactory.Mac.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BackendOS)' != 'Linux' And '$(BackendOS)' != 'Windows' And '$(BackendOS)' != 'OSX'">
+    <Compile Include="BackendFactory.Unsupported.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <!-- Dienst-Lebenszyklus je OS (No-op außerhalb des jeweiligen Dienstmanagers). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LinFan.Daemon.Tests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+      Layout-Skala: zentrale Abstands- und Eckenradius-Werte, damit „über Styles" wirklich eine
+      Skala greift statt verstreuter Literale. Die Spacing-Skala ist an den vorhandenen dominanten
+      Werten ausgerichtet (minimaler optischer Drift); seltene Ausreißer (4/14/18) ziehen auf die
+      nächste Stufe. Die Radius-Tokens spiegeln die Ist-Werte exakt (Single-Source, keine Optik-
+      Änderung) und werden u. a. von den Border-Klassen in Layout.axaml genutzt.
+    -->
+
+    <!-- Spacing-Skala (StackPanel-Abstände). -->
+    <x:Double x:Key="SpacingXxs">2</x:Double>
+    <x:Double x:Key="SpacingXs">6</x:Double>
+    <x:Double x:Key="SpacingSm">8</x:Double>
+    <x:Double x:Key="SpacingMd">10</x:Double>
+    <x:Double x:Key="SpacingLg">12</x:Double>
+    <x:Double x:Key="SpacingXl">16</x:Double>
+
+    <!-- Eckenradius-Stufen. -->
+    <CornerRadius x:Key="RadiusSm">6</CornerRadius>
+    <CornerRadius x:Key="RadiusMd">8</CornerRadius>
+    <CornerRadius x:Key="RadiusLg">10</CornerRadius>
+    <CornerRadius x:Key="RadiusXl">12</CornerRadius>
+    <CornerRadius x:Key="RadiusXxl">14</CornerRadius>
+</ResourceDictionary>

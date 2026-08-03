@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             x:Class="LinFan.App.Controls.CalibrationCard"
+             x:Name="Root">
+    <!--
+        Geteilte Kalibrier-Statusanzeige (Kopfzeile + Fortschrittsbalken + Detailzeile) — dasselbe Bild im
+        Onboarding-Assistenten und im Kalibrier-Banner des Hauptfensters. Bindet an die eigenen
+        StyledProperties (#Root); der Container (InfoBg-Border, evtl. Abbrechen-Button) liegt am Aufrufer.
+    -->
+    <StackPanel Spacing="{StaticResource SpacingSm}">
+        <TextBlock Text="{Binding #Root.Headline}" Foreground="{DynamicResource InfoText}"
+                   FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                   IsVisible="{Binding #Root.Headline, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding #Root.Progress}"
+                     Height="6" IsVisible="{Binding #Root.ShowProgress}" />
+        <TextBlock Text="{Binding #Root.Detail}" Foreground="{DynamicResource InfoText}"
+                   FontSize="12" TextWrapping="Wrap"
+                   IsVisible="{Binding #Root.Detail, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+</UserControl>

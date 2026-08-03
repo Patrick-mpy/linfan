@@ -1,0 +1,1154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Deutsche Übersetzung (Satellite-Assembly de/LinFan.App.resources.dll).
+  Key-Konvention und Parität: siehe Strings.resx (neutral = Englisch).
+-->
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Header.Theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="Header.ThemeTooltip" xml:space="preserve">
+    <value>Farbschema — System folgt dem Betriebssystem.</value>
+  </data>
+  <data name="Header.Language" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="Header.LanguageTooltip" xml:space="preserve">
+    <value>Anzeigesprache.</value>
+  </data>
+  <data name="Header.RunInBackground" xml:space="preserve">
+    <value>Im Hintergrund weiterlaufen</value>
+  </data>
+  <data name="Header.RunInBackgroundTooltip" xml:space="preserve">
+    <value>Beim Schließen ins Benachrichtigungsfeld minimieren statt zu beenden — die Lüftersteuerung läuft im Hintergrund weiter.</value>
+  </data>
+  <data name="MainWindow.UnsavedChanges" xml:space="preserve">
+    <value>● Nicht gespeicherte Änderungen</value>
+  </data>
+  <data name="MainWindow.ApplyChangesTooltip" xml:space="preserve">
+    <value>Übernimmt die ungespeicherten Änderungen — speichert über den Hintergrunddienst.</value>
+  </data>
+  <data name="MainWindow.Apply" xml:space="preserve">
+    <value>Übernehmen</value>
+  </data>
+  <data name="MainWindow.RevertTooltip" xml:space="preserve">
+    <value>Verwirft alle Änderungen seit dem letzten Speichern (mit Bestätigung).</value>
+  </data>
+  <data name="MainWindow.Revert" xml:space="preserve">
+    <value>Verwerfen</value>
+  </data>
+  <data name="MainWindow.DaemonUnreachable" xml:space="preserve">
+    <value>⚠ Hintergrunddienst nicht erreichbar — läuft der Dienst? Prüfen mit: systemctl status linfan-daemon</value>
+  </data>
+  <data name="MainWindow.Close" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
+  <data name="MainWindow.TabOverview" xml:space="preserve">
+    <value>Übersicht</value>
+  </data>
+  <data name="MainWindow.Profile" xml:space="preserve">
+    <value>Profil</value>
+  </data>
+  <data name="MainWindow.ActiveCurvesToggleTooltip" xml:space="preserve">
+    <value>Aktive Kurven ein-/ausklappen.</value>
+  </data>
+  <data name="MainWindow.ActiveCurves" xml:space="preserve">
+    <value>Aktive Kurven</value>
+  </data>
+  <data name="MainWindow.CurveOn" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="MainWindow.CurveOff" xml:space="preserve">
+    <value>Aus</value>
+  </data>
+  <data name="MainWindow.CurveToggleTooltip" xml:space="preserve">
+    <value>Kurve an/aus — „aus“ stellt die zugeordneten Lüfter auf Hardware-Auto.</value>
+  </data>
+  <data name="MainWindow.CurveOffHardwareAuto" xml:space="preserve">
+    <value>aus → Hardware-Auto</value>
+  </data>
+  <data name="MainWindow.EditCurveTooltip" xml:space="preserve">
+    <value>Wechselt zum Tab „Kurven &amp; Zuordnung“ und wählt diese Kurve aus.</value>
+  </data>
+  <data name="MainWindow.EditCurve" xml:space="preserve">
+    <value>Kurve bearbeiten</value>
+  </data>
+  <data name="MainWindow.TemperaturesToggleTooltip" xml:space="preserve">
+    <value>Temperaturen ein-/ausklappen.</value>
+  </data>
+  <data name="MainWindow.Temperatures" xml:space="preserve">
+    <value>Temperaturen</value>
+  </data>
+  <data name="MainWindow.History60s" xml:space="preserve">
+    <value>Verlauf: letzte 60 Sek.</value>
+  </data>
+  <data name="MainWindow.NoTemperatureSensors" xml:space="preserve">
+    <value>Keine Temperatursensoren erkannt.</value>
+  </data>
+  <data name="MainWindow.FansToggleTooltip" xml:space="preserve">
+    <value>Lüfter ein-/ausklappen.</value>
+  </data>
+  <data name="MainWindow.Fans" xml:space="preserve">
+    <value>Lüfter</value>
+  </data>
+  <data name="MainWindow.NoFans" xml:space="preserve">
+    <value>Keine Lüfter erkannt.</value>
+  </data>
+  <data name="MainWindow.CalibrationRunning" xml:space="preserve">
+    <value>Kalibrierung läuft …</value>
+  </data>
+  <data name="MainWindow.Manual" xml:space="preserve">
+    <value>Manuell</value>
+  </data>
+  <data name="MainWindow.Auto" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="MainWindow.ManualPowerTooltip" xml:space="preserve">
+    <value>Manuelle Lüfterleistung in % — nur im Manuell-Modus aktiv.</value>
+  </data>
+  <data name="MainWindow.CalibrateTooltip" xml:space="preserve">
+    <value>Ermittelt den minimalen PWM-Wert, bei dem dieser Lüfter sicher anläuft.</value>
+  </data>
+  <data name="MainWindow.Calibrate" xml:space="preserve">
+    <value>Kalibrieren</value>
+  </data>
+  <data name="MainWindow.TabDevices" xml:space="preserve">
+    <value>Geräte</value>
+  </data>
+  <data name="MainWindow.NoDevices" xml:space="preserve">
+    <value>Keine Geräte erkannt.</value>
+  </data>
+  <data name="MainWindow.TemperatureSensors" xml:space="preserve">
+    <value>Temperatursensoren</value>
+  </data>
+  <data name="MainWindow.SensorListSubtitle" xml:space="preserve">
+    <value>Live-Temperatur · Anzeigename, Gruppe &amp; Sichtbarkeit im Dashboard</value>
+  </data>
+  <data name="MainWindow.SearchPlaceholder" xml:space="preserve">
+    <value>Suchen…</value>
+  </data>
+  <data name="MainWindow.HideHidden" xml:space="preserve">
+    <value>Versteckte aus</value>
+  </data>
+  <data name="MainWindow.HideHiddenSensorsTooltip" xml:space="preserve">
+    <value>Blendet im Dashboard ausgeblendete Sensoren aus dieser Liste aus (löscht sie nicht).</value>
+  </data>
+  <data name="MainWindow.NameRequired" xml:space="preserve">
+    <value>Name erforderlich</value>
+  </data>
+  <data name="MainWindow.ToggleVisibleSensorTooltip" xml:space="preserve">
+    <value>Im Dashboard ein-/ausblenden (gemessen wird weiterhin).</value>
+  </data>
+  <data name="MainWindow.Group" xml:space="preserve">
+    <value>Gruppe</value>
+  </data>
+  <data name="MainWindow.GroupSensorTooltip" xml:space="preserve">
+    <value>Fasst Sensoren im Dashboard zu einem Block zusammen — gleicher Name = ein Block. Leer → „Ungruppiert“.</value>
+  </data>
+  <data name="MainWindow.Optional" xml:space="preserve">
+    <value>optional</value>
+  </data>
+  <data name="MainWindow.AddGroup" xml:space="preserve">
+    <value>＋ Gruppe</value>
+  </data>
+  <data name="MainWindow.HardwareAddressTooltip" xml:space="preserve">
+    <value>Hardware-Adresse (Kernel-/hwmon-Pfad).</value>
+  </data>
+  <data name="MainWindow.FanListSubtitle" xml:space="preserve">
+    <value>Live-Drehzahl · Name, Position, Gruppe &amp; Sichtbarkeit im Dashboard</value>
+  </data>
+  <data name="MainWindow.HideHiddenFansTooltip" xml:space="preserve">
+    <value>Blendet im Dashboard ausgeblendete Lüfter aus dieser Liste aus (geregelt werden sie weiter).</value>
+  </data>
+  <data name="MainWindow.CalibrationFailed" xml:space="preserve">
+    <value>Kalibrierung fehlgeschlagen oder abgebrochen.</value>
+  </data>
+  <data name="MainWindow.ToggleVisibleFanTooltip" xml:space="preserve">
+    <value>Im Dashboard ein-/ausblenden (geregelt wird er weiterhin).</value>
+  </data>
+  <data name="MainWindow.GroupFanTooltip" xml:space="preserve">
+    <value>Fasst Lüfter im Dashboard zu einem Block zusammen — gleicher Name = ein Block. Leer → nach Position bzw. „Ungruppiert“.</value>
+  </data>
+  <data name="MainWindow.Position" xml:space="preserve">
+    <value>Position</value>
+  </data>
+  <data name="MainWindow.PositionLabelTooltip" xml:space="preserve">
+    <value>Einbau-Position / Luftrichtung — Grundlage für den geplanten Airflow-Abgleich.</value>
+  </data>
+  <data name="MainWindow.PickLocationTooltip" xml:space="preserve">
+    <value>Einbau-Position im Gehäuse wählen (interaktive Vorschau).</value>
+  </data>
+  <data name="MainWindow.AdvancedToggleTooltip" xml:space="preserve">
+    <value>Grenzwerte &amp; Kalibrierung ein-/ausklappen.</value>
+  </data>
+  <data name="MainWindow.AdvancedHeader" xml:space="preserve">
+    <value>Erweitert · Grenzwerte &amp; Kalibrierung</value>
+  </data>
+  <data name="MainWindow.Min" xml:space="preserve">
+    <value>Min</value>
+  </data>
+  <data name="MainWindow.MinTooltip" xml:space="preserve">
+    <value>Untergrenze: der Lüfter wird nie unter diese Leistung geregelt (Anlaufpunkt).</value>
+  </data>
+  <data name="MainWindow.Max" xml:space="preserve">
+    <value>Max</value>
+  </data>
+  <data name="MainWindow.MaxTooltip" xml:space="preserve">
+    <value>Obergrenze: der Lüfter wird nie über diese Leistung geregelt.</value>
+  </data>
+  <data name="MainWindow.IdentifyTooltip" xml:space="preserve">
+    <value>Dreht den Lüfter kurz auf 100 % hoch (andere werden gedrosselt), um ihn physisch zu identifizieren.</value>
+  </data>
+  <data name="MainWindow.Identify" xml:space="preserve">
+    <value>Identifizieren</value>
+  </data>
+  <data name="MainWindow.ManualControl" xml:space="preserve">
+    <value>Manuell steuern</value>
+  </data>
+  <data name="MainWindow.ManualControlTooltip" xml:space="preserve">
+    <value>Lüfter vorübergehend von Hand regeln, um ihn physisch zuzuordnen. Beim Zuklappen der Sektion zurück auf Kurve/Auto.</value>
+  </data>
+  <data name="MainWindow.Pwm" xml:space="preserve">
+    <value>PWM</value>
+  </data>
+  <data name="MainWindow.ManualPwmFloorHint" xml:space="preserve">
+    <value>0 % ist die Hardware-Untergrenze — manche Lüfter halten dort eine Mindestdrehzahl und lassen sich nicht ganz abschalten. Zum sicheren Identifizieren stattdessen den Puls-Knopf (Identifizieren) nutzen.</value>
+  </data>
+  <data name="MainWindow.AirflowAutoTune" xml:space="preserve">
+    <value>Airflow-Auto-Tune</value>
+  </data>
+  <data name="MainWindow.AirflowAutoTuneSubtitle" xml:space="preserve">
+    <value>Leitet aus den Einbau-Positionen eine Druckbilanz und passende Kurven ab. Vorschlag prüfen, übernehmen und dann speichern.</value>
+  </data>
+  <data name="MainWindow.AnalyzeAirflowTooltip" xml:space="preserve">
+    <value>Berechnet aus den Lüfter-Positionen die Druckbilanz und passende Kurven-Vorschläge.</value>
+  </data>
+  <data name="MainWindow.AnalyzeAirflow" xml:space="preserve">
+    <value>Airflow analysieren</value>
+  </data>
+  <data name="MainWindow.ApplySuggestion" xml:space="preserve">
+    <value>Vorschlag übernehmen</value>
+  </data>
+  <data name="MainWindow.ApplySuggestionTooltip" xml:space="preserve">
+    <value>Lädt die angekreuzten Kurven/Zuordnungen in den Editor — danach per Speichern übernehmen.</value>
+  </data>
+  <data name="MainWindow.TabCurves" xml:space="preserve">
+    <value>Kurven &amp; Zuordnung</value>
+  </data>
+  <data name="MainWindow.ProfileNamePlaceholder" xml:space="preserve">
+    <value>Profilname</value>
+  </data>
+  <data name="MainWindow.Done" xml:space="preserve">
+    <value>Fertig</value>
+  </data>
+  <data name="MainWindow.CloseNameFieldTooltip" xml:space="preserve">
+    <value>Namensfeld schließen.</value>
+  </data>
+  <data name="MainWindow.AddProfileTooltip" xml:space="preserve">
+    <value>Legt ein leeres Profil mit einer Standard-Kurve an.</value>
+  </data>
+  <data name="MainWindow.DuplicateProfileTooltip" xml:space="preserve">
+    <value>Dupliziert das aktuelle Profil (Kurven + Zuordnungen).</value>
+  </data>
+  <data name="MainWindow.Duplicate" xml:space="preserve">
+    <value>Duplizieren</value>
+  </data>
+  <data name="MainWindow.RenameProfileTooltip" xml:space="preserve">
+    <value>Aktuelles Profil umbenennen.</value>
+  </data>
+  <data name="MainWindow.Rename" xml:space="preserve">
+    <value>Umbenennen</value>
+  </data>
+  <data name="MainWindow.DeleteProfileTooltip" xml:space="preserve">
+    <value>Löscht das aktuelle Profil (mit Bestätigung).</value>
+  </data>
+  <data name="MainWindow.Delete" xml:space="preserve">
+    <value>Löschen</value>
+  </data>
+  <data name="MainWindow.NoDevicesForCurves" xml:space="preserve">
+    <value>Keine Geräte erkannt — ohne Sensoren und Lüfter lassen sich keine Kurven anlegen.</value>
+  </data>
+  <data name="MainWindow.Curves" xml:space="preserve">
+    <value>Kurven</value>
+  </data>
+  <data name="MainWindow.AddCurveTooltip" xml:space="preserve">
+    <value>Legt eine neue Lüfterkurve an.</value>
+  </data>
+  <data name="MainWindow.Curve" xml:space="preserve">
+    <value>Kurve</value>
+  </data>
+  <data name="MainWindow.DuplicateCurveTooltip" xml:space="preserve">
+    <value>Dupliziert die ausgewählte Kurve.</value>
+  </data>
+  <data name="MainWindow.DeleteCurveTooltip" xml:space="preserve">
+    <value>Löscht die ausgewählte Kurve (mit Bestätigung).</value>
+  </data>
+  <data name="MainWindow.OffParen" xml:space="preserve">
+    <value>(aus)</value>
+  </data>
+  <data name="MainWindow.CurveDisabledTooltip" xml:space="preserve">
+    <value>Kurve deaktiviert — Lüfter auf Hardware-Auto.</value>
+  </data>
+  <data name="MainWindow.Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="MainWindow.CurveEditorHint" xml:space="preserve">
+    <value>Kurve (Temperatur → Leistung) · Punkte ziehen</value>
+  </data>
+  <data name="MainWindow.NoSourceSensor" xml:space="preserve">
+    <value>Kein Quell-Sensor gewählt — kein Live-Arbeitspunkt.</value>
+  </data>
+  <data name="MainWindow.Sensors" xml:space="preserve">
+    <value>Sensoren</value>
+  </data>
+  <data name="MainWindow.ToggleAllSensorsTooltip" xml:space="preserve">
+    <value>Blendet die übrigen Quell-Sensoren ein bzw. aus.</value>
+  </data>
+  <data name="MainWindow.Mix" xml:space="preserve">
+    <value>Mix</value>
+  </data>
+  <data name="MainWindow.MixTooltip" xml:space="preserve">
+    <value>Wie mehrere Quell-Sensoren zusammengefasst werden: Max (wärmster) oder Avg (Mittel).</value>
+  </data>
+  <data name="MainWindow.Interpolation" xml:space="preserve">
+    <value>Interpolation</value>
+  </data>
+  <data name="MainWindow.InterpolationTooltip" xml:space="preserve">
+    <value>Linear = geradlinig zwischen den Punkten. Spline = weicher Verlauf, nie weniger Kühlung als die gerade Verbindung.</value>
+  </data>
+  <data name="MainWindow.Hysteresis" xml:space="preserve">
+    <value>Hysterese</value>
+  </data>
+  <data name="MainWindow.HysteresisTooltip" xml:space="preserve">
+    <value>Totband in °C: verhindert ständiges Nachregeln bei kleinen Temperaturschwankungen.</value>
+  </data>
+  <data name="MainWindow.PointsToggleTooltip" xml:space="preserve">
+    <value>Stützpunkt-Liste ein-/ausklappen.</value>
+  </data>
+  <data name="MainWindow.DecreasingPercentWarning" xml:space="preserve">
+    <value>⚠ Leistung sinkt bei steigender Temperatur — der Lüfter kühlt dann weniger, je heißer es wird.</value>
+  </data>
+  <data name="MainWindow.TempToPercentHeader" xml:space="preserve">
+    <value>°C → %</value>
+  </data>
+  <data name="MainWindow.PointTempTooltip" xml:space="preserve">
+    <value>Temperatur des Stützpunkts (°C).</value>
+  </data>
+  <data name="MainWindow.PointPercentTooltip" xml:space="preserve">
+    <value>Lüfterleistung an diesem Punkt (%).</value>
+  </data>
+  <data name="MainWindow.RemovePointTooltip" xml:space="preserve">
+    <value>Diesen Stützpunkt entfernen.</value>
+  </data>
+  <data name="MainWindow.AddPointTooltip" xml:space="preserve">
+    <value>Fügt der Kurve einen Stützpunkt hinzu.</value>
+  </data>
+  <data name="MainWindow.Point" xml:space="preserve">
+    <value>Punkt</value>
+  </data>
+  <data name="MainWindow.FansOfCurve" xml:space="preserve">
+    <value>Lüfter dieser Kurve</value>
+  </data>
+  <data name="MainWindow.FansOfCurveSubtitle" xml:space="preserve">
+    <value>Ankreuzen, welche Lüfter die ausgewählte Kurve nutzen</value>
+  </data>
+  <data name="Onboarding.WindowTitle" xml:space="preserve">
+    <value>LinFan – Einrichtungsassistent</value>
+  </data>
+  <data name="Onboarding.WelcomeTitle" xml:space="preserve">
+    <value>Willkommen bei LinFan</value>
+  </data>
+  <data name="Onboarding.WelcomeIntro" xml:space="preserve">
+    <value>Dieser Assistent richtet LinFan für dein System ein. Du wirst durch die Kalibrierung der Lüfter und die Wahl eines Arbeitsprofils geführt.</value>
+  </data>
+  <data name="Onboarding.WelcomeSkipHint" xml:space="preserve">
+    <value>Du kannst den Assistenten jederzeit überspringen und die Einstellungen später im Hauptfenster vornehmen.</value>
+  </data>
+  <data name="Onboarding.CalibrationTitle" xml:space="preserve">
+    <value>Lüfter einrichten</value>
+  </data>
+  <data name="Onboarding.CalibrationIntro" xml:space="preserve">
+    <value>Für jeden steuerbaren Lüfter wird zuerst der Drehzahl-Sensor gekoppelt (Lüfter antreiben, reagierenden Tacho zuordnen) und dann der minimale PWM-Wert kalibriert, bei dem er noch anläuft. Lüfter ohne Tacho werden übersprungen.</value>
+  </data>
+  <data name="Onboarding.ControllableFansLabel" xml:space="preserve">
+    <value>Steuerbare Lüfter:</value>
+  </data>
+  <data name="Onboarding.NoControllableFans" xml:space="preserve">
+    <value>(keine steuerbaren Lüfter erkannt)</value>
+  </data>
+  <data name="Onboarding.CalibrateButton" xml:space="preserve">
+    <value>Kalibrieren (empfohlen)</value>
+  </data>
+  <data name="Onboarding.Skip" xml:space="preserve">
+    <value>Überspringen</value>
+  </data>
+  <data name="Onboarding.DevicesTitle" xml:space="preserve">
+    <value>Geräte einrichten</value>
+  </data>
+  <data name="Onboarding.DevicesIntro" xml:space="preserve">
+    <value>Optional: Ordne deinen Lüftern ihre Einbau-Position zu (Grundlage für den Airflow-Abgleich) und wähle, welche Sensoren im Dashboard erscheinen.</value>
+  </data>
+  <data name="Onboarding.FanPositionsLabel" xml:space="preserve">
+    <value>Lüfter-Positionen (optional)</value>
+  </data>
+  <data name="Onboarding.IdentifyTooltip" xml:space="preserve">
+    <value>Dreht den Lüfter kurz auf 100 % hoch (andere werden gedrosselt), um ihn physisch zu identifizieren.</value>
+  </data>
+  <data name="Onboarding.IdentifyButton" xml:space="preserve">
+    <value>Identifizieren</value>
+  </data>
+  <data name="Onboarding.PickLocationTooltip" xml:space="preserve">
+    <value>Einbau-Position im Gehäuse wählen (interaktive Vorschau).</value>
+  </data>
+  <data name="Onboarding.ManualControlLabel" xml:space="preserve">
+    <value>Manuell steuern</value>
+  </data>
+  <data name="Onboarding.ManualControlTooltip" xml:space="preserve">
+    <value>Lüfter vorübergehend von Hand regeln (0 % = Hardware-Untergrenze, manche Lüfter halten dort eine Mindestdrehzahl). Beim Verlassen des Schritts zurück auf Auto.</value>
+  </data>
+  <data name="Onboarding.SensorsLabel" xml:space="preserve">
+    <value>Sensoren im Dashboard</value>
+  </data>
+  <data name="Onboarding.SensorsHint" xml:space="preserve">
+    <value>Abgewählte Sensoren werden im Dashboard ausgeblendet. Sensoren ohne aktuellen Messwert sind vorab ausgeblendet.</value>
+  </data>
+  <data name="Onboarding.ProfileTitle" xml:space="preserve">
+    <value>Profil &amp; Primärsensor wählen</value>
+  </data>
+  <data name="Onboarding.PrimarySensorLabel" xml:space="preserve">
+    <value>Primärer Temperatursensor</value>
+  </data>
+  <data name="Onboarding.PrimarySensorHint" xml:space="preserve">
+    <value>Dieser Sensor steuert alle Lüfterkurven. Meist der CPU-Sensor.</value>
+  </data>
+  <data name="Onboarding.FanProfileLabel" xml:space="preserve">
+    <value>Lüfterprofil</value>
+  </data>
+  <data name="Onboarding.DoneTitle" xml:space="preserve">
+    <value>Einrichtung abgeschlossen</value>
+  </data>
+  <data name="Onboarding.DoneIntro" xml:space="preserve">
+    <value>LinFan ist jetzt eingerichtet. So findest du dich im Hauptfenster zurecht:</value>
+  </data>
+  <data name="Onboarding.DoneDashboard" xml:space="preserve">
+    <value>• Dashboard — Live-Temperaturen und Drehzahlen im Blick.</value>
+  </data>
+  <data name="Onboarding.DoneCurves" xml:space="preserve">
+    <value>• Kurven — Lüfterkurven anpassen und Profile wechseln.</value>
+  </data>
+  <data name="Onboarding.DoneDevices" xml:space="preserve">
+    <value>• Geräte — Namen, Positionen und Sichtbarkeit ändern; Airflow-Abgleich aus den Positionen vorschlagen lassen.</value>
+  </data>
+  <data name="Onboarding.Back" xml:space="preserve">
+    <value>Zurück</value>
+  </data>
+  <data name="Onboarding.Next" xml:space="preserve">
+    <value>Weiter</value>
+  </data>
+  <data name="Onboarding.Finish" xml:space="preserve">
+    <value>Fertigstellen</value>
+  </data>
+  <data name="FanLocationDialog.Hint" xml:space="preserve">
+    <value>Klicke eine Position im Gehäuse an oder wähle sie unten aus der Liste.</value>
+  </data>
+  <data name="FanLocationDialog.Direction" xml:space="preserve">
+    <value>Richtung:</value>
+  </data>
+  <data name="FanLocationDialog.ToggleDirection" xml:space="preserve">
+    <value>Einlass ⇄ Auslass umschalten</value>
+  </data>
+  <data name="FanLocationDialog.Position" xml:space="preserve">
+    <value>Position</value>
+  </data>
+  <data name="FanLocationDialog.ManualNudge" xml:space="preserve">
+    <value>Lüfter manuell anstoßen</value>
+  </data>
+  <data name="FanLocationDialog.ManualNudgeTooltip" xml:space="preserve">
+    <value>Dreht diesen Lüfter testweise hoch, um ihn physisch zuzuordnen. Beim Schließen zurück auf Auto/Kurve.</value>
+  </data>
+  <data name="FanLocationDialog.Pwm" xml:space="preserve">
+    <value>PWM</value>
+  </data>
+  <data name="FanLocationDialog.HardwareFloorHint" xml:space="preserve">
+    <value>0 % ist die Hardware-Untergrenze — manche Lüfter halten dort eine Mindestdrehzahl und lassen sich nicht ganz abschalten.</value>
+  </data>
+  <data name="FanLocationDialog.Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="FanLocationDialog.Apply" xml:space="preserve">
+    <value>Übernehmen</value>
+  </data>
+  <data name="UnsavedChanges.Title" xml:space="preserve">
+    <value>Ungespeicherte Änderungen</value>
+  </data>
+  <data name="UnsavedChanges.Message" xml:space="preserve">
+    <value>Es gibt nicht gespeicherte Änderungen.</value>
+  </data>
+  <data name="UnsavedChanges.Question" xml:space="preserve">
+    <value>Möchtest du sie speichern, bevor LinFan geschlossen wird?</value>
+  </data>
+  <data name="UnsavedChanges.Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="UnsavedChanges.Discard" xml:space="preserve">
+    <value>Verwerfen</value>
+  </data>
+  <data name="UnsavedChanges.Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="ConfirmDialog.Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Tray.ShowWindow" xml:space="preserve">
+    <value>Fenster anzeigen</value>
+  </data>
+  <data name="Tray.Quit" xml:space="preserve">
+    <value>Beenden</value>
+  </data>
+  <data name="MainCtrl.Connecting" xml:space="preserve">
+    <value>Verbinde …</value>
+  </data>
+  <data name="MainCtrl.ConnectingToService" xml:space="preserve">
+    <value>Verbinde mit dem Hintergrunddienst …</value>
+  </data>
+  <data name="MainCtrl.LoadingDevices" xml:space="preserve">
+    <value>Lade Geräte …</value>
+  </data>
+  <data name="MainCtrl.LoadingCurves" xml:space="preserve">
+    <value>Lade Kurven …</value>
+  </data>
+  <data name="MainCtrl.MaxTemp" xml:space="preserve">
+    <value>max {0}</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationHeadline" xml:space="preserve">
+    <value>Lüfter {0} von {1}: {2}</value>
+  </data>
+  <data name="OnboardingCtrl.CouplingStarting" xml:space="preserve">
+    <value>Drehzahl-Sensor koppeln – Lüfter {0} von {1} …</value>
+  </data>
+  <data name="OnboardingCtrl.CouplingNoTacho" xml:space="preserve">
+    <value>{0}: kein Drehzahlsignal gefunden — Kalibrierung übersprungen</value>
+  </data>
+  <data name="OnboardingCtrl.CouplingAmbiguous" xml:space="preserve">
+    <value>{0}: nicht eindeutig — den Sensor später in den Einstellungen manuell zuordnen; Kalibrierung übersprungen</value>
+  </data>
+  <data name="OnboardingCtrl.CouplingFailed" xml:space="preserve">
+    <value>{0}: Kopplung fehlgeschlagen — {1}</value>
+  </data>
+  <data name="OnboardingCtrl.CouplingTimeout" xml:space="preserve">
+    <value>Kopplung Lüfter {0} von {1}: Zeitüberschreitung</value>
+  </data>
+  <data name="OnboardingFanRow.Coupling" xml:space="preserve">
+    <value>koppeln …</value>
+  </data>
+  <data name="OnboardingFanRow.Calibrating" xml:space="preserve">
+    <value>kalibrieren …</value>
+  </data>
+  <data name="OnboardingFanRow.Done" xml:space="preserve">
+    <value>fertig</value>
+  </data>
+  <data name="OnboardingFanRow.NoTacho" xml:space="preserve">
+    <value>kein Tacho</value>
+  </data>
+  <data name="OnboardingFanRow.Ambiguous" xml:space="preserve">
+    <value>nicht eindeutig</value>
+  </data>
+  <data name="OnboardingFanRow.Failed" xml:space="preserve">
+    <value>fehlgeschlagen</value>
+  </data>
+  <data name="OnboardingCtrl.ProfileSilentName" xml:space="preserve">
+    <value>Leise</value>
+  </data>
+  <data name="OnboardingCtrl.ProfileSilentDesc" xml:space="preserve">
+    <value>Lüfter laufen erst bei hoher Temperatur, maximale Ruhe.</value>
+  </data>
+  <data name="OnboardingCtrl.ProfileBalancedName" xml:space="preserve">
+    <value>Ausgewogen</value>
+  </data>
+  <data name="OnboardingCtrl.ProfileBalancedDesc" xml:space="preserve">
+    <value>Ausgeglichenes Verhältnis aus Geräusch und Kühlung. Empfohlen.</value>
+  </data>
+  <data name="OnboardingCtrl.ProfilePerformanceName" xml:space="preserve">
+    <value>Leistung</value>
+  </data>
+  <data name="OnboardingCtrl.ProfilePerformanceDesc" xml:space="preserve">
+    <value>Lüfter laufen früh und hoch für maximale Kühlleistung.</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationError" xml:space="preserve">
+    <value>Fehler bei {0}: {1}</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationDone" xml:space="preserve">
+    <value>Lüfter {0} kalibriert (Anlauf-PWM: {1})</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationPhase" xml:space="preserve">
+    <value>{0} – pwm {1}, {2} rpm</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationStarting" xml:space="preserve">
+    <value>Lüfter {0}/{1} – starte …</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationTimeout" xml:space="preserve">
+    <value>Lüfter {0}/{1}: Zeitüberschreitung — abgebrochen.</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationInterrupted" xml:space="preserve">
+    <value>Kalibrierung unterbrochen: {0}</value>
+  </data>
+  <data name="OnboardingCtrl.CalibrationAborted" xml:space="preserve">
+    <value>Kalibrierung abgebrochen.</value>
+  </data>
+  <data name="OnboardingCtrl.NoTemperatureSensor" xml:space="preserve">
+    <value>Kein Temperatursensor gefunden.</value>
+  </data>
+  <data name="OnboardingCtrl.FanDefaultName" xml:space="preserve">
+    <value>Lüfter {0}</value>
+  </data>
+  <data name="OnboardingCtrl.SaveFailed" xml:space="preserve">
+    <value>Hintergrunddienst nicht erreichbar — Einstellungen konnten nicht gespeichert werden.</value>
+  </data>
+  <data name="CurveEditorCtrl.NewCurveName" xml:space="preserve">
+    <value>Neue Kurve</value>
+  </data>
+  <data name="CurveEditorCtrl.NewProfileName" xml:space="preserve">
+    <value>Neues Profil</value>
+  </data>
+  <data name="CurveEditorCtrl.CopySuffix" xml:space="preserve">
+    <value>{0} (Kopie)</value>
+  </data>
+  <data name="CurveEditorCtrl.NoCurveHardwareAuto" xml:space="preserve">
+    <value>Hardware-Auto (keine Kurve)</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowApplied" xml:space="preserve">
+    <value>Airflow-Vorschlag übernommen — jetzt speichern.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowWeights" xml:space="preserve">
+    <value> (Gewichtung Einlass {0} : Auslass {1})</value>
+  </data>
+  <data name="CurveEditorCtrl.PressurePositive" xml:space="preserve">
+    <value>Druckbilanz: Überdruck — günstig gegen Staub.</value>
+  </data>
+  <data name="CurveEditorCtrl.PressureNegative" xml:space="preserve">
+    <value>Druckbilanz: Unterdruck.</value>
+  </data>
+  <data name="CurveEditorCtrl.PressureBalanced" xml:space="preserve">
+    <value>Druckbilanz: ausgeglichen.</value>
+  </data>
+  <data name="CurveEditorCtrl.PressureUnknown" xml:space="preserve">
+    <value>Druckbilanz: nicht bestimmbar (keine Gehäuselüfter mit Position).</value>
+  </data>
+  <data name="CurveEditorCtrl.ChangesReverted" xml:space="preserve">
+    <value>Änderungen verworfen.</value>
+  </data>
+  <data name="CurveEditorCtrl.NotConnected" xml:space="preserve">
+    <value>Noch nicht mit dem Hintergrunddienst verbunden.</value>
+  </data>
+  <data name="CurveEditorCtrl.NoSaveTarget" xml:space="preserve">
+    <value>Kein Speicherziel verfügbar.</value>
+  </data>
+  <data name="CurveEditorCtrl.Saved" xml:space="preserve">
+    <value>Gespeichert — Änderungen werden übernommen</value>
+  </data>
+  <data name="CurveEditorCtrl.SaveFailed" xml:space="preserve">
+    <value>Nicht gespeichert — der Hintergrunddienst ist gerade nicht erreichbar.</value>
+  </data>
+  <data name="InterpolationOption.Linear" xml:space="preserve">
+    <value>Linear (sicher, vorhersagbar)</value>
+  </data>
+  <data name="InterpolationOption.Spline" xml:space="preserve">
+    <value>Spline (weich, monoton)</value>
+  </data>
+  <data name="AggregationOption.Max" xml:space="preserve">
+    <value>Maximum (heißester Sensor)</value>
+  </data>
+  <data name="AggregationOption.Avg" xml:space="preserve">
+    <value>Mittelwert</value>
+  </data>
+  <data name="FanLocationOption.Unspecified" xml:space="preserve">
+    <value>— nicht zugeordnet —</value>
+  </data>
+  <data name="FanLocationOption.CpuCooler" xml:space="preserve">
+    <value>CPU-Kühler</value>
+  </data>
+  <data name="FanLocationOption.GpuCooler" xml:space="preserve">
+    <value>GPU-Kühler</value>
+  </data>
+  <data name="FanLocationOption.Radiator" xml:space="preserve">
+    <value>Radiator (AIO/Custom)</value>
+  </data>
+  <data name="FanLocationOption.CaseFrontIntake" xml:space="preserve">
+    <value>Gehäuse vorn · Einlass</value>
+  </data>
+  <data name="FanLocationOption.CaseBottomIntake" xml:space="preserve">
+    <value>Gehäuse unten · Einlass</value>
+  </data>
+  <data name="FanLocationOption.CaseSideIntake" xml:space="preserve">
+    <value>Gehäuse seitlich · Einlass</value>
+  </data>
+  <data name="FanLocationOption.CaseTopIntake" xml:space="preserve">
+    <value>Gehäuse oben · Einlass</value>
+  </data>
+  <data name="FanLocationOption.CaseRearIntake" xml:space="preserve">
+    <value>Gehäuse hinten · Einlass</value>
+  </data>
+  <data name="FanLocationOption.CaseRearExhaust" xml:space="preserve">
+    <value>Gehäuse hinten · Auslass</value>
+  </data>
+  <data name="FanLocationOption.CaseTopExhaust" xml:space="preserve">
+    <value>Gehäuse oben · Auslass</value>
+  </data>
+  <data name="FanLocationOption.CaseFrontExhaust" xml:space="preserve">
+    <value>Gehäuse vorn · Auslass</value>
+  </data>
+  <data name="FanLocationOption.CaseBottomExhaust" xml:space="preserve">
+    <value>Gehäuse unten · Auslass</value>
+  </data>
+  <data name="FanLocationOption.CaseSideExhaust" xml:space="preserve">
+    <value>Gehäuse seitlich · Auslass</value>
+  </data>
+  <data name="FanLocationOption.Psu" xml:space="preserve">
+    <value>Netzteil</value>
+  </data>
+  <data name="FanLocationOption.Other" xml:space="preserve">
+    <value>Sonstige</value>
+  </data>
+  <data name="FanLocationOption.Group.CpuCooler" xml:space="preserve">
+    <value>CPU-Kühler</value>
+  </data>
+  <data name="FanLocationOption.Group.GpuCooler" xml:space="preserve">
+    <value>GPU-Kühler</value>
+  </data>
+  <data name="FanLocationOption.Group.Radiator" xml:space="preserve">
+    <value>Radiator</value>
+  </data>
+  <data name="FanLocationOption.Group.FrontIntake" xml:space="preserve">
+    <value>Front · Einlass</value>
+  </data>
+  <data name="FanLocationOption.Group.BottomIntake" xml:space="preserve">
+    <value>Boden · Einlass</value>
+  </data>
+  <data name="FanLocationOption.Group.SideIntake" xml:space="preserve">
+    <value>Seite · Einlass</value>
+  </data>
+  <data name="FanLocationOption.Group.TopIntake" xml:space="preserve">
+    <value>Oben · Einlass</value>
+  </data>
+  <data name="FanLocationOption.Group.RearIntake" xml:space="preserve">
+    <value>Hinten · Einlass</value>
+  </data>
+  <data name="FanLocationOption.Group.RearExhaust" xml:space="preserve">
+    <value>Hinten · Auslass</value>
+  </data>
+  <data name="FanLocationOption.Group.TopExhaust" xml:space="preserve">
+    <value>Oben · Auslass</value>
+  </data>
+  <data name="FanLocationOption.Group.FrontExhaust" xml:space="preserve">
+    <value>Front · Auslass</value>
+  </data>
+  <data name="FanLocationOption.Group.BottomExhaust" xml:space="preserve">
+    <value>Boden · Auslass</value>
+  </data>
+  <data name="FanLocationOption.Group.SideExhaust" xml:space="preserve">
+    <value>Seite · Auslass</value>
+  </data>
+  <data name="FanLocationOption.Group.Psu" xml:space="preserve">
+    <value>Netzteil</value>
+  </data>
+  <data name="FanLocationOption.Group.Other" xml:space="preserve">
+    <value>Sonstige</value>
+  </data>
+  <data name="Dialog.RevertTitle" xml:space="preserve">
+    <value>Änderungen verwerfen?</value>
+  </data>
+  <data name="Dialog.RevertMessage" xml:space="preserve">
+    <value>Alle Änderungen seit dem letzten Speichern gehen verloren.</value>
+  </data>
+  <data name="Dialog.DeleteProfileTitle" xml:space="preserve">
+    <value>Profil löschen?</value>
+  </data>
+  <data name="Dialog.DeleteProfileMessage" xml:space="preserve">
+    <value>Das aktuelle Profil mit seinen Kurven und Zuordnungen wird gelöscht.</value>
+  </data>
+  <data name="Dialog.DeleteCurveTitle" xml:space="preserve">
+    <value>Kurve löschen?</value>
+  </data>
+  <data name="Dialog.DeleteCurveMessage" xml:space="preserve">
+    <value>Die ausgewählte Kurve wird gelöscht.</value>
+  </data>
+  <data name="FanLocationDialog.WindowTitle" xml:space="preserve">
+    <value>Position wählen</value>
+  </data>
+  <data name="FanLocationDialog.HeadingGeneric" xml:space="preserve">
+    <value>Einbau-Position wählen</value>
+  </data>
+  <data name="FanLocationDialog.HeadingFor" xml:space="preserve">
+    <value>Position von „{0}“</value>
+  </data>
+  <data name="FanLocation.Intake" xml:space="preserve">
+    <value>Einlass</value>
+  </data>
+  <data name="FanLocation.Exhaust" xml:space="preserve">
+    <value>Auslass</value>
+  </data>
+  <data name="FanDiagram.FrontIntake" xml:space="preserve">
+    <value>Vorn · Einlass</value>
+  </data>
+  <data name="FanDiagram.FrontExhaust" xml:space="preserve">
+    <value>Vorn · Auslass</value>
+  </data>
+  <data name="FanDiagram.BottomIntake" xml:space="preserve">
+    <value>Unten · Einlass</value>
+  </data>
+  <data name="FanDiagram.BottomExhaust" xml:space="preserve">
+    <value>Unten · Auslass</value>
+  </data>
+  <data name="FanDiagram.SideIntake" xml:space="preserve">
+    <value>Seite · Einlass</value>
+  </data>
+  <data name="FanDiagram.SideExhaust" xml:space="preserve">
+    <value>Seite · Auslass</value>
+  </data>
+  <data name="FanDiagram.TopExhaust" xml:space="preserve">
+    <value>Oben · Auslass</value>
+  </data>
+  <data name="FanDiagram.TopIntake" xml:space="preserve">
+    <value>Oben · Einlass</value>
+  </data>
+  <data name="FanDiagram.RearExhaust" xml:space="preserve">
+    <value>Hinten · Auslass</value>
+  </data>
+  <data name="FanDiagram.RearIntake" xml:space="preserve">
+    <value>Hinten · Einlass</value>
+  </data>
+  <data name="FanDiagram.Cpu" xml:space="preserve">
+    <value>CPU</value>
+  </data>
+  <data name="FanDiagram.Gpu" xml:space="preserve">
+    <value>GPU</value>
+  </data>
+  <data name="FanDiagram.Radiator" xml:space="preserve">
+    <value>Radiator</value>
+  </data>
+  <data name="FanDiagram.Psu" xml:space="preserve">
+    <value>Netzteil</value>
+  </data>
+  <data name="FanDiagram.Other" xml:space="preserve">
+    <value>Sonstige</value>
+  </data>
+  <data name="FanDiagram.Unspecified" xml:space="preserve">
+    <value>— nicht zugeordnet —</value>
+  </data>
+  <data name="CurveChart.NoPoints" xml:space="preserve">
+    <value>Keine Stützpunkte</value>
+  </data>
+  <data name="CurveEditRow.ShowAll" xml:space="preserve">
+    <value>Alle {0} einblenden</value>
+  </data>
+  <data name="CurveEditRow.ShowLess" xml:space="preserve">
+    <value>Weniger anzeigen</value>
+  </data>
+  <data name="CurveEditRow.ActiveHint" xml:space="preserve">
+    <value>Aktiv: Quell-Sensor und mindestens ein Lüfter zugeordnet.</value>
+  </data>
+  <data name="CurveEditRow.InactiveNoSource" xml:space="preserve">
+    <value>Inaktiv: kein Quell-Sensor gewählt.</value>
+  </data>
+  <data name="CurveEditRow.InactiveNoFan" xml:space="preserve">
+    <value>Inaktiv: kein Lüfter zugeordnet.</value>
+  </data>
+  <data name="FanAssignRow.Error" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+  <data name="FanAssignRow.Aborted" xml:space="preserve">
+    <value>Abgebrochen: {0}</value>
+  </data>
+  <data name="FanAssignRow.CalibDone" xml:space="preserve">
+    <value>Fertig — Anlauf bei pwm {0}</value>
+  </data>
+  <data name="FanAssignRow.Identifying" xml:space="preserve">
+    <value>Identifiziere … (100 %, andere gedrosselt)</value>
+  </data>
+  <data name="FanAssignRow.MinClamped" xml:space="preserve">
+    <value>Min auf {0} % gesenkt (muss ≤ Max sein)</value>
+  </data>
+  <data name="FanAssignRow.MaxClamped" xml:space="preserve">
+    <value>Max auf {0} % angehoben (muss ≥ Min sein)</value>
+  </data>
+  <data name="CalibrationStatus.Aborted" xml:space="preserve">
+    <value>Kalibrierung abgebrochen: {0}</value>
+  </data>
+  <data name="CalibrationStatus.Done" xml:space="preserve">
+    <value>Kalibrierung fertig — Anlaufpunkt bei pwm {0}</value>
+  </data>
+  <data name="CalibrationStatus.Calibrating" xml:space="preserve">
+    <value>Kalibriere {0}</value>
+  </data>
+  <data name="CalibrationBadge.NoSafeStart" xml:space="preserve">
+    <value>Bereits kalibriert · kein sicherer Anlaufpunkt gefunden</value>
+  </data>
+  <data name="CalibrationBadge.StartAt" xml:space="preserve">
+    <value>Bereits kalibriert · Anlauf bei {0} %</value>
+  </data>
+  <data name="IpcLiveMonitor.Unreachable" xml:space="preserve">
+    <value>Hintergrunddienst nicht erreichbar ({0}) — Wiederverbinden …</value>
+  </data>
+  <data name="IpcLiveMonitor.AccessDenied" xml:space="preserve">
+    <value>Der Hintergrunddienst läuft, aber der Zugriff auf seinen Socket wurde verweigert. Unter Linux: prüfe, ob dein Benutzer in der Gruppe „linfan“ ist, und melde dich danach ab und wieder an.</value>
+  </data>
+  <data name="Ipc.Status.Active" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Ipc.Status.DryRun" xml:space="preserve">
+    <value>Dry-Run (keine erhöhten Rechte)</value>
+  </data>
+  <data name="Ipc.Phase.Starting" xml:space="preserve">
+    <value>Start …</value>
+  </data>
+  <data name="Ipc.Phase.Measuring" xml:space="preserve">
+    <value>Messe {0} %</value>
+  </data>
+  <data name="Ipc.Fail.Canceled" xml:space="preserve">
+    <value>Abgebrochen</value>
+  </data>
+  <data name="Ipc.Fail.OverTemperature" xml:space="preserve">
+    <value>Übertemperatur {0:0.0} °C ≥ {1:0.0} °C — Fail-Safe ausgelöst.</value>
+  </data>
+  <data name="Ipc.Fail.NotControllable" xml:space="preserve">
+    <value>Nicht steuerbar (Root nötig).</value>
+  </data>
+  <data name="Ipc.Fail.NoTacho" xml:space="preserve">
+    <value>Kein Tachosignal — Kalibrierung nicht möglich.</value>
+  </data>
+  <data name="Ipc.Fail.NoTemperatureReading" xml:space="preserve">
+    <value>Keine lesbare Temperatur — kein Watchdog.</value>
+  </data>
+  <data name="Ipc.Fail.Unknown" xml:space="preserve">
+    <value>Unbekannter Fehler.</value>
+  </data>
+  <data name="Ipc.Tach.Matched" xml:space="preserve">
+    <value>Drehzahl-Sensor zugeordnet.</value>
+  </data>
+  <data name="Ipc.Tach.NoResponse" xml:space="preserve">
+    <value>Kein Drehzahlsignal gefunden (Lüfter ohne Tacho).</value>
+  </data>
+  <data name="Ipc.Tach.Ambiguous" xml:space="preserve">
+    <value>Nicht eindeutig — bitte manuell zuordnen.</value>
+  </data>
+  <data name="FanAssignRow.NoTachometer" xml:space="preserve">
+    <value>— (keiner) —</value>
+  </data>
+  <data name="FanAssignRow.Coupling" xml:space="preserve">
+    <value>Koppeln … (treibt an, misst Drehzahlen)</value>
+  </data>
+  <data name="MainWindow.TachometerHeader" xml:space="preserve">
+    <value>Drehzahl-Sensor-Kopplung</value>
+  </data>
+  <data name="MainWindow.CoupleSensor" xml:space="preserve">
+    <value>Sensor koppeln</value>
+  </data>
+  <data name="MainWindow.CoupleSensorTooltip" xml:space="preserve">
+    <value>Findet automatisch den Drehzahl-Sensor dieses Lüfters: treibt den Lüfter an, drosselt die anderen und ordnet den reagierenden Tacho zu.</value>
+  </data>
+  <data name="MainWindow.CancelCouple" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="MainWindow.CancelCoupleTooltip" xml:space="preserve">
+    <value>Bricht die laufende automatische Kopplung ab.</value>
+  </data>
+  <data name="MainWindow.Tachometer" xml:space="preserve">
+    <value>Drehzahl-Sensor</value>
+  </data>
+  <data name="MainWindow.TachometerTooltip" xml:space="preserve">
+    <value>Ordnet dem Lüfter manuell den passenden Drehzahl-Sensor (Tacho) zu. „— (keiner) —“ löscht die Zuordnung.</value>
+  </data>
+  <data name="MainWindow.TabSettings" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="Settings.GroupDevices" xml:space="preserve">
+    <value>Geräte</value>
+  </data>
+  <data name="Settings.GroupApp" xml:space="preserve">
+    <value>Anwendung</value>
+  </data>
+  <data name="Settings.GroupManage" xml:space="preserve">
+    <value>Verwaltung</value>
+  </data>
+  <data name="Settings.SectionSensors" xml:space="preserve">
+    <value>Sensoren</value>
+  </data>
+  <data name="Settings.SectionFans" xml:space="preserve">
+    <value>Lüfter</value>
+  </data>
+  <data name="Settings.SectionAirflow" xml:space="preserve">
+    <value>Airflow</value>
+  </data>
+  <data name="Settings.SectionAppearance" xml:space="preserve">
+    <value>Darstellung</value>
+  </data>
+  <data name="Settings.SectionLanguage" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="Settings.SectionBackground" xml:space="preserve">
+    <value>Hintergrund</value>
+  </data>
+  <data name="Settings.SectionBackup" xml:space="preserve">
+    <value>Sicherung</value>
+  </data>
+  <data name="Settings.SectionOnboarding" xml:space="preserve">
+    <value>Einrichtung</value>
+  </data>
+  <data name="Settings.SensorsDesc" xml:space="preserve">
+    <value>Temperatursensoren umbenennen, gruppieren und ungenutzte ausblenden.</value>
+  </data>
+  <data name="Settings.FansDesc" xml:space="preserve">
+    <value>Lüfter benennen, Position setzen, kalibrieren und Min/Max anpassen.</value>
+  </data>
+  <data name="Settings.AirflowDesc" xml:space="preserve">
+    <value>Aus den Einbau-Positionen Druckbilanz und passende Kurven vorschlagen.</value>
+  </data>
+  <data name="Settings.AppearanceDesc" xml:space="preserve">
+    <value>Farbschema wählen.</value>
+  </data>
+  <data name="Settings.LanguageDesc" xml:space="preserve">
+    <value>Anzeigesprache wählen.</value>
+  </data>
+  <data name="Settings.BackgroundDesc" xml:space="preserve">
+    <value>Verhalten beim Schließen des Fensters.</value>
+  </data>
+  <data name="Settings.BackupDesc" xml:space="preserve">
+    <value>Konfiguration exportieren, importieren oder zurücksetzen.</value>
+  </data>
+  <data name="Settings.OnboardingDesc" xml:space="preserve">
+    <value>Die geführte Ersteinrichtung erneut ausführen.</value>
+  </data>
+  <data name="Settings.Export" xml:space="preserve">
+    <value>Backup exportieren…</value>
+  </data>
+  <data name="Settings.ExportTooltip" xml:space="preserve">
+    <value>Alle Einstellungen (Sensoren, Lüfter, Profile, Kurven) plus Theme/Sprache in eine Datei speichern.</value>
+  </data>
+  <data name="Settings.Import" xml:space="preserve">
+    <value>Backup importieren…</value>
+  </data>
+  <data name="Settings.ImportTooltip" xml:space="preserve">
+    <value>Einstellungen aus einer Backup-Datei wiederherstellen — ersetzt die aktuelle Konfiguration.</value>
+  </data>
+  <data name="Settings.DangerZone" xml:space="preserve">
+    <value>Gefahrenzone</value>
+  </data>
+  <data name="Settings.Reset" xml:space="preserve">
+    <value>Auf Werkszustand zurücksetzen</value>
+  </data>
+  <data name="Settings.ResetTooltip" xml:space="preserve">
+    <value>Alle Sensoren, Lüfter, Profile, Kurven und Kalibrierungen löschen.</value>
+  </data>
+  <data name="Settings.ResetConfirmTitle" xml:space="preserve">
+    <value>Konfiguration zurücksetzen?</value>
+  </data>
+  <data name="Settings.ResetConfirmMessage" xml:space="preserve">
+    <value>Löscht alle Namen, Gruppen, Profile, Kurven und Kalibrierungen und stellt den Werkszustand her. Kann nicht rückgängig gemacht werden.</value>
+  </data>
+  <data name="Settings.ResetConfirm" xml:space="preserve">
+    <value>Zurücksetzen</value>
+  </data>
+  <data name="Settings.StartOnboarding" xml:space="preserve">
+    <value>Einrichtung starten</value>
+  </data>
+  <data name="Settings.StartOnboardingTooltip" xml:space="preserve">
+    <value>Die geführte Kalibrierung und Profilwahl erneut ausführen.</value>
+  </data>
+  <data name="Settings.BackupExported" xml:space="preserve">
+    <value>Backup exportiert.</value>
+  </data>
+  <data name="Settings.ExportFailed" xml:space="preserve">
+    <value>Export fehlgeschlagen.</value>
+  </data>
+  <data name="Settings.BackupImported" xml:space="preserve">
+    <value>Backup importiert.</value>
+  </data>
+  <data name="Settings.ImportFailedParse" xml:space="preserve">
+    <value>Die Datei ist kein gültiges LinFan-Backup.</value>
+  </data>
+  <data name="Settings.ImportFailedVersion" xml:space="preserve">
+    <value>Nicht unterstützte Backup-Version {0}.</value>
+  </data>
+  <data name="Settings.ImportFailedDaemon" xml:space="preserve">
+    <value>Dienst nicht erreichbar — Import fehlgeschlagen.</value>
+  </data>
+  <data name="Settings.ConfigReset" xml:space="preserve">
+    <value>Auf Werkszustand zurückgesetzt.</value>
+  </data>
+  <data name="Settings.ResetFailedDaemon" xml:space="preserve">
+    <value>Dienst nicht erreichbar — Reset fehlgeschlagen.</value>
+  </data>
+  <data name="MainWindow.UpdateAvailable" xml:space="preserve">
+    <value>Neue Version verfügbar:</value>
+  </data>
+  <data name="MainWindow.UpdateOpen" xml:space="preserve">
+    <value>Öffnen</value>
+  </data>
+  <data name="MainWindow.UpdateDismiss" xml:space="preserve">
+    <value>Später</value>
+  </data>
+  <data name="Settings.CheckForUpdates" xml:space="preserve">
+    <value>Beim Start auf Updates prüfen</value>
+  </data>
+  <data name="Settings.CheckForUpdatesTooltip" xml:space="preserve">
+    <value>Fragt bei jedem Start bei GitHub nach einer neueren Version.</value>
+  </data>
+</root>

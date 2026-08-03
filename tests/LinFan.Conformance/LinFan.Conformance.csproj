@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Geteiltes Conformance-Test-Kit: die ausführbare Spezifikation des Backend-Vertrags
+    (BackendConformanceTests, INV-1..INV-10) plus das hardwarefreie Referenz-Backend und die
+    Fehler-Injektoren. Backend-Test-Projekte (LinFan.Core.Tests heute, LinFan.Hardware.Windows.Tests
+    künftig) referenzieren dieses Kit und leiten die Suite ab — Struktur nur einmal definiert.
+    Kennt NUR LinFan.Core (Abstraktionen/POCOs); NICHT LinFan.Hardware.* (Schichtgrenze — das
+    konkrete Backend bringt der Konsument mit). Selbst kein Test-Projekt: enthält nur die abstrakte
+    Basis + Fixtures, die erst in einem ableitenden Projekt zu laufenden Tests werden.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <!--
+      Opt-out aus der Test-Discovery: ohne Test-SDK/Runner ist dies kein lauffähiges Test-Projekt
+      (s. o.). Andernfalls versucht ein solution-weites `dotnet test`, hier einen Test-Host zu starten,
+      der mangels Runner an einer fehlenden xunit.abstractions.dll scheitert ("TestHost exited").
+      Die Suite läuft ausschließlich abgeleitet im konsumierenden Projekt (LinFan.Core.Tests).
+    -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LinFan.Core\LinFan.Core.csproj" />
+  </ItemGroup>
+
+</Project>

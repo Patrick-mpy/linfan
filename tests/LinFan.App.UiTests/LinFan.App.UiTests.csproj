@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <!-- Avalonia 12 koppelt Headless.XUnit an xunit v3 — daher hier v3 (die übrigen Test-Projekte
+         bleiben auf v2; eigene Assemblies, kein Konflikt). -->
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />
+    <!-- Headless-Smoke-Tests: kein echtes Rendering (UseHeadlessDrawing) → umgeht Skia/libfontconfig. -->
+    <PackageReference Include="Avalonia.Headless" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LinFan.App\LinFan.App.csproj" />
+    <ProjectReference Include="..\..\src\LinFan.Core\LinFan.Core.csproj" />
+  </ItemGroup>
+
+</Project>

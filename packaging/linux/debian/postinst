@@ -1,0 +1,29 @@
+#!/bin/sh
+# Post-install: create the IPC group, register and start the systemd service.
+set -e
+
+case "$1" in
+  configure)
+    # IPC access group — the root daemon restricts its socket to this group (mode 0660). The
+    # unprivileged GUI can only connect as a group member; otherwise it needs sudo.
+    getent group linfan >/dev/null 2>&1 || groupadd --system linfan || true
+
+    # Add the installing user (sudo apt install) so the GUI works without sudo. Re-login required
+    # for the new group to take effect. If SUDO_USER is unset (unattended install), print the hint.
+    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+      usermod -aG linfan "$SUDO_USER" 2>/dev/null || true
+      echo "linfan: added '$SUDO_USER' to group 'linfan' — log out/in (or 'newgrp linfan') so the GUI can connect."
+    else
+      echo "linfan: add your GUI user to the group:  sudo usermod -aG linfan <user>   (then re-login)."
+    fi
+
+    if [ -d /run/systemd/system ]; then
+      systemctl daemon-reload || true
+      systemctl enable linfan-daemon.service || true
+      # restart (not just start) also loads the new build on upgrade; ramps fans safely on stop.
+      systemctl restart linfan-daemon.service || true
+    fi
+    ;;
+esac
+
+exit 0

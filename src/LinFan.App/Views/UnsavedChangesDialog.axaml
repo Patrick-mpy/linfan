@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:LinFan.App.Localization"
+        x:Class="LinFan.App.Views.UnsavedChangesDialog"
+        Title="{l:Tr UnsavedChanges.Title}"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="{DynamicResource BgWindow}">
+    <StackPanel Margin="24" Spacing="{StaticResource SpacingXl}">
+        <TextBlock Text="{l:Tr UnsavedChanges.Message}" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimary}" />
+        <TextBlock Text="{l:Tr UnsavedChanges.Question}" Foreground="{DynamicResource TextMuted}"
+                   TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource SpacingMd}">
+            <Button Content="{l:Tr UnsavedChanges.Cancel}" Click="OnCancel" />
+            <Button Content="{l:Tr UnsavedChanges.Discard}" Click="OnDiscard" />
+            <Button Content="{l:Tr UnsavedChanges.Save}" Click="OnSave" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -1,0 +1,1295 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:LinFan.App.Controllers"
+        xmlns:l="clr-namespace:LinFan.App.Localization"
+        xmlns:ctrl="clr-namespace:LinFan.App.Controls"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:lconv="using:LinFan.App.Converters"
+        xmlns:sys="using:System"
+        x:Class="LinFan.App.Views.MainWindow"
+        x:DataType="c:MainController"
+        Width="1000" Height="720"
+        MinWidth="760" MinHeight="520"
+        Title="LinFan"
+        Background="{DynamicResource BgWindow}">
+
+    <Window.Styles>
+        <!-- Borderloser Icon-Button (z. B. Augen-Toggle für die Dashboard-Sichtbarkeit im Geräte-Tab). -->
+        <Style Selector="Button.iconBtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.iconBtn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BgInset}" />
+        </Style>
+
+        <!-- Flacher, randloser Aufklapp-Header (Lüfter-„Erweitert"): kein Karten-Kasten, volle Breite,
+             nur ein Trennstrich unter dem Titel (am Inhalt). Der Chevron dreht beim Aufklappen. -->
+        <Style Selector="ToggleButton.advHeader">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0,4" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="ToggleButton.advHeader:checked /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.advHeader:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.advHeader:checked:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.advHeader PathIcon.chevron">
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.advHeader:checked PathIcon.chevron">
+            <Setter Property="RenderTransform" Value="rotate(180deg)" />
+        </Style>
+
+        <!-- Randloses Eingabefeld für die Geräte-Listen: liest sich im Ruhezustand als Text,
+             zeigt Inset-Füllung erst bei Hover und Akzent-Rahmen erst bei Fokus (kein Box-in-Box). -->
+        <Style Selector="TextBox.ghost">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="4,3" />
+        </Style>
+        <Style Selector="TextBox.ghost /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox.ghost:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource BgInset}" />
+        </Style>
+        <Style Selector="TextBox.ghost:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource BgInset}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        </Style>
+
+        <!-- Randlose AutoCompleteBox (Gruppen-Chip): das innere Feld transparent/rahmenlos, damit
+             der umgebende Chip die Fläche stellt. Die TextControl*-Ressourcen setzt die Instanz inline. -->
+        <Style Selector="AutoCompleteBox.ghost">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="AutoCompleteBox.ghost /template/ TextBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="4,3" />
+        </Style>
+
+        <!-- Kompakter Chip-Button (Position): dezente Inset-Fläche, keine schwere Button-Chrome. -->
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="{DynamicResource BgInset}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BgCardAlt}" />
+        </Style>
+
+        <!-- Navigations-Liste (Einstellungen-Sidebar UND Kurvenliste teilen dieselbe Optik):
+             Akzent-Streifen links + abgesetzter Hintergrund + Akzent-Text auf dem aktiven Eintrag;
+             die stock ListBoxItem-Chrome wird neutralisiert (Markierung sitzt auf Border.menuRow). -->
+        <Style Selector="ListBox.navList ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.navList Border.menuRow">
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:pointerover Border.menuRow">
+            <Setter Property="Background" Value="{DynamicResource BgInset}" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:selected Border.menuRow">
+            <Setter Property="Background" Value="{DynamicResource BgCardAlt}" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:selected Border.selBar">
+            <Setter Property="Background" Value="{DynamicResource Accent}" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:selected Border.menuRow PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+        </Style>
+        <Style Selector="ListBox.navList ListBoxItem:selected Border.menuRow TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*" Margin="24">
+
+        <StackPanel Grid.Row="0" Spacing="{StaticResource SpacingXxs}" Margin="0,0,0,16">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="{StaticResource SpacingXxs}">
+                    <TextBlock Text="LinFan" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                    <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                </StackPanel>
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLg}" Margin="0,4,0,0"
+                        IsVisible="{Binding Editor.HasUnsavedChanges}">
+                <TextBlock Text="{l:Tr MainWindow.UnsavedChanges}" Foreground="{DynamicResource WarningText}" FontSize="12"
+                           VerticalAlignment="Center" />
+                <Button Command="{Binding Editor.SaveCommand}"
+                        IsEnabled="{Binding Connected}" Padding="10,3" FontSize="12"
+                        ToolTip.Tip="{l:Tr MainWindow.ApplyChangesTooltip}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                        <PathIcon Data="{StaticResource IconSave}" Width="13" Height="13" />
+                        <TextBlock Text="{l:Tr MainWindow.Apply}" />
+                    </StackPanel>
+                </Button>
+                <Button Padding="10,3" FontSize="12" Click="OnRevertChanges"
+                        ToolTip.Tip="{l:Tr MainWindow.RevertTooltip}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                        <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
+                        <TextBlock Text="{l:Tr MainWindow.Revert}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <Border IsVisible="{Binding !Connected}" Background="{DynamicResource DangerBg}" CornerRadius="{StaticResource RadiusMd}"
+                    Padding="12,8" Margin="0,8,0,0">
+                <TextBlock Foreground="{DynamicResource DangerText}" FontSize="12" TextWrapping="Wrap"
+                           Text="{l:Tr MainWindow.DaemonUnreachable}" />
+            </Border>
+
+            <Border IsVisible="{Binding Calibration, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+                    Background="{DynamicResource InfoBg}" CornerRadius="{StaticResource RadiusMd}" Padding="12,8" Margin="0,8,0,0">
+                <Grid ColumnDefinitions="*,Auto">
+                    <ctrl:CalibrationCard Grid.Column="0" VerticalAlignment="Center"
+                                          Headline="{Binding Calibration.Headline}"
+                                          Detail="{Binding Calibration.Detail}"
+                                          Progress="{Binding Calibration.Progress}"
+                                          ShowProgress="{Binding Calibration.ShowProgress}" />
+                    <Button Grid.Column="1" Content="{l:Tr MainWindow.Close}" Command="{Binding CancelCalibrationCommand}"
+                            Margin="12,0,0,0" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Update-Hinweis: rein additiv, nur bei neuerer Release sichtbar; „Öffnen" führt zur Release-Seite,
+                 „Später" merkt sich die Version (eine neuere zeigt wieder). Opt-out in den Einstellungen. -->
+            <Border IsVisible="{Binding Update.UpdateAvailable}"
+                    Background="{DynamicResource InfoBg}" CornerRadius="{StaticResource RadiusMd}" Padding="12,8" Margin="0,8,0,0">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" VerticalAlignment="Center">
+                        <TextBlock Text="{l:Tr MainWindow.UpdateAvailable}" Foreground="{DynamicResource TextPrimary}"
+                                   FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Update.LatestVersion}" Foreground="{DynamicResource TextPrimary}"
+                                   FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="{l:Tr MainWindow.UpdateOpen}" Command="{Binding Update.OpenReleaseCommand}"
+                            Padding="10,3" FontSize="12" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Content="{l:Tr MainWindow.UpdateDismiss}" Command="{Binding Update.DismissCommand}"
+                            Margin="8,0,0,0" Padding="10,3" FontSize="12" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+
+            <!-- ============ Tab 1: Live-Übersicht ============ -->
+            <TabItem Header="{l:Tr MainWindow.TabOverview}">
+                <Grid RowDefinitions="Auto,*" Margin="0,12,0,0">
+
+                    <!-- Profilauswahl fürs Dashboard -->
+                    <Border Classes="bar" Grid.Row="0">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                            <TextBlock Text="{l:Tr MainWindow.Profile}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                            <ComboBox MinWidth="180" ItemsSource="{Binding Editor.Profiles}"
+                                      SelectedItem="{Binding Editor.SelectedProfile}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="c:ProfileRow">
+                                        <TextBlock Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1">
+                    <StackPanel Spacing="{StaticResource SpacingXl}">
+
+                    <!-- ============ Aktive Kurven (Quelle → Kurve → geregelte Lüfter, live an/aus) ============ -->
+                    <Border Classes="panel" IsVisible="{Binding HasActiveCurves}">
+                        <StackPanel>
+                            <ToggleButton Classes="advHeader" IsChecked="{Binding ActiveCurvesExpanded}"
+                                          ToolTip.Tip="{l:Tr MainWindow.ActiveCurvesToggleTooltip}">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.ActiveCurves}" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ActiveCurves.Count, StringFormat='({0})'}"
+                                               Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    <PathIcon Grid.Column="3" Classes="chevron" Data="{StaticResource IconChevronDown}"
+                                              Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                </Grid>
+                            </ToggleButton>
+                            <ItemsControl IsVisible="{Binding ActiveCurvesExpanded}" ItemsSource="{Binding ActiveCurves}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="c:DashboardCurveRow">
+                                        <Border Classes="itemCard">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <ToggleSwitch Grid.Column="0" IsChecked="{Binding Enabled}" MinWidth="0"
+                                                              OnContent="{l:Tr MainWindow.CurveOn}" OffContent="{l:Tr MainWindow.CurveOff}" Margin="0,0,12,0" VerticalAlignment="Top"
+                                                              ToolTip.Tip="{l:Tr MainWindow.CurveToggleTooltip}" />
+                                                <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXxs}" VerticalAlignment="Top">
+                                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                        <TextBlock Text="{Binding Curve.Name}" Foreground="{DynamicResource TextPrimary}"
+                                                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{l:Tr MainWindow.CurveOffHardwareAuto}" Foreground="{DynamicResource TextFaint}"
+                                                                   FontSize="11" VerticalAlignment="Center" IsVisible="{Binding !Enabled}" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                        <TextBlock Text="{Binding SourceSummary}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
+                                                        <TextBlock Text="{Binding Curve.LiveTemperatureDisplay}"
+                                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+                                                    </StackPanel>
+                                                    <ItemsControl ItemsSource="{Binding Fans}" Margin="0,4,0,0">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="c:FanRow">
+                                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" Margin="0,1">
+                                                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
+                                                                               FontSize="12" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="{Binding Pwm}" Foreground="{DynamicResource TextFaint}"
+                                                                               FontSize="12" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <Button Command="{Binding EditCommand}" HorizontalAlignment="Left" FontSize="11"
+                                                            Padding="8,3" Margin="0,8,0,0"
+                                                            ToolTip.Tip="{l:Tr MainWindow.EditCurveTooltip}">
+                                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                            <PathIcon Data="{StaticResource IconRename}" Width="12" Height="12" />
+                                                            <TextBlock Text="{l:Tr MainWindow.EditCurve}" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                                <!-- Read-only-Vorschau derselben Kurve wie im Kurven-Tab (gleicher CurveChart, nur nicht editierbar). -->
+                                                <Border Grid.Column="2" CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgInset}" Padding="4"
+                                                        Margin="12,0,0,0" VerticalAlignment="Top">
+                                                    <ctrl:CurveChart Points="{Binding Curve.Points}" LiveTemperature="{Binding Curve.LiveTemperature}"
+                                                                     InterpolationMode="{Binding Curve.InterpolationMode}" Evaluator="{Binding Curve.CurveEvaluator}"
+                                                                     IsReadOnly="True" Width="300" Height="130" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid ColumnDefinitions="*,*">
+
+                    <Border Classes="panel" Grid.Column="0" Margin="0,0,9,0" VerticalAlignment="Top">
+                        <StackPanel>
+                            <ToggleButton Classes="advHeader" IsChecked="{Binding TemperaturesExpanded}"
+                                          ToolTip.Tip="{l:Tr MainWindow.TemperaturesToggleTooltip}">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Temperatures}" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Temperatures.Count, StringFormat='({0})'}"
+                                               Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    <TextBlock Grid.Column="2" Text="{Binding MaxTempDisplay}" Foreground="{DynamicResource TextMuted}"
+                                               FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0"
+                                               IsVisible="{Binding !TemperaturesExpanded}" />
+                                    <PathIcon Grid.Column="3" Classes="chevron" Data="{StaticResource IconChevronDown}"
+                                              Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                </Grid>
+                            </ToggleButton>
+                            <StackPanel IsVisible="{Binding TemperaturesExpanded}" Margin="0,4,0,0">
+                                <TextBlock Text="{l:Tr MainWindow.History60s}" Foreground="{DynamicResource TextFaintest}"
+                                           FontSize="10" Margin="0,0,0,14" />
+                                <TextBlock Text="{l:Tr MainWindow.NoTemperatureSensors}" Foreground="{DynamicResource TextFaint}"
+                                           FontSize="12" IsVisible="{Binding ShowNoSensors}" />
+                                <ItemsControl ItemsSource="{Binding SensorGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="c:SensorGroup">
+                                            <StackPanel Spacing="{StaticResource SpacingXxs}" Margin="0,0,0,10">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextFaint}" FontSize="11"
+                                                           FontWeight="SemiBold" Margin="2,0,0,2" />
+                                                <ItemsControl ItemsSource="{Binding Sensors}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="c:SensorRow">
+                                                            <Grid ColumnDefinitions="*,Auto,120" Margin="0,5" VerticalAlignment="Center">
+                                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
+                                                                               VerticalAlignment="Center" />
+                                                                    <!-- Hardware-Id nur bei doppeltem Namen (sonst leer → ausgeblendet). -->
+                                                                    <TextBlock Text="{Binding Disambiguator}" Foreground="{DynamicResource TextFaintest}"
+                                                                               FontSize="10" VerticalAlignment="Center"
+                                                                               IsVisible="{Binding Disambiguator, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}" />
+                                                                </StackPanel>
+                                                                <TextBlock Grid.Column="1" Text="{Binding Display}"
+                                                                           Foreground="{Binding Value, Converter={x:Static lconv:TempToBrushConverter.Instance}}"
+                                                                           VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                                <ctrl:Sparkline Grid.Column="2" Values="{Binding History}" Height="26"
+                                                                                Stroke="{Binding Value, Converter={x:Static lconv:TempToBrushConverter.Instance}}" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel" Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Top">
+                        <StackPanel>
+                            <ToggleButton Classes="advHeader" IsChecked="{Binding FansExpanded}"
+                                          ToolTip.Tip="{l:Tr MainWindow.FansToggleTooltip}">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Fans}" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Fans.Count, StringFormat='({0})'}"
+                                               Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    <PathIcon Grid.Column="3" Classes="chevron" Data="{StaticResource IconChevronDown}"
+                                              Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                </Grid>
+                            </ToggleButton>
+                            <StackPanel IsVisible="{Binding FansExpanded}" Margin="0,4,0,0">
+                                <TextBlock Text="{l:Tr MainWindow.History60s}" Foreground="{DynamicResource TextFaintest}"
+                                           FontSize="10" Margin="0,0,0,14" />
+                                <TextBlock Text="{l:Tr MainWindow.NoFans}" Foreground="{DynamicResource TextFaint}"
+                                           FontSize="12" IsVisible="{Binding ShowNoFans}" />
+                                <ItemsControl ItemsSource="{Binding FanGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="c:FanGroup">
+                                            <StackPanel Spacing="{StaticResource SpacingXs}" Margin="0,0,0,12">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextFaint}" FontSize="11"
+                                                           FontWeight="SemiBold" Margin="2,0,0,2" />
+                                                <ItemsControl ItemsSource="{Binding Fans}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="c:FanRow">
+                                                            <Border Classes="itemCard">
+                                                                <StackPanel Spacing="{StaticResource SpacingXs}">
+                                                                    <Grid ColumnDefinitions="*,Auto">
+                                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                                            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}"
+                                                                                       FontWeight="SemiBold" ToolTip.Tip="{Binding FanId}" />
+                                                                            <!-- Kalibrier-Status — gleiche Optik wie Onboarding/Geräte-Tab (läuft / fertig). -->
+                                                                            <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13"
+                                                                                      Foreground="{DynamicResource Accent}" VerticalAlignment="Center"
+                                                                                      IsVisible="{Binding IsCalibrating}"
+                                                                                      ToolTip.Tip="{l:Tr MainWindow.CalibrationRunning}" />
+                                                                            <PathIcon Data="{StaticResource IconCheckCircle}" Width="13" Height="13"
+                                                                                      Foreground="{DynamicResource Success}" VerticalAlignment="Center"
+                                                                                      IsVisible="{Binding IsCalibrated}"
+                                                                                      ToolTip.Tip="{Binding CalibrationBadgeHint}" />
+                                                                            <TextBlock Text="{Binding Location}" Foreground="{DynamicResource TextFaint}"
+                                                                                       FontSize="11" VerticalAlignment="Center" />
+                                                                        </StackPanel>
+                                                                        <TextBlock Grid.Column="1" Text="{Binding Rpm}" Foreground="{DynamicResource TextSecondary}" FontWeight="SemiBold" />
+                                                                    </Grid>
+                                                                    <ctrl:Sparkline Values="{Binding RpmHistory}" Height="28"
+                                                                                    Stroke="{DynamicResource Accent}" />
+                                                                    <!-- Modus zeigt der Auto/Manuell-Toggle unten; hier nur PWM und (nur bei read-only) der Steuerbar-Hinweis. -->
+                                                                    <Grid ColumnDefinitions="*,Auto">
+                                                                        <TextBlock Grid.Column="0" Text="{Binding Pwm}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
+                                                                        <TextBlock Grid.Column="1" Text="{Binding Control}" Foreground="{DynamicResource TextFaint}" FontSize="12"
+                                                                                   IsVisible="{Binding !CanControl}" />
+                                                                    </Grid>
+                                                                    <Grid ColumnDefinitions="Auto,*,46" IsVisible="{Binding CanControl}"
+                                                                          Margin="0,2,0,0">
+                                                                        <ToggleSwitch Grid.Column="0" IsChecked="{Binding IsManual}"
+                                                                                      OnContent="{l:Tr MainWindow.Manual}" OffContent="{l:Tr MainWindow.Auto}" Margin="0,0,12,0"
+                                                                                      MinWidth="0" />
+                                                                        <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                                                                Value="{Binding SliderPercent}" IsEnabled="{Binding IsManual}"
+                                                                                VerticalAlignment="Center"
+                                                                                ToolTip.Tip="{l:Tr MainWindow.ManualPowerTooltip}" />
+                                                                        <TextBlock Grid.Column="2" Text="{Binding SliderPercent, StringFormat='{}{0:0} %'}"
+                                                                                   Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center"
+                                                                                   TextAlignment="Right" />
+                                                                    </Grid>
+                                                                    <Button Command="{Binding CalibrateCommand}"
+                                                                            IsVisible="{Binding CanControl}" IsEnabled="{Binding CanCalibrate}"
+                                                                            HorizontalAlignment="Left"
+                                                                            FontSize="11" Padding="8,3"
+                                                                            ToolTip.Tip="{l:Tr MainWindow.CalibrateTooltip}">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                            <PathIcon Data="{StaticResource IconGauge}" Width="12" Height="12" />
+                                                                            <TextBlock Text="{l:Tr MainWindow.Calibrate}" />
+                                                                        </StackPanel>
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    </Grid>
+                    </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <!-- ============ Tab 3: Kurven & Zuordnung ============ -->
+            <TabItem Header="{l:Tr MainWindow.TabCurves}">
+                <Grid RowDefinitions="Auto,*" Margin="0,12,0,0">
+
+                    <!-- Profil-Leiste: umschalten, anlegen, umbenennen, löschen -->
+                    <Border Classes="bar" Grid.Row="0">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                            <TextBlock Text="{l:Tr MainWindow.Profile}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                            <ComboBox MinWidth="160" ItemsSource="{Binding Editor.Profiles}"
+                                      SelectedItem="{Binding Editor.SelectedProfile}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="c:ProfileRow">
+                                        <TextBlock Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <!-- Namensfeld nur beim Anlegen/Duplizieren/Umbenennen sichtbar -->
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" VerticalAlignment="Center"
+                                        IsVisible="{Binding Editor.IsNamingProfile}">
+                                <TextBox Width="160" Text="{Binding Editor.SelectedProfile.Name}"
+                                         PlaceholderText="{l:Tr MainWindow.ProfileNamePlaceholder}" />
+                                <Button Content="{l:Tr MainWindow.Done}" Command="{Binding Editor.FinishNamingProfileCommand}"
+                                        ToolTip.Tip="{l:Tr MainWindow.CloseNameFieldTooltip}" />
+                            </StackPanel>
+                            <Button Command="{Binding Editor.AddProfileCommand}"
+                                    ToolTip.Tip="{l:Tr MainWindow.AddProfileTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                    <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
+                                    <TextBlock Text="{l:Tr MainWindow.Profile}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding Editor.DuplicateProfileCommand}"
+                                    ToolTip.Tip="{l:Tr MainWindow.DuplicateProfileTooltip}">
+                                <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" />
+                            </Button>
+                            <Button Command="{Binding Editor.RenameProfileCommand}"
+                                    ToolTip.Tip="{l:Tr MainWindow.RenameProfileTooltip}">
+                                <PathIcon Data="{StaticResource IconRename}" Width="13" Height="13" />
+                            </Button>
+                            <Button Click="OnDeleteProfile" ToolTip.Tip="{l:Tr MainWindow.DeleteProfileTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
+                                    <TextBlock Text="{l:Tr MainWindow.Delete}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Pre-Load-Hinweis: vor dem ersten Snapshot, Text je nach Verbindungszustand -->
+                    <Border Classes="card" Grid.Row="1" IsVisible="{Binding ShowCurveLoading}" VerticalAlignment="Top">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="13" TextWrapping="Wrap"
+                                   Text="{Binding CurveLoadingText}" />
+                    </Border>
+
+                    <!-- Verbunden, aber der Daemon meldet keine Geräte → keine Kurven möglich -->
+                    <Border Classes="card" Grid.Row="1" IsVisible="{Binding ShowNoDevices}" VerticalAlignment="Top">
+                        <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="13" TextWrapping="Wrap"
+                                   Text="{l:Tr MainWindow.NoDevicesForCurves}" />
+                    </Border>
+
+                    <Grid Grid.Row="1" ColumnDefinitions="240,*" IsVisible="{Binding Editor.IsReady}">
+
+                    <!-- Kurvenliste + anlegen/löschen -->
+                    <DockPanel Grid.Column="0" Margin="0,0,14,0">
+                        <TextBlock DockPanel.Dock="Top" Text="{l:Tr MainWindow.Curves}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextHeading}" Margin="0,0,0,10" />
+                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}" Margin="0,10,0,0">
+                            <Button Command="{Binding Editor.AddCurveCommand}"
+                                    ToolTip.Tip="{l:Tr MainWindow.AddCurveTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                    <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
+                                    <TextBlock Text="{l:Tr MainWindow.Curve}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding Editor.DuplicateCurveCommand}"
+                                    ToolTip.Tip="{l:Tr MainWindow.DuplicateCurveTooltip}">
+                                <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" />
+                            </Button>
+                            <Button Click="OnDeleteCurve" ToolTip.Tip="{l:Tr MainWindow.DeleteCurveTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
+                                    <TextBlock Text="{l:Tr MainWindow.Delete}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <ListBox Classes="navList" Background="Transparent"
+                                 ItemsSource="{Binding Editor.Curves}" SelectedItem="{Binding Editor.SelectedCurve}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="c:CurveEditRow">
+                                    <Border Classes="menuRow">
+                                        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                            <!-- Auswahl-Streifen: transparent, außer der Eintrag ist aktiv (navList-Style). -->
+                                            <Border Grid.Column="0" Classes="selBar" Width="3" Height="16" CornerRadius="2"
+                                                    Background="Transparent" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                            <Ellipse Grid.Column="1" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                     Fill="{Binding IsActive, Converter={x:Static lconv:BoolToBrushConverter.Instance}, ConverterParameter='#22C55E,#52525B'}"
+                                                     ToolTip.Tip="{Binding ActivityHint}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Label}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="3" Text="{l:Tr MainWindow.OffParen}" Foreground="{DynamicResource TextFaint}" FontSize="11"
+                                                       VerticalAlignment="Center" Margin="6,0,0,0" IsVisible="{Binding !Enabled}"
+                                                       ToolTip.Tip="{l:Tr MainWindow.CurveDisabledTooltip}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+
+                    <!-- rechte Seite: ausgewählte Kurve + Zuordnung + Speichern -->
+                    <ScrollViewer Grid.Column="1">
+                        <StackPanel Spacing="{StaticResource SpacingXl}">
+
+                            <!-- Flach wie die Einstellungen-Sektionen: Titel + Inhalt auf dem Hintergrund, kein Karten-Kasten. -->
+                            <Border Classes="card" Background="Transparent">
+                                <ContentControl Content="{Binding Editor.SelectedCurve}">
+                                    <ContentControl.ContentTemplate>
+                                        <DataTemplate x:DataType="c:CurveEditRow">
+                                            <StackPanel Spacing="{StaticResource SpacingLg}">
+                                                <!-- Titel + An/Aus-Toggle (live, kein Dirty-Banner). Der Toggle schaltet die
+                                                     ausgewählte Kurve über den Controller — Bindung an dessen DataContext (Window-Ahne). -->
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.EditCurve}" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                                    <ToggleSwitch Grid.Column="1" MinWidth="0" OnContent="{l:Tr MainWindow.CurveOn}" OffContent="{l:Tr MainWindow.CurveOff}"
+                                                                  IsChecked="{Binding $parent[Window].((c:MainController)DataContext).Editor.SelectedCurveEnabled, Mode=TwoWay}"
+                                                                  ToolTip.Tip="{l:Tr MainWindow.CurveToggleTooltip}" />
+                                                </Grid>
+
+                                                <!-- Name oben, Graph direkt darunter -->
+                                                <Grid ColumnDefinitions="90,*">
+                                                    <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Name}" Foreground="{DynamicResource TextMuted}"
+                                                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                    <TextBox Grid.Column="1" Classes="ghost" Text="{Binding Name}"
+                                                             FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                                                </Grid>
+
+                                                <TextBlock Text="{l:Tr MainWindow.CurveEditorHint}" Foreground="{DynamicResource TextMuted}"
+                                                           Margin="0,4,0,0" />
+                                                <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgInset}" Padding="6">
+                                                    <ctrl:CurveChart Points="{Binding Points}"
+                                                                     LiveTemperature="{Binding LiveTemperature}"
+                                                                     InterpolationMode="{Binding InterpolationMode}"
+                                                                     Evaluator="{Binding CurveEvaluator}"
+                                                                     Height="240" />
+                                                </Border>
+                                                <TextBlock IsVisible="{Binding HasNoSource}" Foreground="{DynamicResource TextFaint}"
+                                                           FontSize="11" TextWrapping="Wrap"
+                                                           Text="{l:Tr MainWindow.NoSourceSensor}" />
+
+                                                <!-- Einstellungen: Quell-Sensoren (eingeklappt auf 3), Mix, Interpolation, Hysterese -->
+                                                <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:Tr MainWindow.Sensors}" Foreground="{DynamicResource TextMuted}"
+                                                               VerticalAlignment="Top" Margin="0,4,12,8" />
+                                                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
+                                                        <ItemsControl ItemsSource="{Binding DisplayedSensorGroups}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="c:SensorCheckGroup">
+                                                                    <StackPanel Spacing="{StaticResource SpacingXxs}" Margin="0,0,0,6">
+                                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextFaint}"
+                                                                                   FontSize="11" FontWeight="SemiBold" Margin="2,0,0,2" />
+                                                                        <ItemsControl ItemsSource="{Binding Sensors}">
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate x:DataType="c:SensorCheck">
+                                                                                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                                                                        <CheckBox Grid.Column="0" IsChecked="{Binding Selected}"
+                                                                                                  Content="{Binding Sensor.Name}" />
+                                                                                        <TextBlock Grid.Column="1" Text="{Binding Sensor.LiveValue}"
+                                                                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                                                                                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                                                    </Grid>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <Button Command="{Binding ToggleShowAllSensorsCommand}"
+                                                                Content="{Binding ToggleSensorsLabel}"
+                                                                IsVisible="{Binding HasCollapsibleSensors}"
+                                                                HorizontalAlignment="Left" FontSize="11" Padding="6,2" Margin="0,4,0,0"
+                                                                ToolTip.Tip="{l:Tr MainWindow.ToggleAllSensorsTooltip}" />
+                                                    </StackPanel>
+
+                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr MainWindow.Mix}" Foreground="{DynamicResource TextMuted}"
+                                                               VerticalAlignment="Center" Margin="0,0,12,8" />
+                                                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Aggregations}"
+                                                              SelectedItem="{Binding SelectedAggregation}"
+                                                              HorizontalAlignment="Left" Width="220" Margin="0,0,0,8"
+                                                              ToolTip.Tip="{l:Tr MainWindow.MixTooltip}" />
+
+                                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:Tr MainWindow.Interpolation}" Foreground="{DynamicResource TextMuted}"
+                                                               VerticalAlignment="Center" Margin="0,0,12,8" />
+                                                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Interpolations}"
+                                                              SelectedItem="{Binding SelectedInterpolation}"
+                                                              HorizontalAlignment="Left" Width="220" Margin="0,0,0,8"
+                                                              ToolTip.Tip="{l:Tr MainWindow.InterpolationTooltip}" />
+
+                                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{l:Tr MainWindow.Hysteresis}" Foreground="{DynamicResource TextMuted}"
+                                                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Hysteresis}"
+                                                                   Minimum="0" Maximum="20" Increment="0.5"
+                                                                   HorizontalAlignment="Left" Width="130"
+                                                                   ToolTip.Tip="{l:Tr MainWindow.HysteresisTooltip}" />
+                                                </Grid>
+
+                                                <!-- Stützpunkte einklappbar (wie „Erweitert" im Geräte-Tab): der Header zeigt nur die
+                                                     Anzahl, der Graph oben bleibt die primäre Editierfläche. Die ⚠-Warnung steht bewusst
+                                                     außerhalb des Collapse → ein sicherheitsrelevanter Hinweis wird nie versteckt. -->
+                                                <ToggleButton Classes="advHeader" IsChecked="{Binding ShowPoints}" Margin="0,4,0,0"
+                                                              ToolTip.Tip="{l:Tr MainWindow.PointsToggleTooltip}">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0" Text="{Binding PointsLabel}"
+                                                                   Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" />
+                                                        <PathIcon Grid.Column="1" Classes="chevron" Data="{StaticResource IconChevronDown}"
+                                                                  Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </ToggleButton>
+                                                <TextBlock IsVisible="{Binding HasDecreasingPercent}" Foreground="{DynamicResource WarningText}"
+                                                           FontSize="11" TextWrapping="Wrap"
+                                                           Text="{l:Tr MainWindow.DecreasingPercentWarning}" />
+                                                <Border IsVisible="{Binding ShowPoints}" BorderBrush="{DynamicResource TextFaintest}"
+                                                        BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,6,0,0">
+                                                    <StackPanel Spacing="{StaticResource SpacingXs}">
+                                                        <TextBlock Text="{l:Tr MainWindow.TempToPercentHeader}" Foreground="{DynamicResource TextMuted}" FontSize="11" />
+                                                        <ItemsControl ItemsSource="{Binding Points}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="c:PointRow">
+                                                                    <Grid ColumnDefinitions="*,*,Auto" Margin="0,3">
+                                                                        <NumericUpDown Grid.Column="0" Value="{Binding Temperature}"
+                                                                                       Minimum="0" Maximum="120" Increment="1" Margin="0,0,8,0"
+                                                                                       ToolTip.Tip="{l:Tr MainWindow.PointTempTooltip}" />
+                                                                        <NumericUpDown Grid.Column="1" Value="{Binding Percent}"
+                                                                                       Minimum="0" Maximum="100" Increment="1" Margin="0,0,8,0"
+                                                                                       ToolTip.Tip="{l:Tr MainWindow.PointPercentTooltip}" />
+                                                                        <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}"
+                                                                                ToolTip.Tip="{l:Tr MainWindow.RemovePointTooltip}" />
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <Button Command="{Binding AddPointCommand}" HorizontalAlignment="Left"
+                                                                ToolTip.Tip="{l:Tr MainWindow.AddPointTooltip}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
+                                                                <TextBlock Text="{l:Tr MainWindow.Point}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ContentControl.ContentTemplate>
+                                </ContentControl>
+                            </Border>
+
+                            <Border Classes="card" Background="Transparent">
+                                <StackPanel Spacing="{StaticResource SpacingSm}">
+                                    <TextBlock Text="{l:Tr MainWindow.FansOfCurve}" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                    <TextBlock Text="{l:Tr MainWindow.FansOfCurveSubtitle}"
+                                               Foreground="{DynamicResource TextFaint}" FontSize="11" Margin="0,0,0,4" />
+                                    <ItemsControl ItemsSource="{Binding Editor.SelectedCurveFanGroups}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="c:FanCheckGroup">
+                                                <StackPanel Spacing="{StaticResource SpacingXxs}" Margin="0,0,0,8">
+                                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextFaint}"
+                                                               FontSize="11" FontWeight="SemiBold" Margin="2,0,0,2" />
+                                                    <ItemsControl ItemsSource="{Binding Fans}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="c:FanCurveCheck">
+                                                                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                                    <CheckBox Grid.Column="0" IsChecked="{Binding Assigned}"
+                                                                              Content="{Binding Fan.Name}" />
+                                                                    <TextBlock Grid.Column="1" Text="{Binding Fan.LiveRpm}"
+                                                                               Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                                                                               VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Speichern/Verwerfen liefert das globale „Ungespeichert"-Banner (auf allen Tabs);
+                                 hier nur noch die Statuszeile — zeigt Gespeichert/Fehler, gespeist vom selben
+                                 SaveCommand; ausgeblendet, wenn leer (kein Leerraum). -->
+                            <TextBlock Text="{Binding Editor.Status}" FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       IsVisible="{Binding Editor.Status, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}" />
+                        </StackPanel>
+                    </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </TabItem>
+            <!-- ============ Tab 3: Einstellungen ============ -->
+            <TabItem Header="{l:Tr MainWindow.TabSettings}">
+                <Grid RowDefinitions="*" Margin="0,12,0,0">
+                    <Grid ColumnDefinitions="240,*">
+
+                        <!-- Seitenmenü: gruppiert (Geräte/Anwendung/Verwaltung); Auswahl steuert das rechte Panel. -->
+                        <ListBox Grid.Column="0" Classes="navList" Margin="0,0,14,0" Background="Transparent"
+                                 ItemsSource="{Binding Settings.Sections}"
+                                 SelectedItem="{Binding Settings.SelectedSectionItem}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="c:SettingsSectionItem">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Group}" IsVisible="{Binding IsFirstInGroup}"
+                                                   Foreground="{DynamicResource TextFaint}" FontSize="11" FontWeight="SemiBold"
+                                                   Margin="4,10,0,4" />
+                                        <Border Classes="menuRow">
+                                            <Grid ColumnDefinitions="Auto,Auto,*">
+                                                <!-- Auswahl-Streifen: transparent, außer der Eintrag ist aktiv (Style oben). -->
+                                                <Border Grid.Column="0" Classes="selBar" Width="3" Height="16" CornerRadius="2"
+                                                        Background="Transparent" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <PathIcon Grid.Column="1" Data="{Binding IconKey, Converter={x:Static lconv:ResourceKeyConverter.Instance}}"
+                                                          Width="15" Height="15"
+                                                          Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Label}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <!-- Rechter Innenabstand, damit die Scrollleiste nicht die Filter-Checkbox überlappt (Clipping). -->
+                        <ScrollViewer Grid.Column="1" Padding="0,0,14,0">
+                            <Panel>
+
+                                <!-- ===== Sensoren ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Sensors}">
+                                    <Border Classes="card" IsVisible="{Binding ShowDeviceLoading}">
+                                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="13" TextWrapping="Wrap"
+                                                   Text="{Binding DeviceLoadingText}" />
+                                    </Border>
+                                    <Border Classes="card" IsVisible="{Binding ShowNoDevices}">
+                                        <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="13" TextWrapping="Wrap"
+                                                   Text="{l:Tr MainWindow.NoDevices}" />
+                                    </Border>
+
+                                    <!-- Überschrift + Suche/Filter auf dem Hintergrund (wie die übrigen Sektionen); die Liste darunter in der Card. -->
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                            <TextBlock Text="{l:Tr MainWindow.TemperatureSensors}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                            <TextBlock Text="{Binding Editor.FilteredSensors.Count, StringFormat='({0})'}" Foreground="{DynamicResource TextFaint}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="{l:Tr MainWindow.SensorListSubtitle}"
+                                                   Foreground="{DynamicResource TextFaint}" FontSize="12" />
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SpacingMd}">
+                                        <Border Classes="inset" Grid.Column="0" BorderBrush="{DynamicResource TextFaint}"
+                                                BorderThickness="1" CornerRadius="{StaticResource RadiusMd}" Padding="10,6">
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <PathIcon Grid.Column="0" Data="{StaticResource IconSearch}" Width="13" Height="13"
+                                                          Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                <TextBox Grid.Column="1" x:Name="SensorSearchBox"
+                                                         Text="{Binding Editor.SensorSearch, UpdateSourceTrigger=PropertyChanged}"
+                                                         PlaceholderText="{l:Tr MainWindow.SearchPlaceholder}" BorderThickness="0" Background="Transparent" Padding="8,5" />
+                                            </Grid>
+                                        </Border>
+                                        <CheckBox Grid.Column="1" IsChecked="{Binding Editor.HideHiddenSensors}" Content="{l:Tr MainWindow.HideHidden}"
+                                                  VerticalAlignment="Center"
+                                                  ToolTip.Tip="{l:Tr MainWindow.HideHiddenSensorsTooltip}" />
+                                    </Grid>
+
+                                    <ItemsControl ItemsSource="{Binding Editor.FilteredSensors}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="c:SensorOption">
+                                            <Border Classes="deviceRow">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                                    <PathIcon Grid.Row="0" Grid.Column="0" Data="{StaticResource IconThermometer}" Width="16" Height="16"
+                                                              Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                    <TextBox Grid.Row="0" Grid.Column="1" Classes="ghost" Text="{Binding Name}"
+                                                             PlaceholderText="{l:Tr MainWindow.NameRequired}"
+                                                             FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SpacingXs}"
+                                                                VerticalAlignment="Center" Margin="10,0,0,0">
+                                                        <TextBlock Text="{Binding LiveValue}" Foreground="{DynamicResource TextSecondary}"
+                                                                   FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                                        <Button Classes="iconBtn" Command="{Binding ToggleVisibleCommand}"
+                                                                ToolTip.Tip="{l:Tr MainWindow.ToggleVisibleSensorTooltip}">
+                                                            <Panel>
+                                                                <PathIcon Data="{StaticResource IconEye}" Width="15" Height="15"
+                                                                          Foreground="{DynamicResource TextSecondary}" IsVisible="{Binding Visible}" />
+                                                                <PathIcon Data="{StaticResource IconEyeOff}" Width="15" Height="15"
+                                                                          Foreground="{DynamicResource TextFaintest}" IsVisible="{Binding !Visible}" />
+                                                            </Panel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <!-- Sekundärzeile: HW-Adresse (Tooltip) links, Gruppe als Chip rechts — kein wiederholtes Label. -->
+                                                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto"
+                                                          Margin="0,4,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource TextFaintest}"
+                                                                   FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                                   ToolTip.Tip="{l:Tr MainWindow.HardwareAddressTooltip}" />
+                                                        <Border Grid.Column="2" Classes="chip" ToolTip.Tip="{l:Tr MainWindow.GroupSensorTooltip}">
+                                                            <AutoCompleteBox Classes="ghost" Text="{Binding Group, UpdateSourceTrigger=LostFocus}"
+                                                                             ItemsSource="{Binding AvailableGroups}" FilterMode="Contains"
+                                                                             MinimumPrefixLength="0" PlaceholderText="{l:Tr MainWindow.AddGroup}">
+                                                                <AutoCompleteBox.Resources>
+                                                                    <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                                                                </AutoCompleteBox.Resources>
+                                                            </AutoCompleteBox>
+                                                        </Border>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                </StackPanel>
+
+                                <!-- ===== Lüfter ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Fans}">
+                                    <Border Classes="card" IsVisible="{Binding ShowDeviceLoading}">
+                                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="13" TextWrapping="Wrap"
+                                                   Text="{Binding DeviceLoadingText}" />
+                                    </Border>
+                                    <Border Classes="card" IsVisible="{Binding ShowNoDevices}">
+                                        <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="13" TextWrapping="Wrap"
+                                                   Text="{l:Tr MainWindow.NoDevices}" />
+                                    </Border>
+
+                                    <!-- Überschrift + Suche/Filter auf dem Hintergrund (wie die übrigen Sektionen); die Liste darunter in der Card. -->
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                            <TextBlock Text="{l:Tr MainWindow.Fans}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                            <TextBlock Text="{Binding Editor.FilteredFans.Count, StringFormat='({0})'}" Foreground="{DynamicResource TextFaint}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="{l:Tr MainWindow.FanListSubtitle}"
+                                                   Foreground="{DynamicResource TextFaint}" FontSize="12" />
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SpacingMd}">
+                                        <Border Classes="inset" Grid.Column="0" BorderBrush="{DynamicResource TextFaint}"
+                                                BorderThickness="1" CornerRadius="{StaticResource RadiusMd}" Padding="10,6">
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <PathIcon Grid.Column="0" Data="{StaticResource IconSearch}" Width="13" Height="13"
+                                                          Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                <TextBox Grid.Column="1" x:Name="FanSearchBox"
+                                                         Text="{Binding Editor.FanSearch, UpdateSourceTrigger=PropertyChanged}"
+                                                         PlaceholderText="{l:Tr MainWindow.SearchPlaceholder}" BorderThickness="0" Background="Transparent" Padding="8,5" />
+                                            </Grid>
+                                        </Border>
+                                        <CheckBox Grid.Column="1" IsChecked="{Binding Editor.HideHiddenFans}" Content="{l:Tr MainWindow.HideHidden}"
+                                                  VerticalAlignment="Center"
+                                                  ToolTip.Tip="{l:Tr MainWindow.HideHiddenFansTooltip}" />
+                                    </Grid>
+
+                                    <ItemsControl ItemsSource="{Binding Editor.FilteredFans}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="c:FanAssignRow">
+                                            <Border Classes="deviceRow">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                                    <PathIcon Grid.Row="0" Grid.Column="0" Data="{StaticResource IconFan}" Width="16" Height="16"
+                                                              Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                    <TextBox Grid.Row="0" Grid.Column="1" Classes="ghost" Text="{Binding Name}"
+                                                             PlaceholderText="{l:Tr MainWindow.NameRequired}"
+                                                             FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SpacingXs}"
+                                                                VerticalAlignment="Center" Margin="10,0,0,0">
+                                                        <!-- Kalibrier-Status auf einen Blick (gleiches Bild wie im Onboarding):
+                                                             Lüfter-Icon = läuft, Alert = fehlgeschlagen, Häkchen = bereits kalibriert. -->
+                                                        <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13"
+                                                                  Foreground="{DynamicResource Accent}" VerticalAlignment="Center"
+                                                                  IsVisible="{Binding IsCalibrating}"
+                                                                  ToolTip.Tip="{l:Tr MainWindow.CalibrationRunning}" />
+                                                        <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13"
+                                                                  Foreground="{DynamicResource DangerAccent}" VerticalAlignment="Center"
+                                                                  IsVisible="{Binding CalibrationFailed}"
+                                                                  ToolTip.Tip="{l:Tr MainWindow.CalibrationFailed}" />
+                                                        <PathIcon Data="{StaticResource IconCheckCircle}" Width="13" Height="13"
+                                                                  Foreground="{DynamicResource Success}" VerticalAlignment="Center"
+                                                                  IsVisible="{Binding IsCalibrated}"
+                                                                  ToolTip.Tip="{Binding CalibrationBadgeHint}" />
+                                                        <TextBlock Text="{Binding LiveRpm}" Foreground="{DynamicResource TextSecondary}"
+                                                                   FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                                        <Button Classes="iconBtn" Command="{Binding ToggleVisibleCommand}"
+                                                                ToolTip.Tip="{l:Tr MainWindow.ToggleVisibleFanTooltip}">
+                                                            <Panel>
+                                                                <PathIcon Data="{StaticResource IconEye}" Width="15" Height="15"
+                                                                          Foreground="{DynamicResource TextSecondary}" IsVisible="{Binding Visible}" />
+                                                                <PathIcon Data="{StaticResource IconEyeOff}" Width="15" Height="15"
+                                                                          Foreground="{DynamicResource TextFaintest}" IsVisible="{Binding !Visible}" />
+                                                            </Panel>
+                                                        </Button>
+                                                    </StackPanel>
+
+                                                    <!-- Sekundärzeile: HW-Adresse (Tooltip) · Gruppe · Position als kompakte Chips statt voll-breiter Zeilen. -->
+                                                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto,Auto"
+                                                          ColumnSpacing="{StaticResource SpacingSm}" Margin="0,4,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Grid.Column="0" Text="{Binding HardwareName}" Foreground="{DynamicResource TextFaintest}"
+                                                                   FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                                   ToolTip.Tip="{l:Tr MainWindow.HardwareAddressTooltip}" />
+                                                        <Border Grid.Column="2" Classes="chip" ToolTip.Tip="{l:Tr MainWindow.GroupFanTooltip}">
+                                                            <AutoCompleteBox Classes="ghost" Text="{Binding Group, UpdateSourceTrigger=LostFocus}"
+                                                                             ItemsSource="{Binding AvailableGroups}" FilterMode="Contains"
+                                                                             MinimumPrefixLength="0" PlaceholderText="{l:Tr MainWindow.AddGroup}">
+                                                                <AutoCompleteBox.Resources>
+                                                                    <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                                                                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                                                                </AutoCompleteBox.Resources>
+                                                            </AutoCompleteBox>
+                                                        </Border>
+                                                        <!-- Öffnet das Positions-Modal mit interaktiver Gehäuse-Vorschau; zeigt die aktuelle Wahl. -->
+                                                        <Button Grid.Column="3" Classes="chip" Click="OnPickLocation"
+                                                                ToolTip.Tip="{l:Tr MainWindow.PickLocationTooltip}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                <TextBlock Text="{Binding Location.Display}" VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10"
+                                                                          Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </Grid>
+
+                                                    <!-- „Erweitert" über die ganze Breite, ruhig: flacher Aufklapp-Header, transparenter Inhalt,
+                                                         nur ein Trennstrich unter dem Titel (kein abgegrenzter Karten-Kasten). -->
+                                                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,10,0,0">
+                                                        <ToggleButton Classes="advHeader" IsChecked="{Binding ShowAdvanced}"
+                                                                      ToolTip.Tip="{l:Tr MainWindow.AdvancedToggleTooltip}">
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.AdvancedHeader}"
+                                                                           Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" />
+                                                                <PathIcon Grid.Column="1" Classes="chevron" Data="{StaticResource IconChevronDown}"
+                                                                          Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </ToggleButton>
+                                                        <Border IsVisible="{Binding ShowAdvanced}" BorderBrush="{DynamicResource TextFaintest}"
+                                                                BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,6,0,0">
+                                                            <StackPanel Spacing="{StaticResource SpacingMd}">
+                                                                <!-- Min/Max per Slider (Roh-PWM bleibt die Wahrheit; % nur Anzeige). Ganzzahlige Schritte
+                                                                     (SnapToTick) → saubere int-Bindung an Min/MaxPercent; die Min≤Max-Kopplung sitzt im FanAssignRow. -->
+                                                                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
+                                                                      ColumnSpacing="{StaticResource SpacingSm}" RowSpacing="{StaticResource SpacingXs}">
+                                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:Tr MainWindow.Min}" Foreground="{DynamicResource TextMuted}"
+                                                                               VerticalAlignment="Center" Width="28"
+                                                                               ToolTip.Tip="{l:Tr MainWindow.MinTooltip}" />
+                                                                    <Slider Grid.Row="0" Grid.Column="1" Value="{Binding MinPercent}" Minimum="0" Maximum="100"
+                                                                            TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                                                                            ToolTip.Tip="{Binding MinPwm, StringFormat='Roh-PWM: {0}/255'}" />
+                                                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding MinPercent, StringFormat='{}{0} %'}"
+                                                                               Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                                                               MinWidth="40" TextAlignment="Right" />
+                                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr MainWindow.Max}" Foreground="{DynamicResource TextMuted}"
+                                                                               VerticalAlignment="Center" Width="28"
+                                                                               ToolTip.Tip="{l:Tr MainWindow.MaxTooltip}" />
+                                                                    <Slider Grid.Row="1" Grid.Column="1" Value="{Binding MaxPercent}" Minimum="0" Maximum="100"
+                                                                            TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                                                                            ToolTip.Tip="{Binding MaxPwm, StringFormat='Roh-PWM: {0}/255'}" />
+                                                                    <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MaxPercent, StringFormat='{}{0} %'}"
+                                                                               Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                                                               MinWidth="40" TextAlignment="Right" />
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding PwmAdjustHint}" Foreground="{DynamicResource WarningText}"
+                                                                           FontSize="11" TextWrapping="Wrap"
+                                                                           IsVisible="{Binding PwmAdjustHint, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}" />
+                                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLg}" IsVisible="{Binding CanControl}">
+                                                                    <Button Command="{Binding CalibrateCommand}" IsEnabled="{Binding CanCalibrate}"
+                                                                            ToolTip.Tip="{l:Tr MainWindow.CalibrateTooltip}">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                            <PathIcon Data="{StaticResource IconGauge}" Width="13" Height="13" />
+                                                                            <TextBlock Text="{l:Tr MainWindow.Calibrate}" />
+                                                                        </StackPanel>
+                                                                    </Button>
+                                                                    <TextBlock Text="{Binding CalibrationProgress}" Foreground="{DynamicResource InfoAccent}"
+                                                                               FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                                    <Button Command="{Binding IdentifyCommand}" IsEnabled="{Binding CanIdentify}"
+                                                                            ToolTip.Tip="{l:Tr MainWindow.IdentifyTooltip}">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                            <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13" />
+                                                                            <TextBlock Text="{l:Tr MainWindow.Identify}" />
+                                                                        </StackPanel>
+                                                                    </Button>
+                                                                    <TextBlock Text="{Binding IdentifyProgress}" Foreground="{DynamicResource InfoAccent}"
+                                                                               FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                                <!-- Fortschrittsbalken der laufenden Kalibrierung dieses Lüfters (gleiche Anzeige wie im Onboarding). -->
+                                                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding CalibrationFanProgress}"
+                                                                             Height="5" Margin="0,4,0,0" IsVisible="{Binding IsCalibrating}" />
+                                                                <!-- Temporäre Manuell-Steuerung: erleichtert die Zuordnung („welcher Lüfter ist das?").
+                                                                     Beim Zuklappen der Erweitert-Sektion automatisch zurück auf Kurve/Auto (FanAssignRow.OnShowAdvancedChanged). -->
+                                                                <StackPanel Spacing="{StaticResource SpacingSm}" IsVisible="{Binding CanControl}">
+                                                                    <CheckBox IsChecked="{Binding Manual.IsActive}" Content="{l:Tr MainWindow.ManualControl}"
+                                                                              ToolTip.Tip="{l:Tr MainWindow.ManualControlTooltip}" />
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSm}"
+                                                                          IsVisible="{Binding Manual.IsActive}">
+                                                                        <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Pwm}" Foreground="{DynamicResource TextMuted}"
+                                                                                   VerticalAlignment="Center" Width="28" />
+                                                                        <Slider Grid.Column="1" Value="{Binding Manual.Percent}" Minimum="0" Maximum="100"
+                                                                                TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
+                                                                        <TextBlock Grid.Column="2" Text="{Binding Manual.Percent, StringFormat='{}{0:0} %'}"
+                                                                                   Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                                                                   MinWidth="40" TextAlignment="Right" />
+                                                                        <TextBlock Grid.Column="3" Text="{Binding Manual.LiveRpm}" Foreground="{DynamicResource Accent}"
+                                                                                   VerticalAlignment="Center" FontSize="11" MinWidth="64" TextAlignment="Right" />
+                                                                    </Grid>
+                                                                    <TextBlock IsVisible="{Binding Manual.IsActive}" Foreground="{DynamicResource TextFaint}"
+                                                                               FontSize="11" TextWrapping="Wrap"
+                                                                               Text="{l:Tr MainWindow.ManualPwmFloorHint}" />
+                                                                </StackPanel>
+                                                                <!-- Drehzahl-Sensor-Kopplung: automatisch koppeln (nur steuerbar) + manuelle Zuordnung des Tachos. -->
+                                                                <StackPanel Spacing="{StaticResource SpacingSm}">
+                                                                    <TextBlock Text="{l:Tr MainWindow.TachometerHeader}" Foreground="{DynamicResource TextMuted}"
+                                                                               FontSize="12" FontWeight="SemiBold" />
+                                                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLg}"
+                                                                                IsVisible="{Binding CanControl}">
+                                                                        <Button Command="{Binding CoupleSensorCommand}" IsEnabled="{Binding CanCoupleSensor}"
+                                                                                ToolTip.Tip="{l:Tr MainWindow.CoupleSensorTooltip}">
+                                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                                <PathIcon Data="{StaticResource IconWind}" Width="13" Height="13" />
+                                                                                <TextBlock Text="{l:Tr MainWindow.CoupleSensor}" />
+                                                                            </StackPanel>
+                                                                        </Button>
+                                                                        <Button Command="{Binding CancelCoupleSensorCommand}" IsVisible="{Binding IsTachMapping}"
+                                                                                ToolTip.Tip="{l:Tr MainWindow.CancelCoupleTooltip}">
+                                                                            <TextBlock Text="{l:Tr MainWindow.CancelCouple}" />
+                                                                        </Button>
+                                                                        <TextBlock Text="{Binding TachMappingProgress}" Foreground="{DynamicResource InfoAccent}"
+                                                                                   FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                                    </StackPanel>
+                                                                    <ProgressBar IsIndeterminate="True" Height="5" IsVisible="{Binding IsTachMapping}" />
+                                                                    <!-- Manuelle Zuordnung: verfügbaren Drehzahl-Sensor wählen; „— (keiner) —" löscht die Zuordnung. -->
+                                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SpacingSm}">
+                                                                        <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Tachometer}" Foreground="{DynamicResource TextMuted}"
+                                                                                   VerticalAlignment="Center" />
+                                                                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                                                                  ItemsSource="{Binding AvailableTachSensors}" SelectedItem="{Binding SelectedTach}"
+                                                                                  ToolTip.Tip="{l:Tr MainWindow.TachometerTooltip}">
+                                                                            <ComboBox.ItemTemplate>
+                                                                                <DataTemplate x:DataType="c:TachSensorOption">
+                                                                                    <TextBlock Text="{Binding Name}" />
+                                                                                </DataTemplate>
+                                                                            </ComboBox.ItemTemplate>
+                                                                        </ComboBox>
+                                                                    </Grid>
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                </StackPanel>
+
+                                <!-- ===== Airflow ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Airflow}">
+                                    <Border Classes="card" IsVisible="{Binding !Editor.IsReady}">
+                                        <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="13" TextWrapping="Wrap"
+                                                   Text="{l:Tr MainWindow.NoDevices}" />
+                                    </Border>
+
+                                    <!-- Überschrift auf dem Hintergrund (wie die übrigen Sektionen); Aktion + Ergebnisse in der Card. -->
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}" IsVisible="{Binding Editor.IsReady}">
+                                        <TextBlock Text="{l:Tr MainWindow.AirflowAutoTune}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="12" TextWrapping="Wrap"
+                                                   Text="{l:Tr MainWindow.AirflowAutoTuneSubtitle}" />
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="{StaticResource SpacingMd}" IsVisible="{Binding Editor.IsReady}">
+                                <Button Command="{Binding Editor.AnalyzeAirflowCommand}"
+                                        HorizontalAlignment="Left"
+                                        ToolTip.Tip="{l:Tr MainWindow.AnalyzeAirflowTooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                        <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" />
+                                        <TextBlock Text="{l:Tr MainWindow.AnalyzeAirflow}" />
+                                    </StackPanel>
+                                </Button>
+
+                                <StackPanel Spacing="{StaticResource SpacingMd}" IsVisible="{Binding Editor.HasAirflowSuggestion}">
+                                    <TextBlock Text="{Binding Editor.AirflowPressureText}" Foreground="{DynamicResource InfoText}"
+                                               FontSize="12" TextWrapping="Wrap" />
+
+                                    <ItemsControl ItemsSource="{Binding Editor.AirflowHints}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="sys:String">
+                                                <TextBlock Text="{Binding}" Foreground="{DynamicResource WarningText}" FontSize="11"
+                                                           TextWrapping="Wrap" Margin="0,1" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <ItemsControl ItemsSource="{Binding Editor.AirflowSuggestions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="c:AirflowSuggestionRow">
+                                                <Border Margin="0,3" Padding="10" CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCardAlt}">
+                                                    <Grid ColumnDefinitions="Auto,*">
+                                                        <CheckBox Grid.Column="0" IsChecked="{Binding Apply}"
+                                                                  VerticalAlignment="Top" Margin="0,0,8,0" />
+                                                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXxs}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                                <TextBlock Text="{Binding FanName}" Foreground="{DynamicResource TextPrimary}"
+                                                                           FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding LocationDisplay}" Foreground="{DynamicResource TextFaint}"
+                                                                           FontSize="11" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding CurveName}" Foreground="{DynamicResource Accent}" FontSize="12" />
+                                                            <TextBlock Text="{Binding Reason}" Foreground="{DynamicResource TextMuted}"
+                                                                       FontSize="11" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Button Content="{l:Tr MainWindow.ApplySuggestion}" Command="{Binding Editor.ApplyAirflowCommand}"
+                                            HorizontalAlignment="Left"
+                                            ToolTip.Tip="{l:Tr MainWindow.ApplySuggestionTooltip}" />
+                                </StackPanel>
+                            </StackPanel>
+                                </StackPanel>
+
+                                <!-- ===== Darstellung ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Appearance}">
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <TextBlock Text="{l:Tr Settings.SectionAppearance}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Text="{l:Tr Settings.AppearanceDesc}" FontSize="12" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                                        <TextBlock Text="{l:Tr Header.Theme}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                                        <ComboBox MinWidth="160" ItemsSource="{Binding Settings.ThemeOptions}"
+                                                  SelectedItem="{Binding Settings.SelectedThemeOption}"
+                                                  ToolTip.Tip="{l:Tr Header.ThemeTooltip}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- ===== Sprache ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Language}">
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <TextBlock Text="{l:Tr Settings.SectionLanguage}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Text="{l:Tr Settings.LanguageDesc}" FontSize="12" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                                        <TextBlock Text="{l:Tr Header.Language}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                                        <ComboBox MinWidth="160" ItemsSource="{Binding Settings.LanguageOptions}"
+                                                  SelectedItem="{Binding Settings.SelectedLanguageOption}"
+                                                  ToolTip.Tip="{l:Tr Header.LanguageTooltip}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- ===== Hintergrund ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Background}">
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <TextBlock Text="{l:Tr Settings.SectionBackground}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Text="{l:Tr Settings.BackgroundDesc}" FontSize="12" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding Settings.MinimizeToTray}" Content="{l:Tr Header.RunInBackground}"
+                                              ToolTip.Tip="{l:Tr Header.RunInBackgroundTooltip}" />
+                                    <CheckBox IsChecked="{Binding Settings.UpdateChecksEnabled}" Content="{l:Tr Settings.CheckForUpdates}"
+                                              ToolTip.Tip="{l:Tr Settings.CheckForUpdatesTooltip}" />
+                                </StackPanel>
+
+                                <!-- ===== Sicherung ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingXl}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Backup}">
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <TextBlock Text="{l:Tr Settings.SectionBackup}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Text="{l:Tr Settings.BackupDesc}" FontSize="12" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="{StaticResource SpacingLg}">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                                            <Button Click="OnExportBackup" IsEnabled="{Binding Connected}" ToolTip.Tip="{l:Tr Settings.ExportTooltip}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                        <PathIcon Data="{StaticResource IconArchive}" Width="14" Height="14" />
+                                                        <TextBlock Text="{l:Tr Settings.Export}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Click="OnImportBackup" IsEnabled="{Binding Connected}" ToolTip.Tip="{l:Tr Settings.ImportTooltip}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                        <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" />
+                                                        <TextBlock Text="{l:Tr Settings.Import}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Backup.Status}" Foreground="{DynamicResource Accent}" FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       IsVisible="{Binding Backup.Status, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}" />
+                                    </StackPanel>
+                                    <!-- Gefahrenzone: Reset klar abgesetzt (destruktiv). -->
+                                    <Border Background="{DynamicResource DangerBg}" CornerRadius="{StaticResource RadiusMd}" Padding="16">
+                                        <StackPanel Spacing="{StaticResource SpacingSm}">
+                                            <TextBlock Text="{l:Tr Settings.DangerZone}" FontWeight="SemiBold" Foreground="{DynamicResource DangerText}" />
+                                            <TextBlock Text="{l:Tr Settings.ResetTooltip}" FontSize="12" Foreground="{DynamicResource DangerText}" TextWrapping="Wrap" />
+                                            <Button Click="OnResetConfig" IsEnabled="{Binding Connected}" HorizontalAlignment="Left" Margin="0,4,0,0">
+                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                    <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
+                                                    <TextBlock Text="{l:Tr Settings.Reset}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- ===== Onboarding ===== -->
+                                <StackPanel Spacing="{StaticResource SpacingLg}"
+                                            IsVisible="{Binding Settings.SelectedSection, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Onboarding}">
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                        <TextBlock Text="{l:Tr Settings.SectionOnboarding}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Text="{l:Tr Settings.OnboardingDesc}" FontSize="12" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Command="{Binding StartOnboardingCommand}" IsEnabled="{Binding Connected}"
+                                            HorizontalAlignment="Left"
+                                            ToolTip.Tip="{l:Tr Settings.StartOnboardingTooltip}">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                            <PathIcon Data="{StaticResource IconSparkle}" Width="14" Height="14" />
+                                            <TextBlock Text="{l:Tr Settings.StartOnboarding}" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                            </Panel>
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

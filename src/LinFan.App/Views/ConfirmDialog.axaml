@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:LinFan.App.Localization"
+        x:Class="LinFan.App.Views.ConfirmDialog"
+        Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="{DynamicResource BgWindow}">
+    <Window.Styles>
+        <!-- Destruktiver Bestätigungs-Button (Löschen/Verwerfen): dezent rot, beim Hover voll. -->
+        <Style Selector="Button.danger">
+            <Setter Property="Background" Value="{DynamicResource DangerBg}" />
+            <Setter Property="Foreground" Value="{DynamicResource DangerText}" />
+        </Style>
+        <Style Selector="Button.danger:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource DangerAccent}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        </Style>
+    </Window.Styles>
+    <StackPanel Margin="24" Spacing="{StaticResource SpacingXl}">
+        <TextBlock x:Name="HeadingText" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" />
+        <TextBlock x:Name="MessageText" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource SpacingMd}">
+            <!-- Abbrechen ist der sichere Default (Esc / Fenster-X) → keine destruktive Aktion versehentlich. -->
+            <Button x:Name="CancelButton" Content="{l:Tr ConfirmDialog.Cancel}" Click="OnCancel" IsCancel="True" />
+            <Button x:Name="ConfirmButton" Click="OnConfirm" />
+        </StackPanel>
+    </StackPanel>
+</Window>

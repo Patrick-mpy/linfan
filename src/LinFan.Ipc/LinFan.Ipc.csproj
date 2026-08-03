@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Nur die Logging-Abstraktion (ILogger): der privilegierte IPC-Server braucht eine Audit-Spur
+         für fehlerhafte/böswillige Kommandos; die konkrete Logging-Implementierung stellt der Host. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tests prüfen die internen Transport-Implementierungen (Named Pipe) direkt. -->
+    <InternalsVisibleTo Include="LinFan.Ipc.Tests" />
+  </ItemGroup>
+
+</Project>

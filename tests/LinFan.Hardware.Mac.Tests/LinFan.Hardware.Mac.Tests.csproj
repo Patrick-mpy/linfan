@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    Das Backend plus das geteilte Conformance-Kit (abstrakte Suite INV-1..INV-10). Die Tests injizieren
+    ein Fake-SMC in den internen Inject-Ctor und laufen daher auf JEDEM OS (kein IOKit, keine Root-Rechte).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LinFan.Hardware.Mac\LinFan.Hardware.Mac.csproj" />
+    <ProjectReference Include="..\LinFan.Conformance\LinFan.Conformance.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,80 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+      Zentrale „Karten"-Abstände als Style-Klassen, damit wiederholte Border-Muster konsistent bleiben
+      und an einer Stelle justierbar sind. Bewusst nur Eigenschaften, die je Rolle identisch sind
+      (CornerRadius/Padding/Background, sowie der je Rolle gleiche Margin bei bar/listItem); rein
+      positionsbezogene Margins (z. B. der Spalten-Gutter der Panels) bleiben kontextspezifisch inline.
+      Background als DynamicResource → der Theme-Wechsel (Hell/Dunkel) bleibt erhalten.
+    -->
+
+    <!-- Inhaltskarte (Tab-Inhalte) — die häufigste Karte. -->
+    <Style Selector="Border.card">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusXl}" />
+        <Setter Property="Padding" Value="18" />
+        <Setter Property="Background" Value="{DynamicResource BgCard}" />
+    </Style>
+
+    <!-- Dashboard-Panel (Aktive Kurven / Temperaturen / Lüfter). Flach: kein Karten-Hintergrund,
+         der Inhalt (umrissene itemCards, Sensor-Zeilen) geht in den Fenster-Hintergrund über. -->
+    <Style Selector="Border.panel">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusXxl}" />
+        <Setter Property="Padding" Value="20" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- Schmale Leiste (Profil-Auswahl, Dashboard & Kurven-Tab). Ebenfalls flach ohne Hintergrund. -->
+    <Style Selector="Border.bar">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+
+    <!-- Geräte-Listenzeile (Einstellungen → Sensoren/Lüfter): ruhige, durch eine Hairline getrennte
+         Zeile statt gefüllter Karte; erst beim Überfahren eine dezente Füllung als Editier-Hinweis. -->
+    <Style Selector="Border.deviceRow">
+        <Setter Property="Padding" Value="8,9" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Divider}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.deviceRow:pointerover">
+        <Setter Property="Background" Value="{DynamicResource BgCard}" />
+    </Style>
+
+    <!-- Kompakter Chip (Gruppe): dezente Inset-Fläche, Rahmen erst bei Hover/Fokus (im Feld). -->
+    <Style Selector="Border.chip">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+        <Setter Property="Padding" Value="4,1" />
+        <Setter Property="MinWidth" Value="104" />
+        <Setter Property="Background" Value="{DynamicResource BgInset}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.chip:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource TextFaintest}" />
+    </Style>
+    <Style Selector="Border.chip:focus-within">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    </Style>
+
+    <!-- Reiche, interaktive Listenzeile (Dashboard-Lüfter mit Slider/Sparkline, „Aktive Kurven" mit
+         Mini-Graph): umrissene Karte (Divider-Rand, transparent) statt gefülltem Kasten — Fassung für
+         Slider/Graph ohne Box-in-Box. Einfache Zeilen (Sensoren) bleiben flach ohne Karte. -->
+    <Style Selector="Border.itemCard">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="Margin" Value="0,3" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Divider}" />
+    </Style>
+
+    <!-- Eingelassenes Feld (Suchfeld). -->
+    <Style Selector="Border.inset">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="Background" Value="{DynamicResource BgInset}" />
+    </Style>
+</Styles>

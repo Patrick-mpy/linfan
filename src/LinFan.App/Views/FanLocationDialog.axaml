@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="clr-namespace:LinFan.App.Controls"
+        xmlns:c="clr-namespace:LinFan.App.Controllers"
+        xmlns:views="clr-namespace:LinFan.App.Views"
+        xmlns:l="clr-namespace:LinFan.App.Localization"
+        x:Class="LinFan.App.Views.FanLocationDialog"
+        x:DataType="views:FanLocationDialog"
+        Width="580" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="{DynamicResource BgWindow}">
+    <StackPanel Margin="24" Spacing="{StaticResource SpacingLg}">
+        <TextBlock x:Name="HeadingText" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" />
+        <TextBlock Text="{l:Tr FanLocationDialog.Hint}"
+                   Foreground="{DynamicResource TextFaint}" FontSize="12" TextWrapping="Wrap" />
+
+        <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="14">
+            <ctrl:FanLocationDiagram Height="440" SelectedLocation="{Binding SelectedLocation, Mode=TwoWay}" />
+        </Border>
+
+        <!-- Einlass/Auslass-Umschalter — nur für Gehäuse-Positionen (interne Bauteile haben keine Richtung). -->
+        <StackPanel x:Name="DirectionPanel" Orientation="Horizontal" Spacing="{StaticResource SpacingMd}" IsVisible="False">
+            <TextBlock Text="{l:Tr FanLocationDialog.Direction}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+            <TextBlock x:Name="DirectionText" Foreground="{DynamicResource TextSecondary}"
+                       FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Content="{l:Tr FanLocationDialog.ToggleDirection}" Click="OnToggleDirection" />
+        </StackPanel>
+
+        <!-- Tastatur-Fallback: dieselbe Auswahl als Liste, two-way an dieselbe SelectedLocation gebunden. -->
+        <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Grid.Column="0" Text="{l:Tr FanLocationDialog.Position}" Foreground="{DynamicResource TextMuted}"
+                       VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding Options}"
+                      SelectedValueBinding="{Binding Value}"
+                      SelectedValue="{Binding SelectedLocation, Mode=TwoWay}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="c:FanLocationOption">
+                        <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </Grid>
+
+        <!-- Optionale temporäre Manuell-Steuerung: Lüfter anstoßen, um zu sehen, welcher physisch reagiert,
+             während die Position gewählt wird. Nur für steuerbare Lüfter; beim Schließen zurück auf Auto/Kurve. -->
+        <Border IsVisible="{Binding ShowManual}" CornerRadius="{StaticResource RadiusMd}"
+                Background="{DynamicResource BgCard}" Padding="14">
+            <StackPanel Spacing="{StaticResource SpacingSm}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <CheckBox Grid.Column="0" IsChecked="{Binding Manual.IsActive}" Content="{l:Tr FanLocationDialog.ManualNudge}"
+                              ToolTip.Tip="{l:Tr FanLocationDialog.ManualNudgeTooltip}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Manual.LiveRpm}" Foreground="{DynamicResource Accent}"
+                               VerticalAlignment="Center" FontSize="12" />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource SpacingSm}"
+                      IsVisible="{Binding Manual.IsActive}">
+                    <TextBlock Grid.Column="0" Text="{l:Tr FanLocationDialog.Pwm}" Foreground="{DynamicResource TextMuted}"
+                               VerticalAlignment="Center" Width="28" />
+                    <Slider Grid.Column="1" Value="{Binding Manual.Percent}" Minimum="0" Maximum="100"
+                            TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding Manual.Percent, StringFormat='{}{0:0} %'}"
+                               Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                               MinWidth="40" TextAlignment="Right" />
+                </Grid>
+                <TextBlock IsVisible="{Binding Manual.IsActive}" Foreground="{DynamicResource TextFaint}"
+                           FontSize="11" TextWrapping="Wrap"
+                           Text="{l:Tr FanLocationDialog.HardwareFloorHint}" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource SpacingMd}">
+            <Button Content="{l:Tr FanLocationDialog.Cancel}" Click="OnCancel" IsCancel="True" />
+            <Button Content="{l:Tr FanLocationDialog.Apply}" Click="OnConfirm" IsDefault="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -90,7 +90,7 @@
     <value>Übernehmen</value>
   </data>
   <data name="MainWindow.RevertTooltip" xml:space="preserve">
-    <value>Verwirft alle Änderungen seit dem letzten Speichern (mit Bestätigung).</value>
+    <value>Verwirft alle Änderungen seit dem letzten Speichern.</value>
   </data>
   <data name="MainWindow.Revert" xml:space="preserve">
     <value>Verwerfen</value>
@@ -318,7 +318,7 @@
     <value>Umbenennen</value>
   </data>
   <data name="MainWindow.DeleteProfileTooltip" xml:space="preserve">
-    <value>Löscht das aktuelle Profil (mit Bestätigung).</value>
+    <value>Löscht das aktuelle Profil.</value>
   </data>
   <data name="MainWindow.Delete" xml:space="preserve">
     <value>Löschen</value>
@@ -339,7 +339,7 @@
     <value>Dupliziert die ausgewählte Kurve.</value>
   </data>
   <data name="MainWindow.DeleteCurveTooltip" xml:space="preserve">
-    <value>Löscht die ausgewählte Kurve (mit Bestätigung).</value>
+    <value>Löscht die ausgewählte Kurve.</value>
   </data>
   <data name="MainWindow.OffParen" xml:space="preserve">
     <value>(aus)</value>
@@ -948,7 +948,7 @@
     <value>Hintergrunddienst nicht erreichbar ({0}) — Wiederverbinden …</value>
   </data>
   <data name="IpcLiveMonitor.AccessDenied" xml:space="preserve">
-    <value>Der Hintergrunddienst läuft, aber der Zugriff auf seinen Socket wurde verweigert. Unter Linux: prüfe, ob dein Benutzer in der Gruppe „linfan“ ist, und melde dich danach ab und wieder an.</value>
+    <value>Der Hintergrunddienst läuft, aber der Zugriff wurde verweigert. Prüfe, ob dein Benutzer in der IPC-Zugriffsgruppe ist — „linfan“ unter Linux, „LinFan Users“ unter Windows — und melde dich danach ab und wieder an.</value>
   </data>
   <data name="Ipc.Status.Active" xml:space="preserve">
     <value>Aktiv</value>
@@ -1150,5 +1150,50 @@
   </data>
   <data name="Settings.CheckForUpdatesTooltip" xml:space="preserve">
     <value>Fragt bei jedem Start bei GitHub nach einer neueren Version.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveCpu" xml:space="preserve">
+    <value>Airflow · CPU/Radiator</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveGpu" xml:space="preserve">
+    <value>Airflow · GPU</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveIntake" xml:space="preserve">
+    <value>Airflow · Einlass</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveExhaust" xml:space="preserve">
+    <value>Airflow · Auslass</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveDefault" xml:space="preserve">
+    <value>Airflow · Standard</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowReasonHardwareAuto" xml:space="preserve">
+    <value>Bleibt auf Hardware-Auto (keine Software-Kurve).</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowReasonNoPosition" xml:space="preserve">
+    <value>Keine Position angegeben – neutrale Standardkurve; für besseren Vorschlag Position setzen.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowReasonLocationCurve" xml:space="preserve">
+    <value>{0} → Kurve: {1}</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoSensors" xml:space="preserve">
+    <value>Keine Sensoren konfiguriert – Quell-Sensor der vorgeschlagenen Kurven bitte manuell wählen.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoCaseFans" xml:space="preserve">
+    <value>Keine Gehäuselüfter mit Ein-/Auslass-Position – Druckbilanz nicht bestimmbar.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintCountEstimate" xml:space="preserve">
+    <value>Ohne vollständige Kalibrierung nur nach Lüfter-Anzahl geschätzt (kein Drehzahl-Proxy).</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoIntake" xml:space="preserve">
+    <value>Kein Einlasslüfter erkannt – Frischluftzufuhr prüfen.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoExhaust" xml:space="preserve">
+    <value>Kein Auslasslüfter erkannt – Wärmeabfuhr prüfen.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNegativePressure" xml:space="preserve">
+    <value>Unterdruck: mehr Auslass als Einlass – mehr Einlass erwägen oder Auslass drosseln (zieht sonst Staub durch Ritzen).</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoCpuSensor" xml:space="preserve">
+    <value>Kein CPU-Sensor per Name erkannt – Quelle der CPU-Kurve bitte prüfen.</value>
   </data>
 </root>

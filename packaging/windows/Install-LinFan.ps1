@@ -17,7 +17,9 @@
 
 .NOTES
   The service runs as LocalSystem — writing PWM via LibreHardwareMonitor/WinRing0 needs admin.
-  The GUI runs as a normal user and connects over the named pipe \\.\pipe\linfan.
+  The GUI runs as a normal user and connects over the named pipe \\.\pipe\linfan; access to it is
+  restricted to the local group "LinFan Users", which this script creates and adds the GUI user to
+  (counterpart to the 'linfan' socket group on Linux — needs a re-login to take effect).
   The configuration lives machine-wide under %ProgramData%\linfan (daemon = sole writer).
   -InstallerManaged is set by the Inno Setup installer: files + shortcut are then managed by Inno,
   this script only registers the service.
@@ -26,12 +28,19 @@
 param(
     [string]$Source,
     [string]$InstallDir = (Join-Path $env:ProgramFiles 'LinFan'),
-    [switch]$InstallerManaged
+    [switch]$InstallerManaged,
+    # Set by the Inno installer: path of a marker file to write when the GUI user was NEWLY added to
+    # the IPC group (re-login pending). Inno's NeedRestart() checks it and offers a restart instead
+    # of the "Launch LinFan" checkbox, which could not connect with the pre-add token anyway.
+    [string]$ReloginMarker
 )
 
 $ErrorActionPreference = 'Stop'
 $ServiceName = 'LinFan'
 $DisplayName = 'LinFan Fan Control'
+# Local group the daemon's named-pipe DACL grants access to (must match AllowedGroup in
+# src/LinFan.Ipc/Transport/NamedPipeServerTransport.cs).
+$IpcGroup = 'LinFan Users'
 
 $daemonExe = Join-Path $InstallDir 'Daemon\LinFan.Daemon.exe'
 $appExe = Join-Path $InstallDir 'App\LinFan.App.exe'
@@ -91,8 +100,47 @@ if (-not $InstallerManaged) {
     $shortcut = $shell.CreateShortcut($lnk)
     $shortcut.TargetPath = $appExe
     $shortcut.WorkingDirectory = (Split-Path $appExe)
-    $shortcut.Description = 'LinFan — fan curves, temperatures & speeds'
+    $shortcut.Description = 'LinFan - fan curves, temperatures & speeds'
     $shortcut.Save()
+}
+
+# --- IPC access group (counterpart to the 'linfan' socket group in packaging/install.sh) ---
+# The daemon restricts the named pipe to members of this group. Without it the DACL falls back to
+# "Authenticated Users" — every local account could then talk to the privileged daemon. Must happen
+# BEFORE the service starts: the daemon resolves the group once, when it creates the first pipe.
+# Nothing here may abort the installation; the fallback keeps the GUI working either way.
+$needRelogin = $false
+$guiUser = $null
+try {
+    if (-not (Get-LocalGroup -Name $IpcGroup -ErrorAction SilentlyContinue)) {
+        Write-Host "==> creating the IPC access group '$IpcGroup'"
+        # Windows caps a local group's description at 48 characters — a longer one makes New-LocalGroup
+        # fail outright and no group is created at all. Keep this string short.
+        New-LocalGroup -Name $IpcGroup -Description 'May connect to the LinFan daemon (IPC pipe).' | Out-Null
+    }
+
+    # The GUI user, not the elevating admin: under UAC both are the same account, but with "run as
+    # different user" only the interactive console user is the right target (like SUDO_USER on Linux).
+    $guiUser = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).UserName
+    if (-not $guiUser) { $guiUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name }
+
+    $members = @(Get-LocalGroupMember -Group $IpcGroup -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.Name })
+    if ($members -notcontains $guiUser) {
+        Write-Host "    adding $guiUser to '$IpcGroup'"
+        Add-LocalGroupMember -Group $IpcGroup -Member $guiUser
+        $needRelogin = $true
+    }
+}
+catch {
+    Write-Warning ("IPC access group '$IpcGroup' could not be set up: $($_.Exception.Message)`n" +
+        "The daemon falls back to 'Authenticated Users' (every local account may talk to it). " +
+        "Create the group manually, add your GUI user, then restart the service.")
+}
+
+# Best-effort: a failed marker write must not abort the installation (worst case: no restart offer).
+if ($needRelogin -and $ReloginMarker) {
+    try { Set-Content -Path $ReloginMarker -Value '1' -Encoding ascii } catch {}
 }
 
 # --- Start the service ---
@@ -105,3 +153,11 @@ Write-Host 'Done.'
 Write-Host "  GUI:     Start menu -> 'LinFan'  (start as a normal user, NOT as admin)"
 Write-Host "  Service: Get-Service LinFan   |   Stop: Stop-Service LinFan"
 Write-Host "  Config:  $env:ProgramData\linfan\config.json   (daemon is the sole writer)"
+if ($needRelogin) {
+    Write-Host ''
+    # Console output stays pure ASCII: Windows PowerShell reads a .ps1 without BOM as ANSI, so a
+    # typographic dash would print as mojibake in the installer log.
+    Write-Host "  NOTE: '$guiUser' was added to '$IpcGroup'. Windows only applies group membership at"
+    Write-Host '        sign-in: LOG OUT AND BACK IN once, otherwise the GUI reports the service as'
+    Write-Host '        unreachable even though it is running.'
+}

@@ -24,10 +24,18 @@ public sealed class IpcServer : IIpcServer
     /// </summary>
     private const int MaxCommandBytes = 8 * 1024 * 1024;
 
+    /// <summary>
+    /// Wartezeit, bevor eine fehlgeschlagene Verbindungsannahme wiederholt wird. Ohne sie würde ein
+    /// <b>dauerhafter</b> Accept-Fehler (z. B. fehlendes Recht, eine weitere Pipe-Instanz anzulegen) die
+    /// Schleife frei drehen lassen — im privilegierten Daemon eine Dauerlast, die nichts erreicht.
+    /// </summary>
+    private static readonly TimeSpan AcceptRetryDelay = TimeSpan.FromMilliseconds(500);
+
     private readonly string _path;
     private readonly IIpcServerTransport _transport;
     private readonly ILogger _log;
     private readonly int _maxCommandBytes;
+    private readonly TimeSpan _acceptRetryDelay;
     private readonly List<Stream> _clients = new();
     private readonly object _lock = new();
 
@@ -45,13 +53,18 @@ public sealed class IpcServer : IIpcServer
     {
     }
 
-    /// <summary>Test-Seam: erlaubt eine kleinere Zeilen-Obergrenze, um den DoS-Guard ohne 8-MiB-Payload zu prüfen.</summary>
-    internal IpcServer(string? path, IIpcServerTransport? transport, ILogger? log, int maxCommandBytes)
+    /// <summary>
+    /// Test-Seam: erlaubt eine kleinere Zeilen-Obergrenze, um den DoS-Guard ohne 8-MiB-Payload zu prüfen,
+    /// und eine kürzere <see cref="AcceptRetryDelay"/>, damit der Backoff ohne echte Wartezeit prüfbar ist.
+    /// </summary>
+    internal IpcServer(string? path, IIpcServerTransport? transport, ILogger? log, int maxCommandBytes,
+                       TimeSpan? acceptRetryDelay = null)
     {
         _path = path ?? IpcEndpoint.SocketPath;
         _log = log ?? NullLogger.Instance;
         _transport = transport ?? IpcTransportFactory.CreateServer(_log); // Logger für Zugriffskontrolle/Audit
         _maxCommandBytes = maxCommandBytes;
+        _acceptRetryDelay = acceptRetryDelay ?? AcceptRetryDelay;
     }
 
     public string Path => _path;
@@ -88,6 +101,10 @@ public sealed class IpcServer : IIpcServer
 
     private async Task AcceptLoopAsync(CancellationToken ct)
     {
+        // Je Fehler-Serie nur einmal warnen (und einmal je Erholung zurücksetzen): ein Dauerfehler würde
+        // sonst im Sekundentakt dasselbe ins Log schreiben.
+        bool failureLogged = false;
+
         while (!ct.IsCancellationRequested)
         {
             Stream client;
@@ -99,10 +116,21 @@ public sealed class IpcServer : IIpcServer
             catch (ObjectDisposedException) { break; }
             catch (Exception ex)
             {
-                _log.LogDebug(ex, "IPC: Verbindungsannahme fehlgeschlagen — nächster Versuch.");
+                // Warnung statt Debug: schlägt die Annahme dauerhaft fehl, nimmt der Daemon keine GUI mehr
+                // an — das darf nicht nur im Debug-Log stehen.
+                if (!failureLogged)
+                {
+                    failureLogged = true;
+                    _log.LogWarning(ex, "IPC: Verbindungsannahme fehlgeschlagen — Wiederholung alle {Ms} ms.",
+                        _acceptRetryDelay.TotalMilliseconds);
+                }
+
+                try { await Task.Delay(_acceptRetryDelay, ct); }
+                catch (OperationCanceledException) { break; }
                 continue;
             }
 
+            failureLogged = false;
             int count;
             lock (_lock)
             {

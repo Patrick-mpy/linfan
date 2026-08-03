@@ -33,6 +33,10 @@ public partial class FanAssignRow : ObservableObject
     // Wert eine gerade getätigte (noch nicht bestätigte) Nutzer-Auswahl im Dropdown zurücksetzt.
     private string? _lastDaemonRpmSource;
     private bool _applyingRpmSource; // true, während das Dropdown programmatisch aus dem Snapshot gesetzt wird
+    // Zuletzt vom Daemon gemeldeter Anlaufpunkt (MinPwm) — gleiches Muster wie _lastDaemonRpmSource: nur eine
+    // echte Änderung dort (Kalibrier-Ergebnis) zieht den Wert nach, ein unveränderter Snapshot lässt eine
+    // gerade getippte, noch nicht gespeicherte Eingabe in Ruhe.
+    private int _lastDaemonMinPwm;
 
     public string FanId => _base.FanId;
 
@@ -190,6 +194,7 @@ public partial class FanAssignRow : ObservableObject
         _visible = !baseFan.Hidden;
         _minPwm = baseFan.MinPwm;
         _maxPwm = baseFan.MaxPwm;
+        _lastDaemonMinPwm = baseFan.MinPwm;
 
         // Aktuelle Tacho-Zuordnung aus der Config spiegeln (Feld-Zuweisung → kein SetFanTachometer-Command).
         _lastDaemonRpmSource = baseFan.RpmSource;
@@ -372,6 +377,26 @@ public partial class FanAssignRow : ObservableObject
         _applyingRpmSource = true;
         SelectedTach = AvailableTachSensors.FirstOrDefault(o => o.Id == rpmSource);
         _applyingRpmSource = false;
+    }
+
+    /// <summary>
+    /// Spiegelt den vom Daemon persistierten Anlaufpunkt (<see cref="FanConfig.MinPwm"/>) in die Zeile. Er ändert
+    /// sich dort <b>ohne Zutun des Editors</b>, sobald eine Kalibrierung durchläuft — ohne dieses Nachziehen bliebe
+    /// die Zeile auf dem alten Wert und das nächste Speichern schriebe das Kalibrier-Ergebnis stillschweigend
+    /// wieder weg. Ein Snapshot mit unverändertem Wert wird ignoriert (schützt eine laufende Nutzer-Eingabe, wie
+    /// bei <see cref="ApplyRpmSource"/>). Liefert, ob der Wert übernommen wurde — dann muss der Controller die
+    /// Dirty-Baseline nachziehen, denn eine Kalibrierung ist keine ungespeicherte Nutzer-Änderung.
+    /// </summary>
+    public bool ApplyDaemonMinPwm(int minPwm)
+    {
+        if (minPwm == _lastDaemonMinPwm)
+            return false;
+        _lastDaemonMinPwm = minPwm;
+
+        if (minPwm == MinPwm)
+            return false; // eigener, gerade gespeicherter Wert kommt zurück — nichts zu tun
+        MinPwm = minPwm;
+        return true;
     }
 
     /// <summary>Nutzer-Auswahl im Tacho-Dropdown → dem Daemon die Zuordnung senden (Id <c>null</c> ⇒ löschen). Programmatische Änderungen (Snapshot) sind gegated.</summary>

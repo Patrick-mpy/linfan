@@ -160,10 +160,14 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         ScanFans(control);
         ScanTemperatures();
 
+        // Temperaturen in kuratierter Gruppen-Reihenfolge (CPU → GPU → … → Sonstiges, siehe
+        // MacTemperatureKeys), Lüfter-Tachos nach Lüfter-Index — deterministisch statt alphabetisch,
+        // damit die GUI-Sensorliste stabil gruppiert ist.
         _sensorDescriptors = _sensors.Values
+            .OrderBy(c => c.Kind)
+            .ThenBy(c => c.Rank)
+            .ThenBy(c => c.Name, StringComparer.Ordinal)
             .Select(c => new SensorDescriptor(c.Id, c.Name, c.Kind, c.Unit, c.Key))
-            .OrderBy(d => d.Kind)
-            .ThenBy(d => d.Name, StringComparer.Ordinal)
             .ToArray();
         _fanDescriptors = _fans.Values
             .Select(f => new FanDescriptor(f.Id, f.Name, f.CanControl, f.Tachometer, f.Source))
@@ -190,7 +194,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
             if (!_smc.TryReadKey(acKey, out _)) continue; // kein Ist-Signal → kein Lüfter
 
             var tachId = new SensorId($"smc/{acKey}");
-            _sensors[tachId] = new SensorChannel(tachId, $"Fan {i + 1}", SensorKind.FanRpm, "RPM", acKey);
+            _sensors[tachId] = new SensorChannel(tachId, $"Fan {i + 1}", SensorKind.FanRpm, "RPM", acKey, i);
 
             // Steuer-Keys: Ziel-Drehzahl (Tg) + Modus (Md), Grenzen (Mn/Mx). Steuerbar nur, wenn die
             // Plattform Steuerung erlaubt (Intel + Root; Apple Silicon nie), alle Keys vorhanden sind,
@@ -218,16 +222,34 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
 
     private void ScanTemperatures()
     {
+        int rank = 0;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        // Apple-Silicon-Cluster zuerst (E-Cores → P-Cores → GPU; Familie per Key-Präsenz erkannt),
+        // danach die flache kuratierte Liste. Die Cluster-Tabelle hat Vorrang, weil sich Keys
+        // überlagern (z. B. Tp0P: M1 P-Core 6 vs. Intel Netzteil-Proximity) — `seen` verhindert,
+        // dass die flache Liste einen Familien-Key erneut (falsch beschriftet) aufnimmt.
+        foreach (var (key, name) in MacTemperatureKeys.SelectAppleSiliconCluster(
+                     k => _smc.TryReadKey(k, out _)))
+        {
+            if (seen.Add(key)) AddTemperature(key, name, rank++);
+        }
+
         foreach (var (key, name) in MacTemperatureKeys.Known)
         {
-            if (!_smc.TryReadKey(key, out var raw)) continue;
-            double v = SmcCodec.Decode(raw);
-            // Nur exponieren, wenn der Sensor real bestückt ist (endlicher, plausibler Wert > 0).
-            if (double.IsNaN(v) || v <= 0 || v >= 130) continue;
-
-            var id = new SensorId($"smc/{key}");
-            _sensors[id] = new SensorChannel(id, name, SensorKind.Temperature, "°C", key);
+            if (seen.Add(key)) AddTemperature(key, name, rank++);
         }
+    }
+
+    private void AddTemperature(string key, string name, int rank)
+    {
+        if (!_smc.TryReadKey(key, out var raw)) return;
+        double v = SmcCodec.Decode(raw);
+        // Nur exponieren, wenn der Sensor real bestückt ist (endlicher, plausibler Wert > 0).
+        if (double.IsNaN(v) || v <= 0 || v >= 130) return;
+
+        var id = new SensorId($"smc/{key}");
+        _sensors[id] = new SensorChannel(id, name, SensorKind.Temperature, "°C", key, rank);
     }
 
     /// <summary>Liefert den Key, wenn er lesbar ist (existiert), samt seines SMC-Datentyps; sonst <c>null</c>.</summary>
@@ -289,8 +311,9 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
     /// <summary>Ob Lüftersteuerung möglich ist, plus (falls nicht) ein diagnostischer Grund für <see cref="StartupWarning"/>.</summary>
     internal readonly record struct ControlCapability(bool Allowed, string? DisabledReason);
 
+    // Rank = Anzeigerang innerhalb der Sensorart (kuratierte Listenposition bzw. Lüfter-Index).
     private readonly record struct SensorChannel(
-        SensorId Id, string Name, SensorKind Kind, string Unit, string Key);
+        SensorId Id, string Name, SensorKind Kind, string Unit, string Key, int Rank);
 
     private sealed record FanChannel(
         FanId Id, string Name, string AcKey,

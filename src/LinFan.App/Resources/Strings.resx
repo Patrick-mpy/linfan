@@ -95,7 +95,7 @@
     <value>Apply</value>
   </data>
   <data name="MainWindow.RevertTooltip" xml:space="preserve">
-    <value>Discards all changes since the last save (with confirmation).</value>
+    <value>Discards all changes since the last save.</value>
   </data>
   <data name="MainWindow.Revert" xml:space="preserve">
     <value>Discard</value>
@@ -323,7 +323,7 @@
     <value>Rename</value>
   </data>
   <data name="MainWindow.DeleteProfileTooltip" xml:space="preserve">
-    <value>Deletes the current profile (with confirmation).</value>
+    <value>Deletes the current profile.</value>
   </data>
   <data name="MainWindow.Delete" xml:space="preserve">
     <value>Delete</value>
@@ -344,7 +344,7 @@
     <value>Duplicates the selected curve.</value>
   </data>
   <data name="MainWindow.DeleteCurveTooltip" xml:space="preserve">
-    <value>Deletes the selected curve (with confirmation).</value>
+    <value>Deletes the selected curve.</value>
   </data>
   <data name="MainWindow.OffParen" xml:space="preserve">
     <value>(off)</value>
@@ -953,7 +953,7 @@
     <value>Background service unreachable ({0}) — reconnecting …</value>
   </data>
   <data name="IpcLiveMonitor.AccessDenied" xml:space="preserve">
-    <value>The background service is running, but access to its socket was denied. On Linux, make sure your user is in the "linfan" group, then log out and back in.</value>
+    <value>The background service is running, but access to it was denied. Make sure your user is in the IPC access group — "linfan" on Linux, "LinFan Users" on Windows — then log out and back in.</value>
   </data>
   <data name="Ipc.Status.Active" xml:space="preserve">
     <value>Active</value>
@@ -1155,5 +1155,50 @@
   </data>
   <data name="Settings.CheckForUpdatesTooltip" xml:space="preserve">
     <value>Queries GitHub for a newer release each time the app starts.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveCpu" xml:space="preserve">
+    <value>Airflow · CPU/Radiator</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveGpu" xml:space="preserve">
+    <value>Airflow · GPU</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveIntake" xml:space="preserve">
+    <value>Airflow · Intake</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveExhaust" xml:space="preserve">
+    <value>Airflow · Exhaust</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowCurveDefault" xml:space="preserve">
+    <value>Airflow · Default</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowReasonHardwareAuto" xml:space="preserve">
+    <value>Stays on hardware auto (no software curve).</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowReasonNoPosition" xml:space="preserve">
+    <value>No position set – neutral default curve; set a position for a better suggestion.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowReasonLocationCurve" xml:space="preserve">
+    <value>{0} → curve: {1}</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoSensors" xml:space="preserve">
+    <value>No sensors configured – pick the source sensor of the suggested curves manually.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoCaseFans" xml:space="preserve">
+    <value>No case fans with an intake/exhaust position – the pressure balance cannot be determined.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintCountEstimate" xml:space="preserve">
+    <value>Without full calibration the balance is estimated by fan count only (no RPM proxy).</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoIntake" xml:space="preserve">
+    <value>No intake fan detected – check the fresh-air supply.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoExhaust" xml:space="preserve">
+    <value>No exhaust fan detected – check the heat exhaust.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNegativePressure" xml:space="preserve">
+    <value>Negative pressure: more exhaust than intake – consider more intake or throttle the exhaust (otherwise dust gets pulled in through gaps).</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNoCpuSensor" xml:space="preserve">
+    <value>No CPU sensor recognized by name – check the source of the CPU curve.</value>
   </data>
 </root>

@@ -18,9 +18,13 @@ namespace LinFan.Core.Services;
 /// auf den ersten verfügbaren Sensor zurück und setzt einen Hinweis.</para>
 /// <para>Die Druckbilanz ist bewusst grob: ohne echte CFM-Werte dient die kalibrierte Max-RPM als Proxy,
 /// und ohne Kalibrierung wird nur nach Anzahl gezählt.</para>
-/// <para>Jede <see cref="FanLocation"/> ist in <c>Spec(...)</c> <b>an einer Stelle</b> auf Richtung, Rolle
-/// und Klartext abgebildet; die Kurvenvorlage hängt an der <see cref="AirflowRole"/> (compiler-geprüfter
+/// <para>Jede <see cref="FanLocation"/> ist in <c>Spec(...)</c> <b>an einer Stelle</b> auf Richtung und
+/// Rolle abgebildet; die Kurvenvorlage hängt an der <see cref="AirflowRole"/> (compiler-geprüfter
 /// <c>switch</c>). Neue Positionen brauchen daher nur einen Eintrag, nicht fünf verstreute Zweige.</para>
+/// <para><b>Keine Anzeigetexte im Core:</b> Hinweise und Begründungen sind Codes
+/// (<see cref="AirflowHint"/> / <see cref="AirflowReason"/>), die die GUI übersetzt; die Namen der
+/// vorgeschlagenen Kurven sind neutral englisch und können über <c>curveNames</c> (Key = stabile
+/// Kurven-Id) lokalisiert übergeben werden — sie werden persistiert (Muster wie <see cref="DefaultProfiles"/>).</para>
 /// </remarks>
 public static class AirflowTuneService
 {
@@ -35,14 +39,18 @@ public static class AirflowTuneService
     /// <summary>
     /// Analysiert die Lüfter-Positionen und liefert einen Vorschlag. Liest nur – schreibt nichts.
     /// </summary>
-    public static AirflowTuneResult Analyze(AppConfig config)
+    /// <param name="config">Die zu analysierende Konfiguration.</param>
+    /// <param name="curveNames">Optionale Anzeigenamen der vorgeschlagenen Kurven, Key = stabile
+    /// Kurven-Id (<c>airflow-cpu</c> …) — die GUI reicht hier die lokalisierte Fassung durch, da die
+    /// Namen persistiert werden. Ohne Eintrag gilt der neutrale englische Default.</param>
+    public static AirflowTuneResult Analyze(AppConfig config, IReadOnlyDictionary<string, string>? curveNames = null)
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        var hints = new List<string>();
+        var hints = new List<AirflowHint>();
         SensorSources sensors = ResolveSensors(config.Sensors, hints);
 
-        (PressureParts pressure, IReadOnlyList<string> pressureHints) = ComputePressure(config.Fans);
+        (PressureParts pressure, IReadOnlyList<AirflowHint> pressureHints) = ComputePressure(config.Fans);
         hints.AddRange(pressureHints);
 
         // Welche Rollen-Kurven werden tatsächlich gebraucht? (Netzteil → AirflowRole.None bekommt keine.)
@@ -56,11 +64,11 @@ public static class AirflowTuneService
 
         var curves = usedRoles
             .OrderBy(r => r)
-            .Select(r => BuildCurve(r, sensors))
+            .Select(r => BuildCurve(r, sensors, curveNames))
             .ToList();
 
         if (config.Sensors.Count == 0 && curves.Count > 0)
-            hints.Add("Keine Sensoren konfiguriert – Quell-Sensor der vorgeschlagenen Kurven bitte manuell wählen.");
+            hints.Add(AirflowHint.NoSensorsConfigured);
 
         var fanSuggestions = config.Fans.Select(BuildSuggestion).ToList();
 
@@ -146,32 +154,32 @@ public static class AirflowTuneService
         Default,
     }
 
-    /// <summary>Was eine <see cref="FanLocation"/> für den Tune bedeutet (Richtung, Rolle, Klartext-Label).</summary>
-    private sealed record LocationSpec(AirflowDirection Direction, AirflowRole Role, string Label);
+    /// <summary>Was eine <see cref="FanLocation"/> für den Tune bedeutet (Richtung + Rolle).</summary>
+    private sealed record LocationSpec(AirflowDirection Direction, AirflowRole Role);
 
     /// <summary>
-    /// Einzige Quelle pro Position: Richtung (für die Druckbilanz), Rolle (für die Kurve) und Klartext.
+    /// Einzige Quelle pro Position: Richtung (für die Druckbilanz) und Rolle (für die Kurve).
     /// Der <c>_</c>-Zweig fängt nur undefinierte Enum-Werte ab (z. B. hand-editierte Config) → sichere Defaults.
     /// </summary>
     private static LocationSpec Spec(FanLocation location) => location switch
     {
-        FanLocation.CpuCooler => new(AirflowDirection.Internal, AirflowRole.Cpu, "CPU-Kühler"),
-        FanLocation.Radiator => new(AirflowDirection.Internal, AirflowRole.Cpu, "Radiator (folgt der CPU-/Flüssigkeitstemperatur)"),
-        FanLocation.GpuCooler => new(AirflowDirection.Internal, AirflowRole.Gpu, "GPU-Kühler"),
-        FanLocation.CaseFrontIntake => new(AirflowDirection.Intake, AirflowRole.Intake, "Gehäuse-Einlass vorn"),
-        FanLocation.CaseBottomIntake => new(AirflowDirection.Intake, AirflowRole.Intake, "Gehäuse-Einlass unten"),
-        FanLocation.CaseSideIntake => new(AirflowDirection.Intake, AirflowRole.Intake, "Gehäuse-Einlass seitlich"),
-        FanLocation.CaseTopIntake => new(AirflowDirection.Intake, AirflowRole.Intake, "Gehäuse-Einlass oben"),
-        FanLocation.CaseRearIntake => new(AirflowDirection.Intake, AirflowRole.Intake, "Gehäuse-Einlass hinten"),
-        FanLocation.CaseRearExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust, "Gehäuse-Auslass hinten"),
-        FanLocation.CaseTopExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust, "Gehäuse-Auslass oben"),
-        FanLocation.CaseFrontExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust, "Gehäuse-Auslass vorn"),
-        FanLocation.CaseBottomExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust, "Gehäuse-Auslass unten"),
-        FanLocation.CaseSideExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust, "Gehäuse-Auslass seitlich"),
-        FanLocation.Psu => new(AirflowDirection.Internal, AirflowRole.None, "Netzteil bleibt auf Hardware-Auto (keine Software-Kurve)."),
-        FanLocation.Unspecified => new(AirflowDirection.Unknown, AirflowRole.Default, ""),
-        FanLocation.Other => new(AirflowDirection.Unknown, AirflowRole.Default, ""),
-        _ => new(AirflowDirection.Unknown, AirflowRole.Default, ""),
+        FanLocation.CpuCooler => new(AirflowDirection.Internal, AirflowRole.Cpu),
+        FanLocation.Radiator => new(AirflowDirection.Internal, AirflowRole.Cpu),
+        FanLocation.GpuCooler => new(AirflowDirection.Internal, AirflowRole.Gpu),
+        FanLocation.CaseFrontIntake => new(AirflowDirection.Intake, AirflowRole.Intake),
+        FanLocation.CaseBottomIntake => new(AirflowDirection.Intake, AirflowRole.Intake),
+        FanLocation.CaseSideIntake => new(AirflowDirection.Intake, AirflowRole.Intake),
+        FanLocation.CaseTopIntake => new(AirflowDirection.Intake, AirflowRole.Intake),
+        FanLocation.CaseRearIntake => new(AirflowDirection.Intake, AirflowRole.Intake),
+        FanLocation.CaseRearExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust),
+        FanLocation.CaseTopExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust),
+        FanLocation.CaseFrontExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust),
+        FanLocation.CaseBottomExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust),
+        FanLocation.CaseSideExhaust => new(AirflowDirection.Exhaust, AirflowRole.Exhaust),
+        FanLocation.Psu => new(AirflowDirection.Internal, AirflowRole.None),
+        FanLocation.Unspecified => new(AirflowDirection.Unknown, AirflowRole.Default),
+        FanLocation.Other => new(AirflowDirection.Unknown, AirflowRole.Default),
+        _ => new(AirflowDirection.Unknown, AirflowRole.Default),
     };
 
     // ── Druckbilanz ─────────────────────────────────────────────────────────────
@@ -179,9 +187,9 @@ public static class AirflowTuneService
     /// <summary>Zwischenergebnis der Druckbilanz (innerhalb des Service).</summary>
     private readonly record struct PressureParts(PressureBalance Balance, double Intake, double Exhaust);
 
-    private static (PressureParts, IReadOnlyList<string>) ComputePressure(IReadOnlyList<FanConfig> fans)
+    private static (PressureParts, IReadOnlyList<AirflowHint>) ComputePressure(IReadOnlyList<FanConfig> fans)
     {
-        var hints = new List<string>();
+        var hints = new List<AirflowHint>();
 
         var caseFans = fans
             .Select(f => (Fan: f, Dir: DirectionOf(f.Location)))
@@ -190,7 +198,7 @@ public static class AirflowTuneService
 
         if (caseFans.Count == 0)
         {
-            hints.Add("Keine Gehäuselüfter mit Ein-/Auslass-Position – Druckbilanz nicht bestimmbar.");
+            hints.Add(AirflowHint.NoCaseFans);
             return (new PressureParts(PressureBalance.Unknown, 0, 0), hints);
         }
 
@@ -198,7 +206,7 @@ public static class AirflowTuneService
         // sobald ein Gehäuselüfter unkalibriert ist, zählen wir alle nach Anzahl (1), um Einheiten nicht zu mischen.
         bool allCalibrated = caseFans.All(x => x.Fan.Calibration is { MaxRpm: > 0 });
         if (!allCalibrated)
-            hints.Add("Ohne vollständige Kalibrierung nur nach Lüfter-Anzahl geschätzt (kein Drehzahl-Proxy).");
+            hints.Add(AirflowHint.CountEstimateOnly);
 
         double Weight((FanConfig Fan, AirflowDirection Dir) x) =>
             allCalibrated ? x.Fan.Calibration!.MaxRpm : 1.0;
@@ -207,13 +215,13 @@ public static class AirflowTuneService
         double exhaust = caseFans.Where(x => x.Dir == AirflowDirection.Exhaust).Sum(Weight);
 
         if (intake <= 0)
-            hints.Add("Kein Einlasslüfter erkannt – Frischluftzufuhr prüfen.");
+            hints.Add(AirflowHint.NoIntakeFan);
         if (exhaust <= 0)
-            hints.Add("Kein Auslasslüfter erkannt – Wärmeabfuhr prüfen.");
+            hints.Add(AirflowHint.NoExhaustFan);
 
         PressureBalance balance = Classify(intake, exhaust);
         if (balance == PressureBalance.Negative)
-            hints.Add("Unterdruck: mehr Auslass als Einlass – mehr Einlass erwägen oder Auslass drosseln (zieht sonst Staub durch Ritzen).");
+            hints.Add(AirflowHint.NegativePressure);
 
         return (new PressureParts(balance, intake, exhaust), hints);
     }
@@ -243,17 +251,17 @@ public static class AirflowTuneService
 
         // Netzteil (und jede andere None-Rolle): auf Hardware-Auto lassen, keine Kurve.
         if (spec.Role == AirflowRole.None)
-            return Suggestion(fan, spec.Direction, curveId: null, spec.Label);
+            return Suggestion(fan, spec.Direction, curveId: null, AirflowReason.HardwareAuto);
 
         RoleCurve curve = CurveFor(spec.Role);
-        string reason = fan.Location is FanLocation.Unspecified or FanLocation.Other
-            ? "Keine Position angegeben – neutrale Standardkurve; für besseren Vorschlag Position setzen."
-            : $"{spec.Label} → Kurve: {curve.Name}";
+        AirflowReason reason = fan.Location is FanLocation.Unspecified or FanLocation.Other
+            ? AirflowReason.NoPositionDefaultCurve
+            : AirflowReason.LocationBasedCurve;
 
         return Suggestion(fan, spec.Direction, curve.Id, reason);
     }
 
-    private static AirflowFanSuggestion Suggestion(FanConfig fan, AirflowDirection dir, string? curveId, string reason) =>
+    private static AirflowFanSuggestion Suggestion(FanConfig fan, AirflowDirection dir, string? curveId, AirflowReason reason) =>
         new()
         {
             FanId = fan.FanId,
@@ -268,14 +276,17 @@ public static class AirflowTuneService
     /// <summary>Vorlage einer rollenbasierten Kurve: stabile Id, Anzeigename, Stützpunkte.</summary>
     private sealed record RoleCurve(string Id, string Name, CurvePoint[] Points);
 
-    /// <summary>Kurvenvorlage je Rolle. <see cref="AirflowRole.None"/> hat bewusst keine (wird nie erzeugt).</summary>
+    /// <summary>
+    /// Kurvenvorlage je Rolle — Namen neutral englisch (Default; die GUI kann lokalisierte Namen über
+    /// <c>curveNames</c> hereinreichen). <see cref="AirflowRole.None"/> hat bewusst keine (wird nie erzeugt).
+    /// </summary>
     private static RoleCurve CurveFor(AirflowRole role) => role switch
     {
         AirflowRole.Cpu => new("airflow-cpu", "Airflow · CPU/Radiator", CpuPoints),
         AirflowRole.Gpu => new("airflow-gpu", "Airflow · GPU", GpuPoints),
-        AirflowRole.Intake => new("airflow-intake", "Airflow · Einlass", IntakePoints),
-        AirflowRole.Exhaust => new("airflow-exhaust", "Airflow · Auslass", ExhaustPoints),
-        AirflowRole.Default => new("airflow-default", "Airflow · Standard", DefaultPoints),
+        AirflowRole.Intake => new("airflow-intake", "Airflow · Intake", IntakePoints),
+        AirflowRole.Exhaust => new("airflow-exhaust", "Airflow · Exhaust", ExhaustPoints),
+        AirflowRole.Default => new("airflow-default", "Airflow · Default", DefaultPoints),
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Rolle hat keine Kurvenvorlage (None bekommt keine Kurve)."),
     };
 
@@ -296,13 +307,16 @@ public static class AirflowTuneService
     private static readonly CurvePoint[] DefaultPoints =
         [new(30, 20), new(50, 35), new(65, 55), new(80, 90), new(90, 100)];
 
-    private static CurveConfig BuildCurve(AirflowRole role, SensorSources sensors)
+    private static CurveConfig BuildCurve(
+        AirflowRole role,
+        SensorSources sensors,
+        IReadOnlyDictionary<string, string>? curveNames)
     {
         RoleCurve curve = CurveFor(role);
         return new CurveConfig
         {
             Id = curve.Id,
-            Name = curve.Name,
+            Name = curveNames is not null && curveNames.TryGetValue(curve.Id, out string? name) ? name : curve.Name,
             SourceSensorIds = sensors.For(role),
             Aggregation = SensorAggregation.Max,
             InterpolationMode = InterpolationMode.Linear,
@@ -319,14 +333,14 @@ public static class AirflowTuneService
     private static readonly string[] GpuKeywords =
         ["gpu", "amdgpu", "radeon", "nvidia", "geforce", "edge", "junction"];
 
-    private static SensorSources ResolveSensors(IReadOnlyList<SensorConfig> sensors, List<string> hints)
+    private static SensorSources ResolveSensors(IReadOnlyList<SensorConfig> sensors, List<AirflowHint> hints)
     {
         string? cpu = FindSensor(sensors, CpuKeywords);
         string? gpu = FindSensor(sensors, GpuKeywords);
         string? primary = cpu ?? gpu ?? sensors.FirstOrDefault()?.SensorId;
 
         if (sensors.Count > 0 && cpu is null)
-            hints.Add("Kein CPU-Sensor per Name erkannt – Quelle der CPU-Kurve bitte prüfen.");
+            hints.Add(AirflowHint.NoCpuSensorDetected);
 
         return new SensorSources(cpu, gpu, primary);
     }

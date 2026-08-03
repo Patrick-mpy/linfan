@@ -969,6 +969,75 @@ public sealed class CurveEditorControllerTests
     }
 
     // ---------------------------------------------------------------------------
+    // Kalibrier-Ergebnis (MinPwm) aus dem Geräte-Tab — der Daemon ändert die Config hier ohne
+    // Zutun des Editors. Regression: die einmalig befüllte Zeile blieb auf dem alten Anlaufpunkt
+    // und das nächste Speichern schrieb das Ergebnis wieder weg.
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateLive_AdoptsCalibratedMinPwm_AndSaveKeepsIt()
+    {
+        AppConfig config = CurveAndFanConfig(); // MinPwm 40
+        var sink = new SaveSink();
+        var ctrl = new CurveEditorController(sink.SaveAsync);
+        ctrl.Initialize(Snapshot(config));
+
+        FanAssignRow fan = Assert.Single(ctrl.Fans);
+        Assert.Equal(40, fan.MinPwm);
+
+        // Daemon hat kalibriert und den Anlaufpunkt persistiert.
+        ctrl.UpdateLive(Snapshot(WithMinPwm(config, "hwmon7/pwm1", 96)));
+
+        Assert.Equal(96, fan.MinPwm);
+        Assert.False(ctrl.HasUnsavedChanges); // Kalibrierung ist keine ungespeicherte Nutzer-Änderung
+
+        await ctrl.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(96, Assert.Single(sink.Saved).Fans.Single(f => f.FanId == "hwmon7/pwm1").MinPwm);
+    }
+
+    // „Verwerfen" darf das übernommene Kalibrier-Ergebnis nicht auf den Vor-Kalibrier-Wert zurückdrehen —
+    // die Baseline muss mitgezogen worden sein.
+    [Fact]
+    public void Revert_AfterCalibration_KeepsCalibratedMinPwm()
+    {
+        AppConfig config = CurveAndFanConfig();
+        var ctrl = new CurveEditorController(new SaveSink().SaveAsync);
+        ctrl.Initialize(Snapshot(config));
+
+        FanAssignRow fan = Assert.Single(ctrl.Fans);
+        ctrl.UpdateLive(Snapshot(WithMinPwm(config, "hwmon7/pwm1", 96)));
+
+        fan.Name = "Umbenannt"; // eine echte Nutzer-Änderung, damit „Verwerfen" überhaupt ausführbar ist
+        Assert.True(ctrl.HasUnsavedChanges);
+        ctrl.RevertCommand.Execute(null);
+
+        Assert.Equal("thinkpad pwm1", fan.Name); // Nutzer-Änderung verworfen …
+        Assert.Equal(96, fan.MinPwm);            // … Kalibrier-Ergebnis bleibt
+    }
+
+    // Gegenprobe: ein Tick mit unveränderter Config darf eine getippte, noch nicht gespeicherte
+    // MinPwm-Eingabe nicht zurücksetzen (sonst wäre das Feld nicht mehr bedienbar).
+    [Fact]
+    public void UpdateLive_WithUnchangedConfig_KeepsEditedMinPwm()
+    {
+        AppConfig config = CurveAndFanConfig();
+        var ctrl = new CurveEditorController(new SaveSink().SaveAsync);
+        ctrl.Initialize(Snapshot(config));
+
+        FanAssignRow fan = Assert.Single(ctrl.Fans);
+        fan.MinPwm = 77;
+        ctrl.UpdateLive(Snapshot(config));
+
+        Assert.Equal(77, fan.MinPwm);
+        Assert.True(ctrl.HasUnsavedChanges);
+    }
+
+    private static AppConfig WithMinPwm(AppConfig config, string fanId, byte minPwm) => config with
+    {
+        Fans = config.Fans.Select(f => f.FanId == fanId ? f with { MinPwm = minPwm } : f).ToList(),
+    };
+
+    // ---------------------------------------------------------------------------
     // Airflow-Auto-Tune
     // ---------------------------------------------------------------------------
 
@@ -1421,6 +1490,79 @@ public sealed class CurveEditorControllerTests
 
         ctrl.Fans.First(f => f.FanId == "front").Visible = true;
         Assert.Equal(2, ctrl.FilteredFans.Count);
+    }
+
+    // --- Hidden-Fans in der Kurven-Zuordnungsliste („Lüfter dieser Kurve") -----------------------
+
+    // Eine Kurve + zwei Lüfter, „front" ist global versteckt (optional der Kurve zugeordnet).
+    private static MonitorSnapshot HiddenFanCurveSnapshot(string? hiddenAssignedCurveId = null) => new(
+        "test",
+        new[] { new SensorReading("hwmon6/temp1", "k10temp Tctl", SensorKind.Temperature, "°C", 41) },
+        new[]
+        {
+            new FanReading("cpu", "CPU", 1500, 128, FanMode.Auto, true),
+            new FanReading("front", "Front", 1000, 128, FanMode.Auto, true),
+        },
+        new AppConfig
+        {
+            Curves = new[]
+            {
+                new CurveConfig
+                {
+                    Id = "c1", Name = "K", SourceSensorIds = new[] { "hwmon6/temp1" },
+                    Points = new[] { new CurvePoint(30, 20), new CurvePoint(80, 100) },
+                },
+            },
+            Fans = new[]
+            {
+                new FanConfig { FanId = "cpu", Name = "CPU" },
+                new FanConfig { FanId = "front", Name = "Front", Hidden = true, AssignedCurveId = hiddenAssignedCurveId },
+            },
+        });
+
+    [Fact]
+    public void SelectedCurveFans_ExcludeGloballyHiddenFans()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(HiddenFanCurveSnapshot());
+
+        Assert.NotNull(ctrl.SelectedCurve);
+        Assert.Equal("cpu", Assert.Single(ctrl.SelectedCurveFans).Fan.FanId);
+        Assert.Equal("cpu", Assert.Single(ctrl.SelectedCurveFanGroups.SelectMany(g => g.Fans)).Fan.FanId);
+    }
+
+    [Fact]
+    public void SelectedCurveFans_KeepHiddenFan_WhileAssignedToSelectedCurve()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(HiddenFanCurveSnapshot(hiddenAssignedCurveId: "c1"));
+
+        FanCurveCheck front = ctrl.SelectedCurveFans.Single(c => c.Fan.FanId == "front");
+        Assert.True(front.Assigned);
+
+        // Abwahl entfernt die Zeile bewusst NICHT sofort (kommt aus der Checkbox dieser Liste) —
+        // erst der nächste Listen-Aufbau (z. B. Kurvenwechsel) filtert sie heraus.
+        front.Assigned = false;
+        Assert.Contains(ctrl.SelectedCurveFans, c => c.Fan.FanId == "front");
+
+        ctrl.SelectedCurve = null;
+        ctrl.SelectedCurve = ctrl.Curves.First();
+        Assert.DoesNotContain(ctrl.SelectedCurveFans, c => c.Fan.FanId == "front");
+    }
+
+    [Fact]
+    public void ToggleFanVisible_UpdatesSelectedCurveFans_Live()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(HiddenFanCurveSnapshot());
+        Assert.Single(ctrl.SelectedCurveFans);
+
+        FanAssignRow front = ctrl.Fans.First(f => f.FanId == "front");
+        front.Visible = true; // Auge-Toggle im Geräte-Tab → sofort in der Kurven-Zuordnungsliste
+        Assert.Equal(2, ctrl.SelectedCurveFans.Count);
+
+        front.Visible = false; // nicht zugeordnet → verschwindet wieder
+        Assert.Equal("cpu", Assert.Single(ctrl.SelectedCurveFans).Fan.FanId);
     }
 
     // --- Gruppierung im Kurven-Tab (Lüfter-Zuordnung + Quell-Sensoren), wie im Dashboard ---------

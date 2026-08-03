@@ -1,31 +1,31 @@
 # Changelog
 
-Alle nennenswerten Änderungen an LinFan, je Release zusammengefasst. Format angelehnt an
-[Keep a Changelog](https://keepachangelog.com/de/1.1.0/); versioniert nach SemVer,
-Quelle der Wahrheit ist der Git-Tag `vX.Y.Z`.
+All notable changes to LinFan, summarized per release. Format loosely follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioned by SemVer,
+the git tag `vX.Y.Z` is the source of truth.
 
-Offene Punkte werden als GitHub-Issues geführt.
+Open items are tracked as GitHub issues.
 
 ## [0.1.0] - 2026-08-03
 
-Erstes öffentliches Release — Lüftersteuerung für **Linux** (im Fokus) und **Windows**,
-**macOS** als Best-Effort. Lizenz: GPL-3.0-or-later.
+First public release — fan control for **Linux** (primary focus) and **Windows**,
+**macOS** best-effort. License: GPL-3.0-or-later.
 
-### Hinzugefügt
+### Added
 
-- **Daemon + GUI, sauber getrennt**: ein privilegierter Daemon (systemd / Windows-Dienst) regelt
-  die Lüfter nach Temperatur-Kurven (Interpolation, Hysterese, Clamping); die Avalonia-GUI läuft
-  ohne Root und spricht ihn über lokales IPC an (Unix-Socket bzw. Named Pipe).
-- **Fail-Safe eingebaut**: ein Watchdog führt bei Übertemperatur, Fehlern oder Beenden auf
-  Volllast bzw. zurück in die Hardware-Automatik.
-- **Onboarding mit Kalibrierung**: pro Lüfter werden PWM→RPM-Kennlinie und Anlaufpunkt gemessen;
-  eine automatische Tacho-Kopplung ordnet jedem Lüfter seinen Drehzahl-Sensor empirisch zu.
-- **GUI**: Live-Dashboard (Temperaturen, Drehzahlen), Kurven-Editor mit Profilen,
-  Gehäuse-Ansicht mit Lüfter-Positionen, Tray-Betrieb, Backup/Restore der Konfiguration,
-  Oberfläche auf Deutsch und Englisch.
-- **Hardware-Backends**: Linux `sysfs`/hwmon, Windows LibreHardwareMonitor, macOS IOKit/SMC
-  (auf Apple Silicon validiert; Lesen ohne Root, Steuern als Root — Dienst-Integration folgt).
-- **Update-Hinweis**: die GUI meldet neuere GitHub-Releases (nur Hinweis, kein Auto-Download,
-  abschaltbar).
-- **Pakete**: Linux-Tarball plus `.deb`-/`.run`-Installer, Windows-ZIP und
-  Ein-Klick-Installer (`.exe`).
+- **Daemon + GUI, cleanly separated**: a privileged daemon (systemd / Windows service) drives
+  the fans along temperature curves (interpolation, hysteresis, clamping); the Avalonia GUI runs
+  without root and talks to it over local IPC (Unix socket / named pipe).
+- **Fail-safe built in**: on over-temperature, errors, or shutdown a watchdog ramps the fans to
+  full speed or hands them back to the hardware's automatic control.
+- **Onboarding with calibration**: per fan, the PWM→RPM curve and the spin-up point are measured;
+  an automatic tachometer coupling empirically pairs each fan with its RPM sensor.
+- **GUI**: live dashboard (temperatures, fan speeds), curve editor with profiles, case view with
+  fan positions, tray mode, configuration backup/restore, interface in English and German.
+- **Hardware backends**: Linux `sysfs`/hwmon, Windows LibreHardwareMonitor, macOS IOKit/SMC
+  (validated on Apple Silicon; reading without root, control as root — service integration to
+  follow).
+- **Update notice**: the GUI reports newer GitHub releases (notice only, no auto-download, can be
+  disabled).
+- **Packages**: Linux tarball plus `.deb`/`.run` installers, Windows ZIP and a one-click
+  installer (`.exe`).

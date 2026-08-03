@@ -24,7 +24,9 @@ public partial class CurveEditorController
         if (!_initialized)
             return;
 
-        AirflowTuneResult result = AirflowTuneService.Analyze(BuildConfig());
+        // Lokalisierte Kurven-Namen hereinreichen — sie werden bei „Übernehmen" persistiert (Muster
+        // wie bei den Onboarding-Profilen); Hints/Reasons kommen als Codes und werden hier übersetzt.
+        AirflowTuneResult result = AirflowTuneService.Analyze(BuildConfig(), AirflowCurveNames());
         _lastAirflowResult = result;
 
         Dictionary<string, string> curveNames = result.SuggestedCurves.ToDictionary(c => c.Id, c => c.Name);
@@ -36,13 +38,13 @@ public partial class CurveEditorController
                 ? n
                 : Localizer.Instance["CurveEditorCtrl.NoCurveHardwareAuto"];
             AirflowSuggestions.Add(new AirflowSuggestionRow(
-                s.FanId, fanName, FanLocationOption.For(s.Location).Display, curveName, s.Reason,
-                apply: s.SuggestedCurveId is not null));
+                s.FanId, fanName, FanLocationOption.For(s.Location).Display, curveName,
+                DescribeReason(s, curveName), apply: s.SuggestedCurveId is not null));
         }
 
         AirflowHints.Clear();
-        foreach (string hint in result.Hints)
-            AirflowHints.Add(hint);
+        foreach (AirflowHint hint in result.Hints)
+            AirflowHints.Add(DescribeHint(hint));
 
         AirflowPressureText = DescribePressure(result);
         HasAirflowSuggestion = true;
@@ -74,6 +76,36 @@ public partial class CurveEditorController
         RefreshDirty();
         SetStatus(Localizer.Instance["CurveEditorCtrl.AirflowApplied"], autoHide: true);
     }
+
+    /// <summary>Lokalisierte Namen der Airflow-Kurven, Key = stabile Kurven-Id des Core-Service.</summary>
+    private static Dictionary<string, string> AirflowCurveNames() => new(StringComparer.Ordinal)
+    {
+        ["airflow-cpu"] = Localizer.Instance["CurveEditorCtrl.AirflowCurveCpu"],
+        ["airflow-gpu"] = Localizer.Instance["CurveEditorCtrl.AirflowCurveGpu"],
+        ["airflow-intake"] = Localizer.Instance["CurveEditorCtrl.AirflowCurveIntake"],
+        ["airflow-exhaust"] = Localizer.Instance["CurveEditorCtrl.AirflowCurveExhaust"],
+        ["airflow-default"] = Localizer.Instance["CurveEditorCtrl.AirflowCurveDefault"],
+    };
+
+    private static string DescribeReason(AirflowFanSuggestion s, string curveName) => s.Reason switch
+    {
+        AirflowReason.HardwareAuto => Localizer.Instance["CurveEditorCtrl.AirflowReasonHardwareAuto"],
+        AirflowReason.NoPositionDefaultCurve => Localizer.Instance["CurveEditorCtrl.AirflowReasonNoPosition"],
+        _ => Localizer.Instance.Format("CurveEditorCtrl.AirflowReasonLocationCurve",
+            FanLocationOption.For(s.Location).Display, curveName),
+    };
+
+    private static string DescribeHint(AirflowHint hint) => hint switch
+    {
+        AirflowHint.NoSensorsConfigured => Localizer.Instance["CurveEditorCtrl.AirflowHintNoSensors"],
+        AirflowHint.NoCaseFans => Localizer.Instance["CurveEditorCtrl.AirflowHintNoCaseFans"],
+        AirflowHint.CountEstimateOnly => Localizer.Instance["CurveEditorCtrl.AirflowHintCountEstimate"],
+        AirflowHint.NoIntakeFan => Localizer.Instance["CurveEditorCtrl.AirflowHintNoIntake"],
+        AirflowHint.NoExhaustFan => Localizer.Instance["CurveEditorCtrl.AirflowHintNoExhaust"],
+        AirflowHint.NegativePressure => Localizer.Instance["CurveEditorCtrl.AirflowHintNegativePressure"],
+        AirflowHint.NoCpuSensorDetected => Localizer.Instance["CurveEditorCtrl.AirflowHintNoCpuSensor"],
+        _ => hint.ToString(), // unbekannter Code: roh anzeigen statt verschlucken
+    };
 
     private static string DescribePressure(AirflowTuneResult r)
     {

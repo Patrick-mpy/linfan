@@ -90,7 +90,12 @@ public partial class CurveEditorController
     {
         SelectedCurveFans.Clear();
         if (SelectedCurve is { } curve)
-            foreach (FanAssignRow fan in Fans)
+            // Global ausgeblendete Lüfter nicht anbieten — außer sie sind dieser Kurve bereits zugeordnet:
+            // Hidden ist reine Anzeige (die Regelung läuft weiter), also muss eine aktive Zuordnung sichtbar
+            // und lösbar bleiben. Ein abgewählter versteckter Lüfter bleibt bewusst bis zum nächsten Aufbau
+            // stehen — die Abwahl kommt aus der Checkbox dieser Liste, ein sofortiger Neuaufbau risse das
+            // Element mitten im Binding-Write weg.
+            foreach (FanAssignRow fan in Fans.Where(f => f.Visible || ReferenceEquals(f.Selected, curve)))
                 SelectedCurveFans.Add(new FanCurveCheck(fan, curve));
         RebuildSelectedCurveFanGroups();
     }
@@ -127,7 +132,10 @@ public partial class CurveEditorController
         else if (e.PropertyName == nameof(FanAssignRow.Group))
             RefreshAvailableGroups();
         else if (e.PropertyName == nameof(FanAssignRow.Visible))
+        {
             RebuildFilteredFans(); // „Versteckte ausblenden" muss die getoggelte Zeile sofort ein-/ausblenden
+            RebuildSelectedCurveFans(); // der Auge-Toggle (Geräte-Tab) wirkt sofort auf die Kurven-Zuordnungsliste
+        }
 
         // Position/Gruppe ändert die Bündelung der Kurven-Zuordnung → Gruppen-Header nachziehen.
         if (e.PropertyName is nameof(FanAssignRow.Group) or nameof(FanAssignRow.Location))

@@ -8,7 +8,8 @@
 ;   dotnet publish -c Release -r win-x64 --self-contained true src/LinFan.App    -o artifacts/LinFan-win-x64/App
 ;
 ; The service registration is handled by the PowerShell scripts (single source of truth for the
-; service logic); Inno only places the files, calls the scripts, and manages the shortcuts.
+; service logic); Inno only places the files, calls the scripts, and manages the shortcuts and
+; the optional GUI autostart.
 
 #define AppName "LinFan"
 ; Fallback for manual builds; the release pipeline injects the version from the git tag
@@ -37,6 +38,13 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayName={#AppName} Fan Control
+; The service scripts run hidden, so their console hints never reach the user — the re-login needed
+; for the "LinFan Users" group membership is shown on this page instead.
+InfoAfterFile=PostInstall.txt
+
+[Tasks]
+; Checked by default: the GUI starts hidden in the tray (--minimized), so the login stays quiet.
+Name: "autostart"; Description: "Start {#AppName} automatically at login (minimized to tray)"
 
 [Files]
 Source: "{#PayloadDir}\Daemon\*"; DestDir: "{app}\Daemon"; Flags: recursesubdirs createallsubdirs ignoreversion
@@ -49,9 +57,17 @@ Source: "Uninstall-LinFan.ps1";   DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\LinFan"; Filename: "{app}\App\LinFan.App.exe"; WorkingDir: "{app}\App"; Comment: "Fan curves, temperatures & speeds"
 Name: "{group}\Uninstall LinFan"; Filename: "{uninstallexe}"
 
+[Registry]
+; Machine-wide autostart (HKLM Run) — the installer runs elevated, so a HKCU entry would land in the
+; ADMIN's hive, not the installing user's. The uninstaller removes the value (uninsdeletevalue).
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: """{app}\App\LinFan.App.exe"" --minimized"; Flags: uninsdeletevalue; Tasks: autostart
+
 [Run]
 ; Register + start the service (files are already in {app} -> -InstallerManaged).
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Install-LinFan.ps1"" -InstallDir ""{app}"" -InstallerManaged"; StatusMsg: "Registering and starting the LinFan service …"; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Install-LinFan.ps1"" -InstallDir ""{app}"" -InstallerManaged -ReloginMarker ""{tmp}\relogin-required.flag"""; StatusMsg: "Registering and starting the LinFan service …"; Flags: runhidden waituntilterminated
+; Finish page "Launch LinFan": runasoriginaluser is essential — without it the GUI would inherit the
+; installer's elevation, and the GUI must run unprivileged (the service does the privileged work).
+Filename: "{app}\App\LinFan.App.exe"; WorkingDir: "{app}\App"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
 ; Remove the service cleanly (stop -> fans to hardware auto) before Inno deletes the files.
@@ -66,6 +82,16 @@ var
 begin
   Result := Exec(ExpandConstant('{cmd}'), '/c sc query LinFan | find "RUNNING" >nul 2>&1',
     '', SW_HIDE, ewWaitUntilTerminated, rc) and (rc = 0);
+end;
+
+// First install: the service script just added the GUI user to "LinFan Users", and Windows only
+// applies group membership at sign-in — until then the pipe stays unreachable for the GUI. The
+// script signals that via the marker file; offering Inno's restart prompt here also suppresses the
+// "Launch LinFan" postinstall checkbox (it could not connect with the pre-add token anyway).
+// Upgrades (user already a member -> no marker) keep the launch checkbox and skip the prompt.
+function NeedRestart(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{tmp}\relogin-required.flag'));
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;

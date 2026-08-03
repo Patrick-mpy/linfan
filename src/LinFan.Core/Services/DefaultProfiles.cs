@@ -5,8 +5,8 @@ using LinFan.Core.Models;
 namespace LinFan.Core.Services;
 
 /// <summary>
-/// Erzeugt die drei vordefinierten Onboarding-Profile (Leise / Ausgewogen / Leistung) als reine, seiteneffektfreie
-/// Factory-Methode. Keine externen Abhängigkeiten — jederzeit unit-testbar.
+/// Erzeugt die drei vordefinierten Onboarding-Profile (silent / balanced / performance) als reine,
+/// seiteneffektfreie Factory-Methode. Keine externen Abhängigkeiten — jederzeit unit-testbar.
 /// </summary>
 public static class DefaultProfiles
 {
@@ -19,8 +19,17 @@ public static class DefaultProfiles
     /// <param name="primarySensorId">
     /// Id des Haupttemperatursensors, der alle Kurven speist. Darf nicht <c>null</c> oder leer sein.
     /// </param>
+    /// <param name="silentName">Anzeigename für Profil + Kurve „silent" — die GUI reicht hier die
+    /// lokalisierte Fassung durch; Core bleibt sprachneutral (englischer Default).</param>
+    /// <param name="balancedName">Anzeigename für „balanced" (siehe <paramref name="silentName"/>).</param>
+    /// <param name="performanceName">Anzeigename für „performance" (siehe <paramref name="silentName"/>).</param>
     /// <returns>Exakt drei Profile in der Reihenfolge: silent, balanced, performance.</returns>
-    public static IReadOnlyList<Profile> Build(IReadOnlyList<FanConfig> fans, string primarySensorId)
+    public static IReadOnlyList<Profile> Build(
+        IReadOnlyList<FanConfig> fans,
+        string primarySensorId,
+        string silentName = "Silent",
+        string balancedName = "Balanced",
+        string performanceName = "Performance")
     {
         ArgumentNullException.ThrowIfNull(fans);
         if (string.IsNullOrEmpty(primarySensorId))
@@ -30,7 +39,7 @@ public static class DefaultProfiles
         {
             BuildProfile(
                 id: "silent",
-                name: "Leise",
+                name: silentName,
                 primarySensorId: primarySensorId,
                 fans: fans,
                 points: new[]
@@ -43,7 +52,7 @@ public static class DefaultProfiles
                 }),
             BuildProfile(
                 id: "balanced",
-                name: "Ausgewogen",
+                name: balancedName,
                 primarySensorId: primarySensorId,
                 fans: fans,
                 points: new[]
@@ -56,7 +65,7 @@ public static class DefaultProfiles
                 }),
             BuildProfile(
                 id: "performance",
-                name: "Leistung",
+                name: performanceName,
                 primarySensorId: primarySensorId,
                 fans: fans,
                 points: new[]

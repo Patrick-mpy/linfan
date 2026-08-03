@@ -95,4 +95,37 @@ public class MainControllerOnboardingTests
         }
         finally { ctrl.Dispose(); }
     }
+
+    /// <summary>
+    /// Regression: Assistent auf bestehender Config wiederholt („Einstellungen → Onboarding"). Da war der
+    /// Editor bereits aus der ALTEN Config befüllt und die einmalige Initialisierung griff nicht mehr — die
+    /// im Assistenten gewählten Positionen blieben unsichtbar und das nächste Speichern schrieb sie wieder
+    /// weg. Der Assistent muss den Editor-Neuaufbau auslösen, sobald der Daemon die neue Config spiegelt.
+    /// </summary>
+    [AvaloniaFact]
+    public void RepeatedOnboarding_RebuildsEditor_FromChosenConfig()
+    {
+        var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()); // OnboardingCompleted == null ⇒ kein Erststart
+        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        try
+        {
+            UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+            Assert.Equal(FanLocation.Unspecified, Assert.Single(ctrl.Editor.Fans).Location.Value);
+
+            ctrl.StartOnboardingCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => ctrl.Onboarding?.Fans.Count > 0);
+
+            OnboardingController wizard = ctrl.Onboarding!;
+            wizard.Fans[0].Location = FanLocationOption.For(FanLocation.CpuCooler);
+            wizard.FinishCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => fake.ConfigCalls.Count > 0);
+
+            // Daemon übernimmt die gesendete Config und spiegelt sie zurück.
+            fake.Current = fake.Current with { Config = fake.ConfigCalls[^1] };
+
+            UiTestHelpers.PumpUntil(() => ctrl.Editor.Fans.Any(f => f.Location.Value == FanLocation.CpuCooler));
+            Assert.Equal(FanLocation.CpuCooler, Assert.Single(ctrl.Editor.Fans).Location.Value);
+        }
+        finally { ctrl.Dispose(); }
+    }
 }

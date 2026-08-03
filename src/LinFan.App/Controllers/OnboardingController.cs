@@ -548,7 +548,14 @@ public partial class OnboardingController : ObservableObject
         // eine Zuordnung (Quelle ist die Live-Discovery, nicht die ggf. leere Config).
         var controllableIds = ControllableFans.Select(f => f.FanId).ToHashSet(StringComparer.Ordinal);
         var controllableFans = fans.Where(f => controllableIds.Contains(f.FanId)).ToList();
-        var profiles = DefaultProfiles.Build(controllableFans, primarySensorId!);
+        // Anzeigenamen lokalisiert durchreichen — die persistierten Profil-/Kurven-Namen folgen der
+        // UI-Sprache beim Onboarding (Core bleibt sprachneutral).
+        var profiles = DefaultProfiles.Build(
+            controllableFans,
+            primarySensorId!,
+            silentName: Localizer.Instance["OnboardingCtrl.ProfileSilentName"],
+            balancedName: Localizer.Instance["OnboardingCtrl.ProfileBalancedName"],
+            performanceName: Localizer.Instance["OnboardingCtrl.ProfilePerformanceName"]);
         AppConfig withProfiles = baseConfig with
         {
             Fans = fans,

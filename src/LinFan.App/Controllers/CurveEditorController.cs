@@ -296,16 +296,33 @@ public partial class CurveEditorController : ObservableObject
         // Config-Ids können (durch Id-Migration/Hand-Edit) doppelt sein — erster gewinnt (wie im SnapshotBuilder),
         // statt hart am ToDictionary zu werfen und die ganze GUI abzureißen.
         var rpmSources = new Dictionary<string, string?>();
+        var minPwms = new Dictionary<string, byte>();
         foreach (FanConfig f in snapshot.Config.Fans)
+        {
             rpmSources.TryAdd(f.FanId, f.RpmSource);
+            minPwms.TryAdd(f.FanId, f.MinPwm);
+        }
+
+        // Vom Daemon geänderte Anlaufpunkte (Kalibrier-Ergebnis) einsammeln — sie müssen anschließend auch in
+        // die Dirty-Baseline, sonst gälten sie als ungespeicherte Nutzer-Änderung (Banner/Verwerfen).
+        Dictionary<string, (int Min, int Max)>? adoptedLimits = null;
         foreach (FanAssignRow fan in Fans)
         {
             fan.ApplyCalibration(snapshot.Calibration);
             fan.ApplyIdentify(snapshot.Identify);
             fan.ApplyTachMapping(snapshot.TachMapping);
             fan.ApplyRpmSource(rpmSources.TryGetValue(fan.FanId, out string? src) ? src : null);
+            if (minPwms.TryGetValue(fan.FanId, out byte min) && fan.ApplyDaemonMinPwm(min))
+            {
+                // Nach dem Setzen lesen: der MinPwm-Setter kann MaxPwm nachziehen (Min > Max).
+                adoptedLimits ??= new Dictionary<string, (int, int)>(StringComparer.Ordinal);
+                adoptedLimits[fan.FanId] = (fan.MinPwm, fan.MaxPwm);
+            }
             fan.SetLiveRpm(rpms.TryGetValue(fan.FanId, out double? r) ? r : null);
         }
+
+        if (adoptedLimits is not null)
+            RebaselineFanPwmLimits(adoptedLimits);
 
         // Dirty-Erkennung läuft NICHT pro Tick aus den Live-Werten (die ändern die Config nicht) — sie hängt an
         // den echten Edit-Pfaden (MarkDirty über die Collection-/Row-Handler). Der Tick zieht nur eine im

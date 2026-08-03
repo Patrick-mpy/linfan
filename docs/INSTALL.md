@@ -122,6 +122,10 @@ Copy the `artifacts/LinFan-win-x64` folder to the Windows PC, then install from 
 Alternatively, a **one-click installer** from `packaging/windows/linfan.iss` (Inno Setup 6, compiled on
 Windows) — it bundles the build and calls the same scripts. Details: `packaging/windows/README.md`.
 
+- **Log out and back in once after the first install.** Access to the pipe is restricted to the local
+  group `LinFan Users`, which the installer creates and adds you to — and Windows only applies group
+  membership at sign-in. Until then the GUI reports the service as unreachable although it is running
+  (same situation as the `linfan` group on Linux).
 - Start the **GUI** as a **normal user** (Start menu → "LinFan"), **not** as admin — it connects to the
   service over the named pipe `\\.\pipe\linfan`.
 - **Machine-wide config** under `%ProgramData%\linfan\config.json`, so the SYSTEM service and the user

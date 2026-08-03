@@ -20,8 +20,10 @@ namespace LinFan.Ipc.Transport;
 /// GUI-Nutzer (nicht jeder authentifizierte Account) mit dem als SYSTEM/Admin laufenden Daemon verbinden
 /// können. Existiert die Gruppe nicht (Installationsschritt fehlt), wird das geloggt und ersatzweise
 /// „Authentifizierte Benutzer" gewährt, damit die GUI nicht bricht (Härtung greift, sobald die Gruppe da
-/// ist). Die ACL wird nur unter Windows gesetzt; auf anderen Systemen (nur Tests, .NET emuliert Named
-/// Pipes über Unix-Domain-Sockets) läuft die Pipe ohne explizite ACL.
+/// ist). Zusätzlich bekommt das <b>eigene Konto</b> des Server-Prozesses Vollzugriff — ohne das Recht
+/// <c>CreateNewInstance</c> ließe sich ab der zweiten Instanz keine weitere mehr anlegen (siehe
+/// <see cref="BuildSecurity"/>). Die ACL wird nur unter Windows gesetzt; auf anderen Systemen (nur Tests,
+/// .NET emuliert Named Pipes über Unix-Domain-Sockets) läuft die Pipe ohne explizite ACL.
 /// </para>
 /// </summary>
 internal sealed class NamedPipeServerTransport : IIpcServerTransport
@@ -33,6 +35,10 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
     private readonly ILogger _log;
     private string? _name;
     private NamedPipeServerStream? _pending; // gerade auf Connect wartende Instanz (für sauberen Dispose)
+    // Die DACL ist für jede Instanz dieselbe → einmal aufbauen und wiederverwenden (der Accept-Loop ruft
+    // AcceptAsync seriell). Nebeneffekt: die Gruppen-Auflösung samt Warnung, falls die Gruppe fehlt, läuft
+    // einmal pro Daemon-Lauf statt bei jedem Client-Connect.
+    private PipeSecurity? _security;
     private bool _disposed;
 
     public NamedPipeServerTransport(ILogger? log = null) => _log = log ?? NullLogger.Instance;
@@ -100,7 +106,14 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
     }
 
     [SupportedOSPlatform("windows")]
-    private NamedPipeServerStream CreateSecuredInstance(string name)
+    private NamedPipeServerStream CreateSecuredInstance(string name) =>
+        NamedPipeServerStreamAcl.Create(
+            name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+            inBufferSize: 0, outBufferSize: 0, _security ??= BuildSecurity());
+
+    [SupportedOSPlatform("windows")]
+    private PipeSecurity BuildSecurity()
     {
         var security = new PipeSecurity();
         security.AddAccessRule(new PipeAccessRule(
@@ -113,10 +126,21 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
             new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
             PipeAccessRights.FullControl, AccessControlType.Allow));
 
-        return NamedPipeServerStreamAcl.Create(
-            name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
-            PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
-            inBufferSize: 0, outBufferSize: 0, security);
+        // Eigenes Konto: Windows prüft für JEDE weitere Instanz einer bereits existierenden Pipe das Recht
+        // FILE_CREATE_PIPE_INSTANCE in deren DACL — nur die allererste Instanz ist frei. Läuft der Server
+        // nicht als SYSTEM/Administrator (z. B. Daemon im Dry-Run ohne Adminrechte, Tests), träfe er sonst
+        // nur die ReadWrite-ACE, könnte nach dem ersten Client keine Instanz mehr anlegen und nähme keine
+        // weitere Verbindung an. Bewusst NUR fürs eigene Konto: bekäme die erlaubte Gruppe dieses Recht,
+        // könnte ein Mitglied eigene Instanzen derselben Pipe anlegen und der GUI gegenüber den Daemon
+        // spielen (Pipe-Squatting) — genau das, was die Zugriffskontrolle hier verhindern soll.
+        using var self = WindowsIdentity.GetCurrent();
+        if (self.User is { } own)
+        {
+            security.AddAccessRule(new PipeAccessRule(
+                own, PipeAccessRights.FullControl, AccessControlType.Allow));
+        }
+
+        return security;
     }
 
     /// <summary>

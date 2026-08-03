@@ -45,6 +45,28 @@ public partial class CurveEditorController
 
     private static string Serialize(AppConfig config) => JsonSerializer.Serialize(config);
 
+    /// <summary>
+    /// Zieht die vom Daemon geänderten PWM-Grenzen (Kalibrier-Ergebnis) in der gespeicherten Baseline nach —
+    /// analog zu <c>RebaselineCurveEnabled</c>: eine Kalibrierung ist kein Nutzer-Edit und darf weder den
+    /// „Nicht gespeichert"-Banner zünden noch von „Verwerfen" auf den Vor-Kalibrier-Wert zurückgenommen werden.
+    /// </summary>
+    private void RebaselineFanPwmLimits(IReadOnlyDictionary<string, (int Min, int Max)> limits)
+    {
+        if (_savedConfigJson is null
+            || JsonSerializer.Deserialize<AppConfig>(_savedConfigJson) is not { } baseline)
+            return;
+
+        _savedConfigJson = Serialize(baseline with
+        {
+            Fans = baseline.Fans
+                .Select(f => limits.TryGetValue(f.FanId, out (int Min, int Max) l)
+                    ? f with { MinPwm = (byte)Math.Clamp(l.Min, 0, 255), MaxPwm = (byte)Math.Clamp(l.Max, 0, 255) }
+                    : f)
+                .ToList(),
+        });
+        RefreshDirty();
+    }
+
     // --- Edit-Funnel: dynamische Collections an die Dirty-Erkennung koppeln ------
 
     /// <summary>Kurven-Membership ändert sich (Add/Delete/Duplicate/Reload) → ConfigChanged je Zeile koppeln, dann Dirty prüfen.</summary>

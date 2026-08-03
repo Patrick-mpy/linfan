@@ -36,13 +36,26 @@ public sealed class DefaultProfilesTests
     }
 
     [Fact]
-    public void Build_ProfileNames_AreGerman()
+    public void Build_ProfileNames_DefaultToNeutralEnglish()
     {
         var profiles = DefaultProfiles.Build(TwoFans, PrimaryId);
+
+        Assert.Equal("Silent", profiles[0].Name);
+        Assert.Equal("Balanced", profiles[1].Name);
+        Assert.Equal("Performance", profiles[2].Name);
+    }
+
+    [Fact]
+    public void Build_CustomNames_ReachProfilesAndCurves()
+    {
+        var profiles = DefaultProfiles.Build(TwoFans, PrimaryId, "Leise", "Ausgewogen", "Leistung");
 
         Assert.Equal("Leise", profiles[0].Name);
         Assert.Equal("Ausgewogen", profiles[1].Name);
         Assert.Equal("Leistung", profiles[2].Name);
+        Assert.Equal("Leise", profiles[0].Curves[0].Name);
+        Assert.Equal("Ausgewogen", profiles[1].Curves[0].Name);
+        Assert.Equal("Leistung", profiles[2].Curves[0].Name);
     }
 
     // ── Kurven ────────────────────────────────────────────────────────────────

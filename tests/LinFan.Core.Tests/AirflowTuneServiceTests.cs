@@ -70,7 +70,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
         Assert.Equal(PressureBalance.Negative, result.Pressure);
-        Assert.Contains(result.Hints, h => h.Contains("Unterdruck"));
+        Assert.Contains(AirflowHint.NegativePressure, result.Hints);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
         Assert.Equal(PressureBalance.Unknown, result.Pressure);
-        Assert.Contains(result.Hints, h => h.Contains("Druckbilanz nicht bestimmbar"));
+        Assert.Contains(AirflowHint.NoCaseFans, result.Hints);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
         Assert.Equal(PressureBalance.Negative, result.Pressure);
-        Assert.Contains(result.Hints, h => h.Contains("Kein Einlasslüfter"));
+        Assert.Contains(AirflowHint.NoIntakeFan, result.Hints);
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
         Assert.Equal(PressureBalance.Positive, result.Pressure);
-        Assert.Contains(result.Hints, h => h.Contains("Kein Auslasslüfter"));
+        Assert.Contains(AirflowHint.NoExhaustFan, result.Hints);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class AirflowTuneServiceTests
         Assert.Equal(1, result.IntakeWeight);
         Assert.Equal(1, result.ExhaustWeight);
         Assert.Equal(PressureBalance.Balanced, result.Pressure);
-        Assert.Contains(result.Hints, h => h.Contains("nach Lüfter-Anzahl"));
+        Assert.Contains(AirflowHint.CountEstimateOnly, result.Hints);
     }
 
     // ── C · Rollenbasierte Kurven ───────────────────────────────────────────────
@@ -169,6 +169,27 @@ public sealed class AirflowTuneServiceTests
 
         Assert.Equal(expectedCurveId, result.Fans.Single().SuggestedCurveId);
         Assert.Contains(result.SuggestedCurves, c => c.Id == expectedCurveId);
+    }
+
+    [Fact]
+    public void Analyze_CurveNames_DefaultToNeutralEnglish()
+    {
+        AppConfig config = ConfigWith(Fan("f1", FanLocation.CaseFrontIntake));
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal("Airflow · Intake", result.SuggestedCurves.Single().Name);
+    }
+
+    [Fact]
+    public void Analyze_CurveNames_OverrideReachesSuggestedCurves()
+    {
+        AppConfig config = ConfigWith(Fan("f1", FanLocation.CaseFrontIntake));
+        var names = new Dictionary<string, string> { ["airflow-intake"] = "Airflow · Einlass" };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config, names);
+
+        Assert.Equal("Airflow · Einlass", result.SuggestedCurves.Single().Name);
     }
 
     [Fact]
@@ -234,13 +255,13 @@ public sealed class AirflowTuneServiceTests
     }
 
     [Fact]
-    public void Analyze_Unspecified_ReasonAsksForPosition()
+    public void Analyze_Unspecified_ReasonIsNoPositionDefaultCurve()
     {
         AppConfig config = ConfigWith(Fan("f1", FanLocation.Unspecified));
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Contains("Position", result.Fans.Single().Reason);
+        Assert.Equal(AirflowReason.NoPositionDefaultCurve, result.Fans.Single().Reason);
     }
 
     // ── D · Sensor-Zuordnung (Namens-Heuristik) ─────────────────────────────────
@@ -299,7 +320,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
         Assert.Empty(result.SuggestedCurves.Single().SourceSensorIds);
-        Assert.Contains(result.Hints, h => h.Contains("Keine Sensoren konfiguriert"));
+        Assert.Contains(AirflowHint.NoSensorsConfigured, result.Hints);
     }
 
     // ── E · Apply ───────────────────────────────────────────────────────────────

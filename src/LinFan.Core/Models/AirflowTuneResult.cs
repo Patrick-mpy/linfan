@@ -18,8 +18,8 @@ public sealed record AirflowTuneResult
     /// <summary>Summiertes Auslass-„Flow-Gewicht".</summary>
     public double ExhaustWeight { get; init; }
 
-    /// <summary>Menschenlesbare Hinweise/Warnungen (z. B. „kein Einlasslüfter", „ohne Kalibrierung geschätzt").</summary>
-    public IReadOnlyList<string> Hints { get; init; } = [];
+    /// <summary>Hinweis-Codes (z. B. „kein Einlasslüfter", „ohne Kalibrierung geschätzt") — die GUI übersetzt.</summary>
+    public IReadOnlyList<AirflowHint> Hints { get; init; } = [];
 
     /// <summary>Die rollenbasierten Kurven, auf die sich die Lüfter-Vorschläge beziehen (nur tatsächlich genutzte Rollen).</summary>
     public IReadOnlyList<CurveConfig> SuggestedCurves { get; init; } = [];

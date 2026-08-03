@@ -27,6 +27,30 @@ release history.
 
 ## Quick start
 
+### Install a release
+
+Grab the asset for your platform from the
+[releases page](https://github.com/Patrick-mpy/linfan/releases):
+
+```bash
+# Debian/Ubuntu
+sudo apt install ./linfan_<version>_amd64.deb
+
+# any other distro — self-extracting installer (elevates itself, no sudo needed):
+chmod +x LinFan-Setup-<version>-linux-x64.run && ./LinFan-Setup-<version>-linux-x64.run
+
+# or: unpack the tarball and run the same installer script
+tar xzf linfan-<version>-linux-x64.tar.gz && ./packaging/linux/install-bin.sh
+```
+
+All three set up the systemd service and the `linfan` socket group — **log out and back in once**,
+then start "LinFan". On **Windows**, run `LinFan-Setup-<version>-win-x64.exe` (or unpack the ZIP and
+run `Install-LinFan.ps1` as admin); that sets up the service and the `LinFan Users` group and likewise
+needs **one log out and back in**. Details — privileges, service, uninstall — in
+**[docs/INSTALL.md](docs/INSTALL.md)**.
+
+### Build from source
+
 ```bash
 dotnet build                                     # build everything
 dotnet test                                      # test suite
@@ -106,9 +130,9 @@ The platform-specific hardware access (the core of the project) and the full dep
   auto-start on boot is still open.
 - **macOS temperature sensors come from a curated key list** — on some models sensors may be
   missing. Open an issue with your model and the `monitor` output.
-- **Linux: group membership needs a re-login.** The installer creates the `linfan` group for socket
-  access; until you log out and back in, the GUI reports the daemon as unreachable even though it is
-  running.
+- **Group membership needs a re-login (Linux and Windows).** The installer creates the IPC access
+  group (`linfan` on Linux, `LinFan Users` on Windows); until you log out and back in, the GUI reports
+  the daemon as unreachable even though it is running.
 - **Some sensor channels report intermittent read errors** (e.g. ThinkPad EC, `EIO`) — they show as
   a missing value; the control loop and the watchdog keep running.
 - **The Windows binaries/installer are unsigned** — SmartScreen warns on first run. Installation

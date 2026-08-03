@@ -1,0 +1,16 @@
+LinFan is installed and the service is running.
+
+IMPORTANT: log out and back in once before starting LinFan.
+
+Access to the daemon is restricted to members of the local group "LinFan Users",
+and Windows only applies group membership at sign-in. On a first install your
+account was just added to that group, so until you sign out and back in the GUI
+reports the service as unreachable even though it is running. In that case the
+setup's final page offers a restart -- accepting it covers the sign-out. (On an
+upgrade you are already a member and can start right away.)
+
+Start the GUI as a NORMAL USER (Start menu -> "LinFan"), not as administrator;
+writing PWM happens in the service, which already runs with SYSTEM rights.
+
+Configuration: %ProgramData%\linfan\config.json (the daemon is the sole writer).
+Log:           %ProgramData%\linfan\logs\linfan.log

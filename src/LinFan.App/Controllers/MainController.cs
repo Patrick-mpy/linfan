@@ -57,6 +57,15 @@ public partial class MainController : ObservableObject, IDisposable
     // Auf die Signatur-Änderung warten (nicht schon beim Absenden), damit der Neuaufbau die NEUE Config trifft.
     private bool _awaitingConfigResync;
     private string _preResyncSignature = "";
+    private int _resyncGraceTicks;
+
+    /// <summary>
+    /// Wie viele Snapshots ein armierter Resync auf den erwarteten Config-Wechsel wartet (≈ Sekunden bei
+    /// 1-s-Poll). Danach wird entschärft: schrieb der Daemon nichts Neues (die gesendete Config war
+    /// inhaltsgleich), bliebe der Resync sonst dauerhaft scharf und ein viel späterer, fremder Wechsel
+    /// (Profilwechsel, Kurve an/aus) würde den Editor samt ungespeicherter Änderungen neu aufbauen.
+    /// </summary>
+    private const int ResyncGraceTicks = 10;
 
     [ObservableProperty] private string _status = Localizer.Instance["MainCtrl.Connecting"];
     [ObservableProperty] private bool _connected;
@@ -325,9 +334,13 @@ public partial class MainController : ObservableObject, IDisposable
             _awaitingConfigResync = false;
             Editor.Resync(snapshot);
         }
-        else if (snapshot.Config.OnboardingCompleted != false)
+        else
         {
-            Editor.Initialize(snapshot);
+            if (_awaitingConfigResync && --_resyncGraceTicks <= 0)
+                _awaitingConfigResync = false; // Frist abgelaufen (siehe ResyncGraceTicks)
+
+            if (snapshot.Config.OnboardingCompleted != false)
+                Editor.Initialize(snapshot);
         }
         // … und danach pro Tick mit Live-Temperaturen für den Arbeitspunkt im Kurven-Graph speisen.
         Editor.UpdateLive(snapshot);
@@ -357,7 +370,7 @@ public partial class MainController : ObservableObject, IDisposable
             Onboarding = new OnboardingController(
                 _sink.SendStartCalibrationAsync,
                 _sink.SendCancelCalibrationAsync,
-                _sink.SendConfigAsync,
+                SendOnboardingConfigAsync,
                 onClose: () => Onboarding = null,
                 sendIdentify: _sink.SendIdentifyAsync,
                 sendManual: _sink.SendManualPwmAsync,
@@ -485,7 +498,7 @@ public partial class MainController : ObservableObject, IDisposable
         Onboarding = new OnboardingController(
             _sink.SendStartCalibrationAsync,
             _sink.SendCancelCalibrationAsync,
-            _sink.SendConfigAsync,
+            SendOnboardingConfigAsync,
             onClose: () => Onboarding = null,
             sendIdentify: _sink.SendIdentifyAsync,
             sendManual: _sink.SendManualPwmAsync,
@@ -500,6 +513,26 @@ public partial class MainController : ObservableObject, IDisposable
     {
         _preResyncSignature = ConfigSignature(_lastConfig);
         _awaitingConfigResync = true;
+        _resyncGraceTicks = ResyncGraceTicks;
+    }
+
+    /// <summary>
+    /// Config-Sender des Assistenten: armiert den Editor-Neuaufbau, BEVOR gesendet wird (so ist die
+    /// Signatur-Basis garantiert die Config von vor dem Assistenten). Ohne das bliebe ein bereits befüllter
+    /// Editor — der Fall „Einstellungen → Onboarding", also jede Wiederholung auf bestehender Config — auf
+    /// dem alten Stand: die im Assistenten gewählten Positionen/Profile wären in den Tabs unsichtbar und das
+    /// nächste Speichern schriebe sie stillschweigend wieder weg.
+    /// </summary>
+    private async Task<bool> SendOnboardingConfigAsync(AppConfig config)
+    {
+        if (_sink is null)
+            return false;
+
+        ArmConfigResync();
+        bool ok = await _sink.SendConfigAsync(config);
+        if (!ok)
+            _awaitingConfigResync = false; // nichts unterwegs → nicht auf einen fremden Wechsel warten
+        return ok;
     }
 
     private static string ConfigSignature(AppConfig config) =>

@@ -39,6 +39,27 @@ public partial class App : Application
             desktop.MainWindow = window;
             TrySetupTray(window);
 
+            // --minimized (Login-Autostart): mit Tray das Fenster direkt nach dem ersten Öffnen verstecken —
+            // das Lifetime ruft Show() nach dieser Methode selbst auf, ein früheres Hide() würde überschrieben.
+            // Ohne Tray-Backend wäre ein verstecktes Fenster unerreichbar → dann nur minimiert starten.
+            if (desktop.Args?.Contains("--minimized") == true)
+            {
+                if (window.TrayAvailable)
+                {
+                    EventHandler? hideOnce = null;
+                    hideOnce = (_, _) =>
+                    {
+                        window.Opened -= hideOnce; // nur der Start — spätere Show() (Tray-Klick) nicht wieder verstecken
+                        window.Hide();
+                    };
+                    window.Opened += hideOnce;
+                }
+                else
+                {
+                    window.WindowState = WindowState.Minimized;
+                }
+            }
+
             // Einmaliger, additiver Update-Check (GitHub-Release) — nach dem Fenster-Setup, best-effort/still.
             controller.BeginUpdateCheck();
 

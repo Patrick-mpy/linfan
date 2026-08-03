@@ -25,9 +25,10 @@ cd <path>\LinFan-win-x64        # or into the repo: packaging\windows
 
 The script stops any running service (upgrade-safe, ramping the fans to hardware auto in the process),
 copies to `%ProgramFiles%\LinFan`, registers the service (autostart + failure restart), creates a
-Start-menu shortcut, and starts the service.
+Start-menu shortcut, sets up the `LinFan Users` IPC access group, and starts the service.
+On a first install, **log out and back in once** afterwards — otherwise the GUI cannot connect.
 
-Remove: `.\Uninstall-LinFan.ps1` (the config under `%ProgramData%\linfan` is kept).
+Remove: `.\Uninstall-LinFan.ps1` (the config under `%ProgramData%\linfan` is kept; the group is removed).
 
 ## 2b. Install — via one-click installer (Inno Setup)
 
@@ -40,12 +41,29 @@ Build from `linfan.iss` on a Windows PC with [Inno Setup 6](https://jrsoftware.o
 Result: `artifacts\LinFan-Setup-0.1.0-win-x64.exe`. The installer bundles the build, calls the same
 PowerShell scripts for the service logic, and ships an uninstaller.
 
+Extras over the script path (both opt-out in the wizard):
+
+- **GUI autostart at login** — a machine-wide `HKLM\...\CurrentVersion\Run` entry starting
+  `LinFan.App.exe --minimized` (hidden in the tray; the uninstaller removes the entry). HKLM on
+  purpose: the elevated installer writing HKCU would land in the *admin's* hive. The manual script
+  install deliberately has no autostart — Inno owns shortcuts/autostart, the scripts own the service.
+- **"Launch LinFan" on the finish page** — started `runasoriginaluser`, so the GUI runs unprivileged
+  despite the elevated installer. Shown on **upgrades only**: on a first install the GUI user was just
+  added to `LinFan Users`, whose membership needs a re-login — the finish page then offers a
+  **restart** instead (a GUI launched with the pre-add token could not reach the pipe; the install
+  script signals this via a marker file, Inno's `NeedRestart()` picks it up).
+
 ## Architecture notes
 
 - **Service = LocalSystem.** Writing PWM via LibreHardwareMonitor/WinRing0 needs admin; the slim daemon
   encapsulates the privileged part, the GUI runs unprivileged.
-- **IPC = named pipe `\\.\pipe\linfan`.** The DACL lets the daemon (SYSTEM) create it and grants the
-  unprivileged GUI read/write access — no env/setup needed, default name on both sides.
+- **IPC = named pipe `\\.\pipe\linfan`.** The DACL grants SYSTEM/administrators full control and the
+  local group **`LinFan Users`** read/write — so only intended GUI users can talk to the privileged
+  daemon, not every local account. The installer creates the group and adds the GUI user; **group
+  membership only takes effect after a re-login** (counterpart to the `linfan` socket group on Linux).
+  If the group is missing, the daemon logs a warning and falls back to "Authenticated Users" so the GUI
+  keeps working. The group is resolved **once at service start** — create it before starting the
+  service, or restart the service after creating it.
 - **Machine-wide config** under `%ProgramData%\linfan\config.json`, so the SYSTEM service and the user
   GUI see the same file (the daemon is the sole writer). No `%AppData%` — that would be per-user and
   invisible to the SYSTEM service.

@@ -68,7 +68,30 @@ public partial class MainController : ObservableObject, IDisposable
     private const int ResyncGraceTicks = 10;
 
     [ObservableProperty] private string _status = Localizer.Instance["MainCtrl.Connecting"];
-    [ObservableProperty] private bool _connected;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDisconnectedToast))]
+    private bool _connected;
+
+    /// <summary>Set when the user closes the disconnect toast with its X; the next disconnect re-shows it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDisconnectedToast))]
+    private bool _disconnectedToastHidden;
+
+    /// <summary>Drives the daemon-unreachable toast: disconnected state minus an explicit user dismissal.</summary>
+    public bool ShowDisconnectedToast => !Connected && !DisconnectedToastHidden;
+
+    // Re-arm only on a true connected->disconnected transition (the generated setter no-ops on equal values).
+    partial void OnConnectedChanged(bool value)
+    {
+        if (!value)
+            DisconnectedToastHidden = false;
+    }
+
+    /// <summary>Hides the disconnect toast until the next disconnect (the connection state itself is untouched).</summary>
+    [RelayCommand]
+    private void HideDisconnectedToast() => DisconnectedToastHidden = true;
+
     [ObservableProperty] private CalibrationStatus? _calibration;
     [ObservableProperty] private OnboardingController? _onboarding;
 
@@ -291,7 +314,7 @@ public partial class MainController : ObservableObject, IDisposable
             Upsert(_fanRows, Fans, f.Id, () => CreateFanRow(f.Id, f.Name), row =>
             {
                 row.Update(f);
-                row.SetPlacement(cfg?.Location ?? FanLocation.Unspecified, cfg?.Group);
+                row.SetPlacement(cfg?.Location ?? FanLocation.Unspecified);
                 row.SetCalibration(cfg?.Calibration);
                 row.IsCalibrating = snapshot.Calibration is { Running: true } rc && rc.FanId == f.Id;
             });
@@ -399,7 +422,8 @@ public partial class MainController : ObservableObject, IDisposable
             .ToList();
 
         FanGroups.Clear();
-        foreach (IGrouping<string, FanRow> grp in ordered.GroupBy(f => f.GroupKey))
+        // Case-insensitive so "cpu"/"CPU" merge into one block (first-seen casing names the header).
+        foreach (IGrouping<string, FanRow> grp in ordered.GroupBy(f => f.GroupKey, StringComparer.OrdinalIgnoreCase))
         {
             var group = new FanGroup(grp.Key);
             foreach (FanRow fan in grp)
@@ -434,7 +458,8 @@ public partial class MainController : ObservableObject, IDisposable
             s.Disambiguator = duplicateNames.Contains(s.Name) ? s.Id : "";
 
         SensorGroups.Clear();
-        foreach (IGrouping<string, SensorRow> grp in ordered.GroupBy(s => s.GroupKey))
+        // Case-insensitive so "cpu"/"CPU" merge into one block (first-seen casing names the header).
+        foreach (IGrouping<string, SensorRow> grp in ordered.GroupBy(s => s.GroupKey, StringComparer.OrdinalIgnoreCase))
         {
             var group = new SensorGroup(grp.Key);
             foreach (SensorRow sensor in grp)
@@ -502,7 +527,9 @@ public partial class MainController : ObservableObject, IDisposable
             onClose: () => Onboarding = null,
             sendIdentify: _sink.SendIdentifyAsync,
             sendManual: _sink.SendManualPwmAsync,
-            sendAuto: _sink.SendFanAutoAsync);
+            sendAuto: _sink.SendFanAutoAsync,
+            sendStartTachMapping: _sink.SendStartTachMappingAsync,
+            sendCancelTachMapping: _sink.SendCancelTachMappingAsync);
     }
 
     /// <summary>

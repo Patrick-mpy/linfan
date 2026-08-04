@@ -1,0 +1,58 @@
+name: Bug report
+description: Report something that does not work as expected.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version / distribution
+      placeholder: e.g. Ubuntu 24.04, Windows 11 24H2, macOS 15.2
+    validations:
+      required: true
+  - type: input
+    id: linfan-version
+    attributes:
+      label: LinFan version
+      placeholder: e.g. 0.1.0 (the release you installed)
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware
+      description: Mainboard or laptop model, and the sensor chip if you know it (e.g. NCT6797D, ThinkPad EC).
+  - type: textarea
+    id: logs
+    attributes:
+      label: Daemon logs
+      description: |
+        Linux: `journalctl -u linfan-daemon` · Windows: `%ProgramData%\linfan\logs\linfan.log` ·
+        macOS: the terminal output of the manually started daemon.
+      render: text

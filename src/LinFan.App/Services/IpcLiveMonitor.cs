@@ -326,7 +326,6 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
         MaxPwm = (byte)Math.Clamp(x.MaxPwm, 0, 255),
         AssignedCurveId = x.AssignedCurveId,
         Location = Enum.TryParse(x.Location, out FanLocation loc) ? loc : FanLocation.Unspecified,
-        Group = string.IsNullOrWhiteSpace(x.Group) ? null : x.Group,
         Hidden = x.Hidden,
         // Zugeordneter Drehzahl-Sensor read-only übernehmen (fürs Dropdown „aktuelle Zuordnung"). Wie die
         // Kalibrierung daemon-verwaltet: die GUI schickt das Feld nie über SaveConfig zurück (ToIpcFan lässt es weg),
@@ -340,7 +339,7 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
     };
 
     private static IpcFanAssignment ToIpcFan(FanConfig f, bool withCalibration = false) => new(
-        f.FanId, f.Name, f.MinPwm, f.MaxPwm, f.AssignedCurveId, f.Location.ToString(), f.Group, f.Hidden,
+        f.FanId, f.Name, f.MinPwm, f.MaxPwm, f.AssignedCurveId, f.Location.ToString(), f.Hidden,
         withCalibration && f.Calibration is { } cal
             ? new IpcFanCalibration(cal.StartPwm, cal.MinRpm, cal.MaxRpm)
             : null);

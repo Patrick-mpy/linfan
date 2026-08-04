@@ -73,6 +73,45 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public void Apply_MultiCurveProfile_ActivatesAllCurvesAndAssignments()
+    {
+        // Airflow-driven onboarding profiles carry several role curves per profile — Apply must
+        // activate the whole set, not just a single curve.
+        var config = new AppConfig
+        {
+            Curves = new[] { new CurveConfig { Id = "old", Name = "Old" } },
+            Fans = new[]
+            {
+                new FanConfig { FanId = "cpu" },
+                new FanConfig { FanId = "rear" },
+            },
+            Profiles = new[]
+            {
+                new Profile
+                {
+                    Id = "balanced", Name = "Balanced",
+                    Curves = new[]
+                    {
+                        new CurveConfig { Id = "airflow-cpu", Name = "Airflow · CPU" },
+                        new CurveConfig { Id = "airflow-exhaust", Name = "Airflow · Exhaust" },
+                    },
+                    Assignments = new[]
+                    {
+                        new ProfileAssignment("cpu", "airflow-cpu"),
+                        new ProfileAssignment("rear", "airflow-exhaust"),
+                    },
+                },
+            },
+        };
+
+        AppConfig result = ProfileService.Apply(config, "balanced");
+
+        Assert.Equal(new[] { "airflow-cpu", "airflow-exhaust" }, result.Curves.Select(c => c.Id));
+        Assert.Equal("airflow-cpu", result.Fans.Single(f => f.FanId == "cpu").AssignedCurveId);
+        Assert.Equal("airflow-exhaust", result.Fans.Single(f => f.FanId == "rear").AssignedCurveId);
+    }
+
+    [Fact]
     public void EnsureProfiles_NoProfiles_CreatesDefaultFromCurrentCurves()
     {
         var config = new AppConfig

@@ -11,6 +11,7 @@ public sealed record InterpolationOption(InterpolationMode Value)
     public static readonly IReadOnlyList<InterpolationOption> All = new[]
     {
         new InterpolationOption(InterpolationMode.Linear),
+        new InterpolationOption(InterpolationMode.Step),
         new InterpolationOption(InterpolationMode.Spline),
     };
 

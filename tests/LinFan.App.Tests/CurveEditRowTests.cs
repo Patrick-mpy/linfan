@@ -18,7 +18,7 @@ public sealed class CurveEditRowTests
     private static CurveEditRow MakeRow()
     {
         var sensors = new ObservableCollection<SensorOption>();
-        return new CurveEditRow("c1", "Kurve", Array.Empty<string>(), SensorAggregation.Max, 0m, sensors, sensors);
+        return new CurveEditRow("c1", "Kurve", Array.Empty<string>(), SensorAggregation.Max, 0m, sensors);
     }
 
     /// <summary>Kurve mit zwei verfügbaren Sensoren; <paramref name="selectedIds"/> sind anfangs als Quelle gesetzt.</summary>
@@ -29,7 +29,7 @@ public sealed class CurveEditRowTests
             new("s1", "CPU"),
             new("s2", "GPU"),
         };
-        return new CurveEditRow("c1", "Kurve", selectedIds, SensorAggregation.Max, 0m, sensors, sensors);
+        return new CurveEditRow("c1", "Kurve", selectedIds, SensorAggregation.Max, 0m, sensors);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class CurveEditRowTests
         var sensors = new ObservableCollection<SensorOption>();
         for (int i = 0; i < n; i++)
             sensors.Add(new SensorOption($"s{i}", $"Sensor {i}"));
-        return new CurveEditRow("c1", "Kurve", selectedIds, SensorAggregation.Max, 0m, sensors, sensors);
+        return new CurveEditRow("c1", "Kurve", selectedIds, SensorAggregation.Max, 0m, sensors);
     }
 
     [Fact]
@@ -227,6 +227,48 @@ public sealed class CurveEditRowTests
         row.ToggleShowAllSensorsCommand.Execute(null);
         Assert.Equal(3, row.DisplayedSensorChecks.Count);
         Assert.Equal("Alle 6 einblenden", row.ToggleSensorsLabel);
+    }
+
+    // --- RebuildSensorChecks: live visibility filter (mirror of the fan assignment list) ---------
+
+    [Fact]
+    public void RebuildSensorChecks_PreservesSelection_AndRewiresSelectionChanged()
+    {
+        CurveEditRow row = MakeRowWithSensors("s1");
+        row.Sensors.First(s => s.Id == "s2").Visible = false;
+
+        row.RebuildSensorChecks();
+
+        SensorCheck s1 = Assert.Single(row.SensorChecks);
+        Assert.Equal("s1", s1.Sensor.Id);
+        Assert.True(s1.Selected);
+
+        // The rebuilt check must still notify the row on selection changes.
+        s1.Selected = false;
+        Assert.True(row.HasNoSource);
+    }
+
+    [Fact]
+    public void RebuildSensorChecks_KeepsHiddenSource_AndNotifiesCollapseGetters()
+    {
+        CurveEditRow row = MakeRowWithSensorCount(4, "s0");
+        Assert.True(row.HasCollapsibleSensors);
+
+        var notified = new List<string?>();
+        row.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+
+        // Hide the selected source plus one more sensor: the source survives, the other drops out,
+        // and the count crosses the collapse threshold (4 → 3).
+        row.Sensors.First(s => s.Id == "s0").Visible = false;
+        row.Sensors.First(s => s.Id == "s1").Visible = false;
+        row.RebuildSensorChecks();
+
+        Assert.Equal(3, row.SensorChecks.Count);
+        Assert.True(row.SensorChecks.Single(c => c.Sensor.Id == "s0").Selected);
+        Assert.DoesNotContain(row.SensorChecks, c => c.Sensor.Id == "s1");
+        Assert.False(row.HasCollapsibleSensors);
+        Assert.Contains(nameof(CurveEditRow.HasCollapsibleSensors), notified);
+        Assert.Contains(nameof(CurveEditRow.ToggleSensorsLabel), notified);
     }
 
     // --- Punkte-Collapse: ShowPoints + PointsLabel („X Punkte", eingeklappt) ---------------------
@@ -271,7 +313,7 @@ public sealed class CurveEditRowTests
         var sensors = new ObservableCollection<SensorOption> { new("s1", "CPU"), new("s2", "GPU") };
         var fans = new ObservableCollection<FanAssignRow>();
         var row = new CurveEditRow("c1", "Kurve", selectedSensorIds, SensorAggregation.Max, 0m,
-                                   sensors, sensors, InterpolationMode.Linear, fans);
+                                   sensors, InterpolationMode.Linear, fans);
         return (row, fans);
     }
 

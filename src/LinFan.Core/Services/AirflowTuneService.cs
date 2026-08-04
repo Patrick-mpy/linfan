@@ -12,10 +12,17 @@ namespace LinFan.Core.Services;
 /// einen Vorschlag, zeigt ihn an und schreibt ihn bei „Übernehmen" über den normalen Speicherpfad zurück.
 /// </summary>
 /// <remarks>
-/// <para><b>Sensor-Zuordnung ist eine Namens-Heuristik.</b> <see cref="SensorConfig"/> trägt keine Art
-/// (CPU/GPU/Temp): diese Information stammt aus der Hardware-Discovery, nicht aus der persistierten Config.
-/// Quell-Sensoren werden daher über Namens-Schlüsselwörter geraten; schlägt das fehl, fällt der Vorschlag
-/// auf den ersten verfügbaren Sensor zurück und setzt einen Hinweis.</para>
+/// <para><b>Ausgeblendete Kanäle bleiben außen vor.</b> Lüfter/Sensoren mit <c>Hidden</c> sind für den
+/// Nutzer „nicht vorhanden" (typisch: ein totes PWM-/Temp-Interface ohne Werte) — sie bekommen keinen
+/// Vorschlag, zählen nicht in die Druckbilanz und taugen nicht als Kurvenquelle.</para>
+/// <para><b>Sensor-Zuordnung ist eine Namens-/Gruppen-Heuristik.</b> <see cref="SensorConfig"/> trägt
+/// keine Art (CPU/GPU/Temp): diese Information stammt aus der Hardware-Discovery, nicht aus der
+/// persistierten Config. Quell-Sensoren werden daher über Schlüsselwörter in Name <i>und</i> Gruppe
+/// geraten (AMD-SoC heißt z. B. „… 5800X SoC", hängt aber in der Gruppe „CPU"); schlägt das fehl, fällt
+/// der Vorschlag auf den ersten verfügbaren Sensor zurück und setzt einen Hinweis. Komponenten-Kurven
+/// (CPU/GPU) nehmen <i>alle</i> Treffer ihrer Komponente und mitteln sie (<see cref="SensorAggregation.Avg"/>):
+/// Offset-Sensoren wie AMDs Tctl oder ein GPU-Hot-Spot liegen konstant deutlich über den übrigen Werten,
+/// mit Max würde die Kurve nur diesen Offset abbilden.</para>
 /// <para>Die Druckbilanz ist bewusst grob: ohne echte CFM-Werte dient die kalibrierte Max-RPM als Proxy,
 /// und ohne Kalibrierung wird nur nach Anzahl gezählt.</para>
 /// <para>Jede <see cref="FanLocation"/> ist in <c>Spec(...)</c> <b>an einer Stelle</b> auf Richtung und
@@ -37,6 +44,13 @@ public static class AirflowTuneService
     public static AirflowDirection DirectionOf(FanLocation location) => Spec(location).Direction;
 
     /// <summary>
+    /// True if the location maps to a specific airflow role (not None/Default) — i.e. the analysis can
+    /// derive a role-based curve from it. Trigger for the airflow-driven onboarding profiles.
+    /// </summary>
+    public static bool HasRoleSpecificCurve(FanLocation location) =>
+        Spec(location).Role is not (AirflowRole.None or AirflowRole.Default);
+
+    /// <summary>
     /// Analysiert die Lüfter-Positionen und liefert einen Vorschlag. Liest nur – schreibt nichts.
     /// </summary>
     /// <param name="config">Die zu analysierende Konfiguration.</param>
@@ -44,18 +58,34 @@ public static class AirflowTuneService
     /// Kurven-Id (<c>airflow-cpu</c> …) — die GUI reicht hier die lokalisierte Fassung durch, da die
     /// Namen persistiert werden. Ohne Eintrag gilt der neutrale englische Default.</param>
     public static AirflowTuneResult Analyze(AppConfig config, IReadOnlyDictionary<string, string>? curveNames = null)
+        => Analyze(config, AirflowAggressiveness.Balanced, curveNames);
+
+    /// <summary>
+    /// Variant of <see cref="Analyze(AppConfig, IReadOnlyDictionary{string, string}?)"/> with an explicit
+    /// aggressiveness: same roles, ids, and sensor sources — only the point tables differ. The default
+    /// overload forwards with <see cref="AirflowAggressiveness.Balanced"/> (the pre-existing tables), so
+    /// the settings' airflow section keeps its behavior.
+    /// </summary>
+    public static AirflowTuneResult Analyze(
+        AppConfig config,
+        AirflowAggressiveness aggressiveness,
+        IReadOnlyDictionary<string, string>? curveNames = null)
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        var hints = new List<AirflowHint>();
-        SensorSources sensors = ResolveSensors(config.Sensors, hints);
+        // Ausgeblendete Kanäle sind für den Nutzer „nicht vorhanden" — komplett aus der Analyse halten.
+        var visibleFans = config.Fans.Where(f => !f.Hidden).ToList();
+        var visibleSensors = config.Sensors.Where(s => !s.Hidden).ToList();
 
-        (PressureParts pressure, IReadOnlyList<AirflowHint> pressureHints) = ComputePressure(config.Fans);
+        var hints = new List<AirflowHint>();
+        SensorSources sensors = ResolveSensors(visibleSensors, hints);
+
+        (PressureParts pressure, IReadOnlyList<AirflowHint> pressureHints) = ComputePressure(visibleFans);
         hints.AddRange(pressureHints);
 
         // Welche Rollen-Kurven werden tatsächlich gebraucht? (Netzteil → AirflowRole.None bekommt keine.)
         var usedRoles = new HashSet<AirflowRole>();
-        foreach (FanConfig fan in config.Fans)
+        foreach (FanConfig fan in visibleFans)
         {
             AirflowRole role = Spec(fan.Location).Role;
             if (role != AirflowRole.None)
@@ -64,13 +94,13 @@ public static class AirflowTuneService
 
         var curves = usedRoles
             .OrderBy(r => r)
-            .Select(r => BuildCurve(r, sensors, curveNames))
+            .Select(r => BuildCurve(r, aggressiveness, sensors, curveNames))
             .ToList();
 
-        if (config.Sensors.Count == 0 && curves.Count > 0)
+        if (visibleSensors.Count == 0 && curves.Count > 0)
             hints.Add(AirflowHint.NoSensorsConfigured);
 
-        var fanSuggestions = config.Fans.Select(BuildSuggestion).ToList();
+        var fanSuggestions = visibleFans.Select(BuildSuggestion).ToList();
 
         return new AirflowTuneResult
         {
@@ -138,6 +168,57 @@ public static class AirflowTuneService
             Curves = MergeCurves(config.Curves, result.SuggestedCurves),
             Fans = fans,
             Profiles = profiles,
+        };
+    }
+
+    /// <summary>
+    /// Builds the three onboarding profiles (silent/balanced/performance — ids and order match
+    /// <see cref="DefaultProfiles.Build"/>) from the airflow analysis: each profile carries the role
+    /// curves in the matching aggressiveness variant plus role-based assignments, restricted to
+    /// <paramref name="assignableFanIds"/> (the controllable fans — read-only channels would only
+    /// produce a failing SetPwm per tick). The analysis runs on the full config first, so the pressure
+    /// balance still counts every visible fan. Curve ids are the stable <c>airflow-*</c> ids in all
+    /// three profiles: only one profile is active at a time and <see cref="ProfileService.Apply"/>
+    /// swaps the curve set wholesale, so assignments stay valid across profile switches. Fans whose
+    /// role has no curve (PSU) get a <c>null</c> assignment — hardware auto, a regular state.
+    /// </summary>
+    /// <param name="curveNames">Localized curve names, key = stable curve id (persisted; see
+    /// <see cref="Analyze(AppConfig, IReadOnlyDictionary{string, string}?)"/>).</param>
+    public static IReadOnlyList<Profile> BuildProfiles(
+        AppConfig config,
+        IEnumerable<string> assignableFanIds,
+        IReadOnlyDictionary<string, string>? curveNames = null,
+        string silentName = "Silent",
+        string balancedName = "Balanced",
+        string performanceName = "Performance")
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(assignableFanIds);
+
+        var assignable = assignableFanIds.ToList();
+        return new[]
+        {
+            BuildProfile("silent", silentName, AirflowAggressiveness.Silent, config, assignable, curveNames),
+            BuildProfile("balanced", balancedName, AirflowAggressiveness.Balanced, config, assignable, curveNames),
+            BuildProfile("performance", performanceName, AirflowAggressiveness.Performance, config, assignable, curveNames),
+        };
+    }
+
+    private static Profile BuildProfile(
+        string id,
+        string name,
+        AirflowAggressiveness aggressiveness,
+        AppConfig config,
+        IReadOnlyList<string> assignableFanIds,
+        IReadOnlyDictionary<string, string>? curveNames)
+    {
+        AirflowTuneResult result = FilterToFans(Analyze(config, aggressiveness, curveNames), assignableFanIds);
+        return new Profile
+        {
+            Id = id,
+            Name = name,
+            Curves = result.SuggestedCurves,
+            Assignments = result.Fans.Select(f => new ProfileAssignment(f.FanId, f.SuggestedCurveId)).ToList(),
         };
     }
 
@@ -253,7 +334,8 @@ public static class AirflowTuneService
         if (spec.Role == AirflowRole.None)
             return Suggestion(fan, spec.Direction, curveId: null, AirflowReason.HardwareAuto);
 
-        RoleCurve curve = CurveFor(spec.Role);
+        // Only the id is needed here, and it is identical across aggressiveness variants.
+        RoleCurve curve = CurveFor(spec.Role, AirflowAggressiveness.Balanced);
         AirflowReason reason = fan.Location is FanLocation.Unspecified or FanLocation.Other
             ? AirflowReason.NoPositionDefaultCurve
             : AirflowReason.LocationBasedCurve;
@@ -279,46 +361,77 @@ public static class AirflowTuneService
     /// <summary>
     /// Kurvenvorlage je Rolle — Namen neutral englisch (Default; die GUI kann lokalisierte Namen über
     /// <c>curveNames</c> hereinreichen). <see cref="AirflowRole.None"/> hat bewusst keine (wird nie erzeugt).
+    /// Id and name are identical across aggressiveness variants; only the point table differs.
     /// </summary>
-    private static RoleCurve CurveFor(AirflowRole role) => role switch
+    private static RoleCurve CurveFor(AirflowRole role, AirflowAggressiveness aggressiveness) => role switch
     {
-        AirflowRole.Cpu => new("airflow-cpu", "Airflow · CPU/Radiator", CpuPoints),
-        AirflowRole.Gpu => new("airflow-gpu", "Airflow · GPU", GpuPoints),
-        AirflowRole.Intake => new("airflow-intake", "Airflow · Intake", IntakePoints),
-        AirflowRole.Exhaust => new("airflow-exhaust", "Airflow · Exhaust", ExhaustPoints),
-        AirflowRole.Default => new("airflow-default", "Airflow · Default", DefaultPoints),
+        AirflowRole.Cpu => new("airflow-cpu", "Airflow · CPU/Radiator", CpuPoints.For(aggressiveness)),
+        AirflowRole.Gpu => new("airflow-gpu", "Airflow · GPU", GpuPoints.For(aggressiveness)),
+        AirflowRole.Intake => new("airflow-intake", "Airflow · Intake", IntakePoints.For(aggressiveness)),
+        AirflowRole.Exhaust => new("airflow-exhaust", "Airflow · Exhaust", ExhaustPoints.For(aggressiveness)),
+        AirflowRole.Default => new("airflow-default", "Airflow · Default", DefaultPoints.For(aggressiveness)),
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Rolle hat keine Kurvenvorlage (None bekommt keine Kurve)."),
     };
 
-    // Stützpunkte je Rolle (monoton steigend, enden bei 100 % → bei hoher Temp volle Kühlung).
-    private static readonly CurvePoint[] CpuPoints =
-        [new(30, 20), new(50, 40), new(65, 65), new(78, 90), new(88, 100)];
+    /// <summary>Point tables of one role in the three aggressiveness variants.</summary>
+    private sealed record RolePoints(CurvePoint[] Silent, CurvePoint[] Balanced, CurvePoint[] Performance)
+    {
+        public CurvePoint[] For(AirflowAggressiveness aggressiveness) => aggressiveness switch
+        {
+            AirflowAggressiveness.Silent => Silent,
+            AirflowAggressiveness.Performance => Performance,
+            _ => Balanced,
+        };
+    }
 
-    private static readonly CurvePoint[] GpuPoints =
-        [new(35, 20), new(55, 45), new(70, 70), new(82, 95), new(90, 100)];
+    // Stützpunkte je Rolle (monoton steigend, enden bei 100 %). Die 100-%-Marke liegt bewusst unter dem
+    // FailSafeTempC-Default (90 °C), damit die Kurve volle Drehzahl erreicht, bevor der Watchdog abrupt
+    // auf Hardware-Auto zurückfällt: Max-Kurven bei 86 °C; die Avg-Komponenten-Kurven früher (82 °C),
+    // weil der Mittelwert dem heißesten Sensor bei Offset-Spreizung (Tctl/Hot-Spot) hinterherläuft.
+    // This holds for EVERY aggressiveness variant: silent starts later/lower (0 % like the
+    // DefaultProfiles silent curve) but must reach 100 % at the same point; performance gets there
+    // much earlier. At every temperature silent ≤ balanced ≤ performance (test-enforced).
+    private static readonly RolePoints CpuPoints = new(
+        Silent: [new(40, 0), new(55, 15), new(68, 35), new(76, 60), new(82, 100)],
+        Balanced: [new(30, 20), new(50, 40), new(65, 65), new(78, 90), new(82, 100)],
+        Performance: [new(30, 30), new(45, 55), new(60, 80), new(72, 100)]);
 
-    private static readonly CurvePoint[] IntakePoints =
-        [new(30, 15), new(50, 30), new(65, 50), new(80, 80), new(90, 100)];
+    private static readonly RolePoints GpuPoints = new(
+        Silent: [new(40, 0), new(58, 20), new(70, 45), new(78, 70), new(82, 100)],
+        Balanced: [new(35, 20), new(55, 45), new(70, 70), new(76, 90), new(82, 100)],
+        Performance: [new(30, 30), new(50, 60), new(65, 85), new(75, 100)]);
+
+    private static readonly RolePoints IntakePoints = new(
+        Silent: [new(35, 0), new(55, 10), new(68, 30), new(80, 60), new(86, 100)],
+        Balanced: [new(30, 15), new(50, 30), new(65, 50), new(80, 80), new(86, 100)],
+        Performance: [new(30, 25), new(45, 45), new(60, 70), new(75, 100)]);
 
     // Auslass liegt bewusst leicht über dem Einlass (zieht Wärme aktiv heraus, hält die Bilanz neutral/positiv).
-    private static readonly CurvePoint[] ExhaustPoints =
-        [new(30, 20), new(50, 38), new(65, 60), new(80, 90), new(90, 100)];
+    private static readonly RolePoints ExhaustPoints = new(
+        Silent: [new(35, 0), new(55, 15), new(68, 35), new(80, 65), new(86, 100)],
+        Balanced: [new(30, 20), new(50, 38), new(65, 60), new(80, 90), new(86, 100)],
+        Performance: [new(30, 30), new(45, 50), new(60, 75), new(75, 100)]);
 
-    private static readonly CurvePoint[] DefaultPoints =
-        [new(30, 20), new(50, 35), new(65, 55), new(80, 90), new(90, 100)];
+    private static readonly RolePoints DefaultPoints = new(
+        Silent: [new(35, 0), new(55, 10), new(68, 30), new(80, 60), new(86, 100)],
+        Balanced: [new(30, 20), new(50, 35), new(65, 55), new(80, 90), new(86, 100)],
+        Performance: [new(30, 30), new(45, 50), new(60, 75), new(75, 100)]);
 
     private static CurveConfig BuildCurve(
         AirflowRole role,
+        AirflowAggressiveness aggressiveness,
         SensorSources sensors,
         IReadOnlyDictionary<string, string>? curveNames)
     {
-        RoleCurve curve = CurveFor(role);
+        RoleCurve curve = CurveFor(role, aggressiveness);
         return new CurveConfig
         {
             Id = curve.Id,
             Name = curveNames is not null && curveNames.TryGetValue(curve.Id, out string? name) ? name : curve.Name,
             SourceSensorIds = sensors.For(role),
-            Aggregation = SensorAggregation.Max,
+            // Komponenten-Kurven mitteln ihre eigenen Sensoren (Offset-Sensoren wie Tctl/Hot-Spot
+            // überzeichnen sonst); Gehäuse-Kurven folgen der heißesten relevanten Quelle.
+            Aggregation = role is AirflowRole.Cpu or AirflowRole.Gpu ? SensorAggregation.Avg : SensorAggregation.Max,
             InterpolationMode = InterpolationMode.Linear,
             HysteresisC = 2.0,
             Points = curve.Points,
@@ -335,33 +448,42 @@ public static class AirflowTuneService
 
     private static SensorSources ResolveSensors(IReadOnlyList<SensorConfig> sensors, List<AirflowHint> hints)
     {
-        string? cpu = FindSensor(sensors, CpuKeywords);
-        string? gpu = FindSensor(sensors, GpuKeywords);
-        string? primary = cpu ?? gpu ?? sensors.FirstOrDefault()?.SensorId;
+        // GPU zuerst und von den CPU-Kandidaten abziehen: GPU-Sensoren heißen oft selbst „… GPU Core"
+        // und würden sonst über das CPU-Schlüsselwort „core" mit einsortiert.
+        IReadOnlyList<string> gpu = FindSensors(sensors, GpuKeywords);
+        var gpuIds = gpu.ToHashSet(StringComparer.Ordinal);
+        IReadOnlyList<string> cpu = FindSensors(sensors, CpuKeywords).Where(id => !gpuIds.Contains(id)).ToList();
 
-        if (sensors.Count > 0 && cpu is null)
+        string? primary = cpu.Count > 0 ? cpu[0] : gpu.Count > 0 ? gpu[0] : sensors.FirstOrDefault()?.SensorId;
+
+        if (sensors.Count > 0 && cpu.Count == 0)
             hints.Add(AirflowHint.NoCpuSensorDetected);
 
         return new SensorSources(cpu, gpu, primary);
     }
 
-    private static string? FindSensor(IReadOnlyList<SensorConfig> sensors, string[] keywords) =>
-        sensors.FirstOrDefault(s =>
-            keywords.Any(k => s.Name.Contains(k, StringComparison.OrdinalIgnoreCase)))?.SensorId;
+    /// <summary>Alle Sensoren, deren Name <i>oder</i> Gruppe eines der Schlüsselwörter enthält.</summary>
+    private static IReadOnlyList<string> FindSensors(IReadOnlyList<SensorConfig> sensors, string[] keywords) =>
+        sensors
+            .Where(s => keywords.Any(k =>
+                s.Name.Contains(k, StringComparison.OrdinalIgnoreCase)
+                || s.Group?.Contains(k, StringComparison.OrdinalIgnoreCase) == true))
+            .Select(s => s.SensorId)
+            .ToList();
 
-    /// <summary>Aufgelöste Quell-Sensoren (per Namens-Heuristik) und die Quellenliste je Rolle.</summary>
-    private readonly record struct SensorSources(string? Cpu, string? Gpu, string? Primary)
+    /// <summary>Aufgelöste Quell-Sensoren (per Namens-/Gruppen-Heuristik) und die Quellenliste je Rolle.</summary>
+    private readonly record struct SensorSources(IReadOnlyList<string> Cpu, IReadOnlyList<string> Gpu, string? Primary)
     {
         public IReadOnlyList<string> For(AirflowRole role) => role switch
         {
-            AirflowRole.Cpu => Cpu is not null ? [Cpu] : Fallback(),
-            AirflowRole.Gpu => Gpu is not null ? [Gpu] : Fallback(),
+            AirflowRole.Cpu => Cpu.Count > 0 ? Cpu : Fallback(),
+            AirflowRole.Gpu => Gpu.Count > 0 ? Gpu : Fallback(),
             _ => CaseSources(), // Intake/Exhaust/Default → heißeste relevante Quellen, Max-Aggregation
         };
 
         private IReadOnlyList<string> CaseSources()
         {
-            var combined = new[] { Cpu, Gpu }.Where(s => s is not null).Cast<string>().ToList();
+            var combined = Cpu.Concat(Gpu).ToList();
             return combined.Count > 0 ? combined : Fallback();
         }
 

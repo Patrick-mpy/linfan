@@ -53,24 +53,20 @@ public partial class FanAssignRow : ObservableObject
     /// <summary>Verfügbare Kurven (gemeinsame Liste des Controllers) für den ComboBox.</summary>
     public ObservableCollection<CurveEditRow> AvailableCurves { get; }
 
-    /// <summary>Vorhandene Gruppennamen für die Auto-Vervollständigung des Gruppen-Felds (geteilte Controller-Liste).</summary>
-    public ObservableCollection<string> AvailableGroups { get; }
-
     /// <summary>Verfügbare Drehzahl-Sensoren fürs manuelle Tacho-Dropdown (geteilte Controller-Liste; „keiner"-Eintrag zuerst).</summary>
     public ObservableCollection<TachSensorOption> AvailableTachSensors { get; }
 
     /// <summary>Auswählbare Einbau-Positionen.</summary>
     public IReadOnlyList<FanLocationOption> Locations => FanLocationOption.All;
 
-    /// <summary>Gruppenschlüssel für die Auto-Gruppierung in der Kurven-Zuordnung (Gruppe › Position › „Ungruppiert") — wie im Dashboard.</summary>
-    public string GroupKey => !string.IsNullOrWhiteSpace(Group)
-        ? Group.Trim()
-        : Location.Value != FanLocation.Unspecified ? FanLocationOption.GroupNameFor(Location.Value) : FanGroup.Ungrouped;
+    /// <summary>Gruppenschlüssel für die Auto-Gruppierung in der Kurven-Zuordnung (Position › „Ungruppiert") — wie im Dashboard.</summary>
+    public string GroupKey => Location.Value != FanLocation.Unspecified
+        ? FanLocationOption.GroupNameFor(Location.Value)
+        : FanGroup.Ungrouped;
 
     [ObservableProperty] private string _name;
     [ObservableProperty] private CurveEditRow? _selected;
     [ObservableProperty] private FanLocationOption _location;
-    [ObservableProperty] private string _group;
     [ObservableProperty] private bool _visible;
 
     // Wahrheit bleibt der rohe PWM-Wert (0–255, so wird gespeichert); MinPercent/MaxPercent sind nur die
@@ -168,7 +164,7 @@ public partial class FanAssignRow : ObservableObject
     /// injizierbar, damit Tests eine kurze Dauer setzen können).</param>
     public FanAssignRow(FanConfig baseFan, CurveEditRow? selected, ObservableCollection<CurveEditRow> availableCurves,
                         bool canControl = false, Func<string, Task>? sendCalibrate = null,
-                        TimeSpan? calibrationHold = null, ObservableCollection<string>? availableGroups = null,
+                        TimeSpan? calibrationHold = null,
                         Func<string, Task>? sendIdentify = null,
                         Func<string, byte, Task>? sendManual = null, Func<string, Task>? sendAuto = null,
                         Func<string, Task>? sendTachMapping = null, Func<Task>? cancelTachMapping = null,
@@ -179,7 +175,6 @@ public partial class FanAssignRow : ObservableObject
         _name = baseFan.Name;
         _selected = selected;
         AvailableCurves = availableCurves;
-        AvailableGroups = availableGroups ?? new();
         AvailableTachSensors = availableTachSensors ?? new();
         CanControl = canControl;
         _sendCalibrate = sendCalibrate;
@@ -190,7 +185,6 @@ public partial class FanAssignRow : ObservableObject
         Manual = new ManualControl(baseFan.FanId, canControl, sendManual, sendAuto);
         _calibrationHold = calibrationHold ?? TimeSpan.FromSeconds(4);
         _location = FanLocationOption.For(baseFan.Location);
-        _group = baseFan.Group ?? "";
         _visible = !baseFan.Hidden;
         _minPwm = baseFan.MinPwm;
         _maxPwm = baseFan.MaxPwm;
@@ -555,7 +549,7 @@ public partial class FanAssignRow : ObservableObject
     private void Clear() => Selected = null;
 
     /// <summary>
-    /// Setzt den editierbaren View-Zustand (Name/Position/Gruppe/Sichtbarkeit/PWM-Grenzen) aus der Config
+    /// Setzt den editierbaren View-Zustand (Name/Position/Sichtbarkeit/PWM-Grenzen) aus der Config
     /// zurück — für „Verwerfen". <see cref="Selected"/> bleibt außen vor; die Kurven-Zuordnung stellt der
     /// Controller über das Neuladen der Kurven her. Null → die Discovery-Basis (<c>_base</c>).
     /// </summary>
@@ -564,7 +558,6 @@ public partial class FanAssignRow : ObservableObject
         FanConfig c = config ?? _base;
         Name = c.Name;
         Location = FanLocationOption.For(c.Location);
-        Group = c.Group ?? "";
         Visible = !c.Hidden;
         MinPwm = c.MinPwm;
         MaxPwm = c.MaxPwm;
@@ -580,7 +573,6 @@ public partial class FanAssignRow : ObservableObject
             : Name.Trim(),
         AssignedCurveId = Selected?.Id,
         Location = Location.Value,
-        Group = string.IsNullOrWhiteSpace(Group) ? null : Group.Trim(),
         Hidden = !Visible,
         MinPwm = (byte)Math.Clamp(MinPwm, 0, 255),
         MaxPwm = (byte)Math.Clamp(MaxPwm, 0, 255),

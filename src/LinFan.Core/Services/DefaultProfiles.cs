@@ -35,6 +35,8 @@ public static class DefaultProfiles
         if (string.IsNullOrEmpty(primarySensorId))
             throw new ArgumentException("primarySensorId darf nicht null oder leer sein.", nameof(primarySensorId));
 
+        // Die 100-%-Marke liegt bei 86 °C und damit unter dem FailSafeTempC-Default (90 °C): die Kurve
+        // erreicht volle Drehzahl, bevor der Watchdog abrupt auf Hardware-Auto zurückfällt.
         return new[]
         {
             BuildProfile(
@@ -48,7 +50,7 @@ public static class DefaultProfiles
                     new CurvePoint(55, 0),
                     new CurvePoint(65, 25),
                     new CurvePoint(78, 55),
-                    new CurvePoint(88, 100),
+                    new CurvePoint(86, 100),
                 }),
             BuildProfile(
                 id: "balanced",
@@ -61,7 +63,7 @@ public static class DefaultProfiles
                     new CurvePoint(50, 35),
                     new CurvePoint(65, 55),
                     new CurvePoint(80, 90),
-                    new CurvePoint(90, 100),
+                    new CurvePoint(86, 100),
                 }),
             BuildProfile(
                 id: "performance",

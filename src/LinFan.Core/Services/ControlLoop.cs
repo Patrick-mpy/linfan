@@ -198,7 +198,10 @@ public sealed class ControlLoop
         var curve = config.Curves.FirstOrDefault(c => c.Id == fan.AssignedCurveId);
         if (curve is null)
         {
-            actions.Add(FanAction.Skipped(fan.FanId, $"Kurve {fan.AssignedCurveId} fehlt"));
+            // A dangling id (e.g. after a profile switch removed the curve) must behave like "no
+            // curve": skipping would freeze the fan at its last written PWM. This keeps the
+            // invariant in ONE place instead of in every config writer.
+            FallBackToAuto(fan.FanId, $"Kurve {fan.AssignedCurveId} fehlt → Auto", actions);
             return;
         }
 

@@ -19,10 +19,7 @@ public sealed record FanConfig
     /// <summary>Einbau-Position (für spätere Airflow-Optimierung).</summary>
     public FanLocation Location { get; init; } = FanLocation.Unspecified;
 
-    /// <summary>Frei benennbare Gruppe zum Organisieren (z. B. „Gehäuse oben"), oder <c>null</c>.</summary>
-    public string? Group { get; init; }
-
-    /// <summary>Im Dashboard ausgeblendet (steuert nichts an der Regelung, nur Anzeige).</summary>
+    /// <summary>Hidden app-wide except in the settings' device lists (does not affect control — an assigned curve keeps running).</summary>
     public bool Hidden { get; init; }
 
     /// <summary>

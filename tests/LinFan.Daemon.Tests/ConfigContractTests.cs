@@ -114,7 +114,7 @@ public class ConfigContractTests
                 new FanConfig
                 {
                     FanId = "f1", Name = "ALT", MinPwm = 0, MaxPwm = 255, AssignedCurveId = null,
-                    Location = FanLocation.Unspecified, Group = null, Hidden = false, Calibration = null,
+                    Location = FanLocation.Unspecified, Hidden = false, Calibration = null,
                 },
             },
             Curves = new[]
@@ -165,7 +165,7 @@ public class ConfigContractTests
                 new FanConfig
                 {
                     FanId = "f1", Name = "Front", MinPwm = 40, MaxPwm = 220, AssignedCurveId = "c1",
-                    Location = FanLocation.CaseFrontIntake, Group = "Gehäuse", Hidden = true, Calibration = null,
+                    Location = FanLocation.CaseFrontIntake, Hidden = true, Calibration = null,
                 },
             },
             Curves = new[] { curve },

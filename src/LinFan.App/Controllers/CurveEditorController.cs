@@ -27,7 +27,6 @@ public partial class CurveEditorController : ObservableObject
     private readonly Func<string, Task>? _startTachMapping;
     private readonly Func<Task>? _cancelTachMapping;
     private readonly Func<string, string?, Task>? _setFanTachometer;
-    private readonly TimeSpan _statusAutoHide;
     private bool _initialized;
     private bool _applyingProfile; // unterdrückt das Live-Umschalten beim programmatischen Setzen
     private string? _savedConfigJson; // Baseline (zuletzt geladen/gespeichert) für die Dirty-Erkennung
@@ -69,7 +68,7 @@ public partial class CurveEditorController : ObservableObject
     public ObservableCollection<string> AirflowHints { get; } = new();
 
     /// <summary>
-    /// Vorhandene Gruppennamen (Sensoren ∪ Lüfter) als Auto-Vervollständigung für die Gruppen-Auswahlfelder
+    /// Vorhandene Sensor-Gruppennamen als Auto-Vervollständigung für das Gruppen-Auswahlfeld der Sensoren
     /// im Geräte-Tab. Geteilte Instanz aller Zeilen; ein frei getippter neuer Name bleibt möglich (kein Zwang).
     /// </summary>
     public ObservableCollection<string> AvailableGroups { get; } = new();
@@ -83,7 +82,9 @@ public partial class CurveEditorController : ObservableObject
 
     [ObservableProperty] private CurveEditRow? _selectedCurve;
     [ObservableProperty] private ProfileRow? _selectedProfile;
-    [ObservableProperty] private string _status = "";
+
+    /// <summary>Save/revert result message, rendered as the transient editor status toast.</summary>
+    public TransientStatus Status { get; }
 
     // Geräte-Tab-Filter: Suchtext + „Versteckte ausblenden" je Liste. Änderungen bauen die jeweilige
     // gefilterte Sicht neu auf (Name-Bearbeitung triggert bewusst keinen Rebuild → kein Fokusverlust beim Tippen).
@@ -102,7 +103,17 @@ public partial class CurveEditorController : ObservableObject
     };
 
     /// <summary>True, sobald sich der Editor-Stand von der zuletzt gespeicherten/geladenen Konfiguration unterscheidet.</summary>
-    [ObservableProperty] private bool _hasUnsavedChanges;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUnsavedToast))]
+    private bool _hasUnsavedChanges;
+
+    /// <summary>Set when the user closes the unsaved-changes toast with its X; the next edit re-shows it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUnsavedToast))]
+    private bool _unsavedToastHidden;
+
+    /// <summary>Drives the unsaved-changes toast: the dirty state minus an explicit user dismissal.</summary>
+    public bool ShowUnsavedToast => HasUnsavedChanges && !UnsavedToastHidden;
 
     /// <summary>True, sobald der erste Snapshot verarbeitet wurde (Geräte/Kurven geladen). Steuert Leer-/Lade-Hinweise.</summary>
     [ObservableProperty] private bool _isReady;
@@ -142,7 +153,7 @@ public partial class CurveEditorController : ObservableObject
         _startTachMapping = startTachMapping;
         _cancelTachMapping = cancelTachMapping;
         _setFanTachometer = setFanTachometer;
-        _statusAutoHide = statusAutoHide ?? TimeSpan.FromSeconds(4);
+        Status = new TransientStatus(statusAutoHide);
 
         // Im Konstruktor verdrahten, damit auch die während Initialize hinzugefügten Zeilen abonniert werden
         // (Dirty bleibt dort No-op, bis Initialize die Baseline setzt). Sensoren/Lüfter ändern ihre Membership
@@ -181,7 +192,7 @@ public partial class CurveEditorController : ObservableObject
             FanConfig baseFan = snapshot.Config.Fans.FirstOrDefault(fc => fc.FanId == f.Id)
                 ?? new FanConfig { FanId = f.Id, Name = f.Name };
             var fan = new FanAssignRow(baseFan, selected: null, Curves, f.CanControl, _calibrate,
-                                       availableGroups: AvailableGroups, sendIdentify: _identify,
+                                       sendIdentify: _identify,
                                        sendManual: _sendManual, sendAuto: _sendAuto,
                                        sendTachMapping: _startTachMapping, cancelTachMapping: _cancelTachMapping,
                                        sendSetTach: _setFanTachometer, availableTachSensors: AvailableTachSensors);
@@ -212,7 +223,7 @@ public partial class CurveEditorController : ObservableObject
         {
             // Fallback ohne Profile (dank Daemon-Migration selten): Kurven direkt aus der Config.
             foreach (CurveConfig c in snapshot.Config.Curves)
-                Curves.Add(CurveEditRow.From(c, Sensors, VisibleSensors, Fans));
+                Curves.Add(CurveEditRow.From(c, Sensors, Fans));
             foreach (FanAssignRow fan in Fans)
             {
                 string? assigned = snapshot.Config.Fans.FirstOrDefault(x => x.FanId == fan.FanId)?.AssignedCurveId;

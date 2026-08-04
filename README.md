@@ -2,23 +2,17 @@
 
 Cross-platform fan control for **Linux, Windows, and macOS** — modern, minimal, open source.
 
-LinFan reads temperature sensors and fans, calibrates them automatically on first start, and drives fan
-speed with freely definable curves (temperature → power). A privileged daemon runs the control loop with
-a fail-safe watchdog; the GUI runs without root and talks to it over local IPC.
+LinFan reads temperature sensors and fans, calibrates them automatically on first start, and drives fan speed with freely definable curves (temperature → power). A privileged daemon runs the control loop with a fail-safe watchdog; the GUI runs without root and talks to it over local IPC.
 
 **Status:** Linux and Windows support is complete — the solution builds on .NET 8 with 1000+ tests
-green, validated on real hardware (ThinkPad/AMD on Linux, NCT6797D on Windows). macOS support is
-best-effort and works on **Apple Silicon** (validated live on an M2 Pro): the IOKit/SMC backend reads
-temperatures and fan RPM without root and **controls fans** (SMC target-RPM, `F*Md`/`F*Tg`) when the
-daemon runs as root — read **and** control confirmed end-to-end via the GUI. See
-[Known issues](#known-issues) for the current gaps and the [CHANGELOG](CHANGELOG.md) for the
-release history.
+green, validated on real hardware (ThinkPad/AMD on Linux, NCT6797D on Windows). macOS support is best-effort and works on **Apple Silicon** (validated live on an M2 Pro): the IOKit/SMC backend reads temperatures and fan RPM without root and **controls fans** (SMC target-RPM, `F*Md`/`F*Tg`) when the daemon runs as root — read **and** control confirmed end-to-end via the GUI. See
+
+[Known issues](#known-issues) for the current gaps and the [CHANGELOG](CHANGELOG.md) for the release history.
 
 ## Features
 
 - **Read** fans (RPM) and temperature sensors, live in the dashboard.
-- **Auto-calibration** on first start: ramps each PWM channel 0→100 %, detects which channels actually
-  drive a fan, the start-up/stall point, and the PWM→RPM characteristic.
+- **Auto-calibration** on first start: ramps each PWM channel 0→100 %, detects which channels actually drive a fan, the start-up/stall point, and the PWM→RPM characteristic.
 - **Curve editor** as a graph: temperature → power, draggable points, hysteresis, live operating point.
   A curve can be assigned to one or more fans.
 - **Profiles** (e.g. silent / performance) with their own curves, switchable from the dashboard.
@@ -43,11 +37,7 @@ chmod +x LinFan-Setup-<version>-linux-x64.run && ./LinFan-Setup-<version>-linux-
 tar xzf linfan-<version>-linux-x64.tar.gz && ./packaging/linux/install-bin.sh
 ```
 
-All three set up the systemd service and the `linfan` socket group — **log out and back in once**,
-then start "LinFan". On **Windows**, run `LinFan-Setup-<version>-win-x64.exe` (or unpack the ZIP and
-run `Install-LinFan.ps1` as admin); that sets up the service and the `LinFan Users` group and likewise
-needs **one log out and back in**. Details — privileges, service, uninstall — in
-**[docs/INSTALL.md](docs/INSTALL.md)**.
+All three set up the systemd service and the `linfan` socket group — **log out and back in once**, then start "LinFan". On **Windows**, run `LinFan-Setup-<version>-win-x64.exe` (or unpack the ZIP and run `Install-LinFan.ps1` as admin); that sets up the service and the `LinFan Users` group and likewise needs **one log out and back in**. Details — privileges, service, uninstall — in **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 ### Build from source
 
@@ -77,13 +67,11 @@ sudo dotnet run --project src/LinFan.Daemon -- run   # binds /Library/Applicatio
 dotnet run --project src/LinFan.App                  # GUI connects over IPC
 ```
 
-Reading needs no root; **fan control needs `sudo`** (SMC writes are privileged). The root daemon makes the
-socket reachable only for the invoking user (via `SUDO_UID`, mode `0600`). Do **not** `sudo` the GUI.
+Reading needs no root; **fan control needs `sudo`** (SMC writes are privileged). The root daemon makes the socket reachable only for the invoking user (via `SUDO_UID`, mode `0600`). Do **not** `sudo` the GUI.
 
 ## Architecture
 
-**MVC** with process separation: the **model** (domain + hardware access) lives authoritatively in the
-**privileged daemon**, while **view + controller** run in the user process. Writing PWM requires
+**MVC** with process separation: the **model** (domain + hardware access) lives authoritatively in the **privileged daemon**, while **view + controller** run in the user process. Writing PWM requires
 root/admin everywhere — instead of privileging the GUI, the slim daemon encapsulates the sensitive part.
 The **IPC boundary is the Controller↔Model boundary**.
 
@@ -97,8 +85,7 @@ The **IPC boundary is the Controller↔Model boundary**.
    └───────────────────────────────────────┘      └──────────────────────────────────┘
 ```
 
-Layers, dependency rules, the IPC contract, and threading in detail:
-**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+Layers, dependency rules, the IPC contract, and threading in detail: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 ## Tech stack
 
@@ -112,8 +99,7 @@ Layers, dependency rules, the IPC contract, and threading in detail:
 | Persistence       | System.Text.Json                          |
 | Service / logging | Microsoft.Extensions.Hosting, Serilog     |
 
-The platform-specific hardware access (the core of the project) and the full dependency list are in
-**[docs/HARDWARE.md](docs/HARDWARE.md)**.
+The platform-specific hardware access (the core of the project) and the full dependency list are in **[docs/HARDWARE.md](docs/HARDWARE.md)**.
 
 ## Documentation
 
@@ -124,28 +110,18 @@ The platform-specific hardware access (the core of the project) and the full dep
 
 ## Known issues
 
-- **macOS on Intel is untested.** The control path is the same code as on Apple Silicon, but it has
-  only been validated live on an M2 Pro — reports from Intel Macs are welcome.
-- **macOS has no `launchd` service yet** — the daemon is started manually (see Quick start);
-  auto-start on boot is still open.
-- **macOS temperature sensors come from a curated key list** — on some models sensors may be
-  missing. Open an issue with your model and the `monitor` output.
-- **Group membership needs a re-login (Linux and Windows).** The installer creates the IPC access
-  group (`linfan` on Linux, `LinFan Users` on Windows); until you log out and back in, the GUI reports
-  the daemon as unreachable even though it is running.
-- **Some sensor channels report intermittent read errors** (e.g. ThinkPad EC, `EIO`) — they show as
-  a missing value; the control loop and the watchdog keep running.
-- **The Windows binaries/installer are unsigned** — SmartScreen warns on first run. Installation
-  needs admin rights; the service then runs as SYSTEM.
+- **macOS on Intel is untested.** The control path is the same code as on Apple Silicon, but it has only been validated live on an M2 Pro — reports from Intel Macs are welcome.
+- **macOS has no `launchd` service yet** — the daemon is started manually (see Quick start); auto-start on boot is still open.
+- **macOS temperature sensors come from a curated key list** — on some models sensors may be missing. Open an issue with your model and the `monitor` output.
+- **Group membership needs a re-login (Linux and Windows).** The installer creates the IPC access group (`linfan` on Linux, `LinFan Users` on Windows); until you log out and back in, the GUI reports the daemon as unreachable even though it is running.
+- **Some sensor channels report intermittent read errors** (e.g. ThinkPad EC, `EIO`) — they show as a missing value; the control loop and the watchdog keep running.
+- **The Windows binaries/installer are unsigned** — SmartScreen warns on first run. Installation needs admin rights; the service then runs as SYSTEM.
 
 ## Contributing
 
-Issues and pull requests are welcome. Before a PR, please keep `dotnet build`, `dotnet test`, and
-`dotnet format` green (the conventions are enforced by `.editorconfig`). Releases are cut from
-version tags and built/published by CI.
+Issues and pull requests are welcome — **[CONTRIBUTING](.github/CONTRIBUTING.md)** has the setup, quality gates, and conventions. Before a PR, please keep `dotnet build`, `dotnet test` and `dotnet format` green (the conventions are enforced by `.editorconfig`). Releases are cut from version tags and built/published by CI. For vulnerabilities, please follow the **[security policy](.github/SECURITY.md)** instead of opening a public issue.
 
 ## License
 
 **GNU General Public License v3.0 or later** (`GPL-3.0-or-later`) — full text in [LICENSE](LICENSE).
-Copyright © 2026 Patrick Machynia. Distributed **without any warranty**. The dependencies are GPLv3-compatible
-(Avalonia, CommunityToolkit.Mvvm: MIT; LibreHardwareMonitorLib: MPL-2.0).
+Copyright © 2026 Patrick Machynia. Distributed **without any warranty**. The dependencies are GPLv3-compatible (Avalonia, CommunityToolkit.Mvvm: MIT; LibreHardwareMonitorLib: MPL-2.0).

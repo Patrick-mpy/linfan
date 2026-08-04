@@ -201,7 +201,7 @@ public class ConfigMapperTests
                 new FanConfig
                 {
                     FanId = "f1", Name = "CPU-Lüfter", MinPwm = 40, MaxPwm = 230,
-                    AssignedCurveId = "c1", Location = FanLocation.CpuCooler, Group = "Zone", Hidden = true,
+                    AssignedCurveId = "c1", Location = FanLocation.CpuCooler, Hidden = true,
                 },
             },
             Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "CPU", Group = "Zone", Hidden = false } },
@@ -230,7 +230,6 @@ public class ConfigMapperTests
         Assert.Equal((byte)230, fan.MaxPwm);
         Assert.Equal("c1", fan.AssignedCurveId);
         Assert.Equal(FanLocation.CpuCooler, fan.Location);
-        Assert.Equal("Zone", fan.Group);
         Assert.True(fan.Hidden);
 
         CurveConfig curve = Assert.Single(back.Curves);

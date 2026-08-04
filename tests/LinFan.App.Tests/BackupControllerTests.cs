@@ -38,7 +38,7 @@ public sealed class BackupControllerTests
         public readonly SettingsController Settings;
         public readonly BackupController Controller;
 
-        public Harness()
+        public Harness(TimeSpan? statusAutoHide = null)
         {
             Settings = new SettingsController(new UiSettingsStore(TempPath()));
             Controller = new BackupController(
@@ -46,7 +46,8 @@ public sealed class BackupControllerTests
                 cfg => { Replaced.Add(cfg); return Task.FromResult(ReplaceResult); },
                 () => { ResetCalls++; return Task.FromResult(ResetResult); },
                 Settings,
-                onConfigReplaced: () => ResyncCalls++);
+                onConfigReplaced: () => ResyncCalls++,
+                statusAutoHide: statusAutoHide);
         }
     }
 
@@ -178,5 +179,54 @@ public sealed class BackupControllerTests
 
         Assert.False(ok);
         Assert.Equal(0, h.ResyncCalls);
+    }
+
+    // --- Status toast: successes auto-hide, errors stay until dismissed ------------------------
+
+    [Fact]
+    public async Task Import_Valid_SetsSuccessStatus_ThatAutoHides()
+    {
+        var source = new Harness();
+        string json = source.Controller.BuildBackupJson();
+
+        var target = new Harness(statusAutoHide: TimeSpan.FromMilliseconds(20));
+        await target.Controller.ImportFromJsonAsync(json);
+
+        Assert.NotEqual("", target.Controller.Status.Text);
+        Assert.False(target.Controller.Status.IsError);
+
+        // Poll instead of a single fixed delay to keep the test robust on slow CI machines.
+        for (int i = 0; i < 100 && target.Controller.Status.Text != ""; i++)
+            await Task.Delay(20);
+        Assert.Equal("", target.Controller.Status.Text);
+    }
+
+    [Fact]
+    public async Task Import_Malformed_SetsErrorStatus_ThatStays_UntilDismissed()
+    {
+        var h = new Harness(statusAutoHide: TimeSpan.FromMilliseconds(20));
+
+        await h.Controller.ImportFromJsonAsync("{ das ist kein json");
+
+        Assert.NotEqual("", h.Controller.Status.Text);
+        Assert.True(h.Controller.Status.IsError);
+
+        await Task.Delay(150); // well past the auto-hide window -> errors must not fade
+        Assert.NotEqual("", h.Controller.Status.Text);
+
+        h.Controller.Status.DismissCommand.Execute(null);
+        Assert.Equal("", h.Controller.Status.Text);
+        Assert.False(h.Controller.Status.IsError);
+    }
+
+    [Fact]
+    public async Task ResetAsync_Failure_SetsErrorStatus()
+    {
+        var h = new Harness { ResetResult = false };
+
+        await h.Controller.ResetAsync();
+
+        Assert.NotEqual("", h.Controller.Status.Text);
+        Assert.True(h.Controller.Status.IsError);
     }
 }

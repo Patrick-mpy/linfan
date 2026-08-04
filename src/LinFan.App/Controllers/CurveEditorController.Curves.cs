@@ -19,13 +19,13 @@ public partial class CurveEditorController
         SensorOption? defaultSource = VisibleSensors.FirstOrDefault() ?? Sensors.FirstOrDefault();
         string[] defaultSources = defaultSource is null ? Array.Empty<string>() : new[] { defaultSource.Id };
         var row = new CurveEditRow($"curve-{Guid.NewGuid():N}"[..14], Localizer.Instance["CurveEditorCtrl.NewCurveName"],
-                                   defaultSources, SensorAggregation.Max, 2m, Sensors, VisibleSensors,
+                                   defaultSources, SensorAggregation.Max, 2m, Sensors,
                                    InterpolationMode.Linear, Fans);
         foreach ((decimal temp, decimal percent) in DefaultCurvePoints)
             row.AddPointRow(temp, percent);
         Curves.Add(row);
         SelectedCurve = row;
-        Status = "";
+        Status.Set("");
     }
 
     /// <summary>Dupliziert die ausgewählte Kurve (neue Id, „… (Kopie)") und wählt die Kopie aus.</summary>
@@ -39,7 +39,7 @@ public partial class CurveEditorController
             Id = $"curve-{Guid.NewGuid():N}"[..14],
             Name = Localizer.Instance.Format("CurveEditorCtrl.CopySuffix", source.Name),
         };
-        var row = CurveEditRow.From(copy, Sensors, VisibleSensors, Fans);
+        var row = CurveEditRow.From(copy, Sensors, Fans);
         Curves.Add(row);
         SelectedCurve = row;
     }
@@ -107,7 +107,7 @@ public partial class CurveEditorController
         IEnumerable<FanCurveCheck> ordered = SelectedCurveFans
             .OrderBy(c => c.Fan.GroupKey == FanGroup.Ungrouped ? "￿" : c.Fan.GroupKey, StringComparer.OrdinalIgnoreCase)
             .ThenBy(c => c.Fan.Name, StringComparer.OrdinalIgnoreCase);
-        foreach (IGrouping<string, FanCurveCheck> grp in ordered.GroupBy(c => c.Fan.GroupKey))
+        foreach (IGrouping<string, FanCurveCheck> grp in ordered.GroupBy(c => c.Fan.GroupKey, StringComparer.OrdinalIgnoreCase))
         {
             var group = new FanCheckGroup(grp.Key);
             foreach (FanCurveCheck c in grp)
@@ -123,22 +123,20 @@ public partial class CurveEditorController
         // Felder. Live-/View-Properties (LiveRpm, Kalibrier-/Identify-Status, ShowAdvanced, MinPercent/MaxPercent
         // = Spiegel von MinPwm/MaxPwm) bewusst ausgenommen, sonst kehrt die Pro-Tick-Serialisierung zurück.
         if (e.PropertyName is nameof(FanAssignRow.Name) or nameof(FanAssignRow.Selected)
-            or nameof(FanAssignRow.Location) or nameof(FanAssignRow.Group) or nameof(FanAssignRow.Visible)
+            or nameof(FanAssignRow.Location) or nameof(FanAssignRow.Visible)
             or nameof(FanAssignRow.MinPwm) or nameof(FanAssignRow.MaxPwm))
             MarkDirty();
 
         if (e.PropertyName == nameof(FanAssignRow.Selected))
             RefreshCurveActivity();
-        else if (e.PropertyName == nameof(FanAssignRow.Group))
-            RefreshAvailableGroups();
         else if (e.PropertyName == nameof(FanAssignRow.Visible))
         {
             RebuildFilteredFans(); // „Versteckte ausblenden" muss die getoggelte Zeile sofort ein-/ausblenden
             RebuildSelectedCurveFans(); // der Auge-Toggle (Geräte-Tab) wirkt sofort auf die Kurven-Zuordnungsliste
         }
 
-        // Position/Gruppe ändert die Bündelung der Kurven-Zuordnung → Gruppen-Header nachziehen.
-        if (e.PropertyName is nameof(FanAssignRow.Group) or nameof(FanAssignRow.Location))
+        // Position ändert die Bündelung der Kurven-Zuordnung → Gruppen-Header nachziehen.
+        if (e.PropertyName == nameof(FanAssignRow.Location))
             RebuildSelectedCurveFanGroups();
     }
 
@@ -183,24 +181,38 @@ public partial class CurveEditorController
     }
 
     /// <summary>
-    /// Aktualisiert die Gruppen-Vorschläge (distinkte, nicht-leere Vereinigung über Sensoren und Lüfter).
+    /// Aktualisiert die Gruppen-Vorschläge (distinkte, nicht-leere Sensor-Gruppen).
     /// Speist nur die Auto-Vervollständigung — frei getippte neue Namen bleiben erhalten.
     /// </summary>
     private void RefreshAvailableGroups()
     {
         List<string> groups = Sensors.Select(s => s.Group)
-            .Concat(Fans.Select(f => f.Group))
             .Where(g => !string.IsNullOrWhiteSpace(g))
             .Select(g => g.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(g => g, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
+        // Deliberately case-SENSITIVE gate: a casing-only rename ("cpu" -> "CPU") must refresh the
+        // suggestions; the case-insensitive Distinct above already prevents duplicates.
         if (AvailableGroups.SequenceEqual(groups))
             return; // unverändert → kein unnötiges Auffrischen gebundener Auswahlfelder
 
-        AvailableGroups.Clear();
-        foreach (string g in groups)
-            AvailableGroups.Add(g);
+        // In-place diff instead of Clear()+Add: this fires as a side effect of the very group edit being
+        // committed, and a Reset event on the shared ItemsSource would rebuild every bound suggestion
+        // popup mid-gesture (the historical "clicking a suggestion creates a new group" bug).
+        for (int i = AvailableGroups.Count - 1; i >= 0; i--)
+        {
+            if (!groups.Contains(AvailableGroups[i], StringComparer.Ordinal))
+                AvailableGroups.RemoveAt(i);
+        }
+        // Survivors of the removal pass are a subsequence of the target in the same relative order
+        // (both lists are sorted with the same fixed comparer and case-insensitively distinct), so a
+        // single insert-merge suffices.
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (i >= AvailableGroups.Count || AvailableGroups[i] != groups[i])
+                AvailableGroups.Insert(i, groups[i]);
+        }
     }
 }

@@ -57,7 +57,7 @@ public sealed record IpcCurve(
 
 public sealed record IpcCurvePoint(double TemperatureC, double Percent);
 
-/// <summary>Zuordnung + PWM-Grenzen eines Lüfters, samt Einbau-Position und Gruppe.</summary>
+/// <summary>Zuordnung + PWM-Grenzen eines Lüfters, samt Einbau-Position.</summary>
 /// <param name="Calibration">Persistiertes Kalibrier-Ergebnis (Anlaufpunkt + Drehzahlbereich), vom Daemon
 /// an die GUI gespiegelt, damit das „bereits kalibriert"-Badge auch nach einem Neustart erscheint. Im
 /// Normalbetrieb (<c>SaveConfig</c>/Merge) fließt es nur Daemon → GUI und die GUI schickt es nicht zurück;
@@ -74,7 +74,6 @@ public sealed record IpcFanAssignment(
     int MaxPwm,
     string? AssignedCurveId,
     string Location = "Unspecified",
-    string? Group = null,
     bool Hidden = false,
     IpcFanCalibration? Calibration = null,
     string? RpmSource = null);

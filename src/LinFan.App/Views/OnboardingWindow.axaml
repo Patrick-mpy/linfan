@@ -4,6 +4,7 @@
         xmlns:ctrl="clr-namespace:LinFan.App.Controls"
         xmlns:conv="using:LinFan.App.Converters"
         xmlns:acv="using:Avalonia.Data.Converters"
+        xmlns:sys="using:System"
         xmlns:l="clr-namespace:LinFan.App.Localization"
         x:Class="LinFan.App.Views.OnboardingWindow"
         x:DataType="c:OnboardingController"
@@ -95,7 +96,7 @@
                     <Button Content="{l:Tr Onboarding.CalibrateButton}"
                             Command="{Binding CalibrateAllCommand}"
                             IsEnabled="{Binding !IsCalibrating}" />
-                    <Button Content="{l:Tr Onboarding.Skip}"
+                    <Button Content="{l:Tr Onboarding.SkipCalibration}"
                             Command="{Binding SkipCalibrationCommand}"
                             IsEnabled="{Binding !IsCalibrating}" />
                 </StackPanel>
@@ -193,86 +194,140 @@
             </ScrollViewer>
 
             <!-- Schritt 3: Profil wählen -->
-            <StackPanel Spacing="{StaticResource SpacingXl}"
-                        IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
-                                    ConverterParameter=ChooseProfile}">
-                <TextBlock Text="{l:Tr Onboarding.ProfileTitle}" FontSize="18" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextPrimary}" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
+                                      ConverterParameter=ChooseProfile}">
+                <StackPanel Spacing="{StaticResource SpacingXl}">
+                    <TextBlock Text="{l:Tr Onboarding.ProfileTitle}" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
 
-                <!-- Primär-Sensor -->
-                <StackPanel Spacing="{StaticResource SpacingXs}">
-                    <TextBlock Text="{l:Tr Onboarding.PrimarySensorLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
-                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="11"
-                               Text="{l:Tr Onboarding.PrimarySensorHint}" />
-                    <ComboBox ItemsSource="{Binding TemperatureSensors}"
-                              SelectedItem="{Binding SelectedPrimarySensor}"
-                              MinWidth="260" HorizontalAlignment="Left">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="c:SensorOption">
-                                <TextBlock Text="{Binding Name}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
+                    <!-- Primär-Sensor (nur im Fallback ohne Airflow-Positionen) -->
+                    <StackPanel Spacing="{StaticResource SpacingXs}" IsVisible="{Binding !UseAirflowProfiles}">
+                        <TextBlock Text="{l:Tr Onboarding.PrimarySensorLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="11"
+                                   Text="{l:Tr Onboarding.PrimarySensorHint}" />
+                        <ComboBox ItemsSource="{Binding PrimarySensorChoices}"
+                                  SelectedItem="{Binding SelectedPrimarySensor}"
+                                  MinWidth="260" HorizontalAlignment="Left">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="c:SensorOption">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Airflow-Modus: die Profile entstehen aus den Einbau-Positionen (Rollen-Kurven je Lüfter) -->
+                    <StackPanel Spacing="{StaticResource SpacingSm}" IsVisible="{Binding UseAirflowProfiles}">
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="12"
+                                   Text="{l:Tr Onboarding.AirflowProfilesIntro}" />
+                        <TextBlock Text="{Binding AirflowPressureText}" Foreground="{DynamicResource InfoText}"
+                                   FontSize="12" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding AirflowHints}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                    <TextBlock Text="{Binding}" Foreground="{DynamicResource WarningText}" FontSize="11"
+                                               TextWrapping="Wrap" Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{l:Tr Onboarding.AirflowFansLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
+                        <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                            <ItemsControl ItemsSource="{Binding AirflowSummary}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="c:AirflowSuggestionRow">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2" ToolTip.Tip="{Binding Reason}">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                <TextBlock Text="{Binding FanName}" Foreground="{DynamicResource TextSecondary}"
+                                                           FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding LocationDisplay}" Foreground="{DynamicResource TextFaint}"
+                                                           FontSize="11" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding CurveName}" Foreground="{DynamicResource Accent}"
+                                                       FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Profil-Auswahl (Einzelauswahl via ListBox) -->
+                    <StackPanel Spacing="{StaticResource SpacingXs}">
+                        <TextBlock Text="{l:Tr Onboarding.FanProfileLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12"
+                                   Margin="0,6,0,0" />
+                        <ListBox ItemsSource="{Binding ProfileOptions}"
+                                 SelectedItem="{Binding SelectedProfile}"
+                                 Background="Transparent" BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="c:ProfileOption">
+                                    <StackPanel Spacing="{StaticResource SpacingXxs}" Margin="0,2">
+                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextHeading}" />
+                                        <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextFaint}"
+                                                   FontSize="11" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
                 </StackPanel>
+            </ScrollViewer>
 
-                <!-- Profil-Auswahl (Einzelauswahl via ListBox) -->
-                <TextBlock Text="{l:Tr Onboarding.FanProfileLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12"
-                           Margin="0,6,0,0" />
-                <ListBox ItemsSource="{Binding ProfileOptions}"
-                         SelectedItem="{Binding SelectedProfile}"
-                         Background="Transparent" BorderThickness="0">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="c:ProfileOption">
-                            <StackPanel Spacing="{StaticResource SpacingXxs}" Margin="0,2">
-                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextHeading}" />
-                                <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextFaint}"
-                                           FontSize="11" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </StackPanel>
-
-            <!-- Schritt 4: Fertig -->
+            <!-- Schritt 4: Fertig (nur über ein erfolgreiches Finish erreichbar — Quittungsseite) -->
             <StackPanel Spacing="{StaticResource SpacingXl}"
                         IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                     ConverterParameter=Done}">
                 <TextBlock Text="{l:Tr Onboarding.DoneTitle}" FontSize="18" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimary}" />
+
+                <!-- Was wurde eingerichtet -->
+                <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                    <StackPanel Spacing="{StaticResource SpacingXs}">
+                        <TextBlock Text="{Binding DoneCalibrationSummary}" Foreground="{DynamicResource TextSecondary}"
+                                   FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DonePositionsSummary}" Foreground="{DynamicResource TextSecondary}"
+                                   FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DoneProfileSummary}" Foreground="{DynamicResource TextSecondary}"
+                                   FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="13"
                            Text="{l:Tr Onboarding.DoneIntro}" />
                 <StackPanel Spacing="{StaticResource SpacingSm}">
                     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
-                               Text="{l:Tr Onboarding.DoneDashboard}" />
+                               Text="{l:Tr Onboarding.DoneOverview}" />
                     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
                                Text="{l:Tr Onboarding.DoneCurves}" />
                     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
-                               Text="{l:Tr Onboarding.DoneDevices}" />
+                               Text="{l:Tr Onboarding.DoneSettings}" />
                 </StackPanel>
             </StackPanel>
 
         </Panel>
 
         <!-- Navigations-Leiste -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,20,0,0">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,20,0,0">
 
-            <!-- Überspringen (global) -->
-            <Button Grid.Column="0" Content="{l:Tr Onboarding.Skip}"
+            <!-- Überspringen (global — nicht auf Done, dort ist die Config bereits gespeichert) -->
+            <Button Grid.Column="0" Content="{l:Tr Onboarding.SkipWizard}"
                     Command="{Binding SkipCommand}"
-                    Foreground="{DynamicResource TextFaint}" />
+                    Foreground="{DynamicResource TextFaint}"
+                    IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
+                                ConverterParameter='Welcome,Calibration,Devices,ChooseProfile'}" />
 
             <!-- Statusmeldung Mitte (nur bei nicht-leerer Meldung) -->
             <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" Foreground="{DynamicResource DangerAccent}"
                        FontSize="11" VerticalAlignment="Center" Margin="8,0" TextWrapping="Wrap"
                        IsVisible="{Binding StatusMessage, Converter={x:Static acv:StringConverters.IsNotNullOrEmpty}}" />
 
-            <!-- Zurück (alle Schritte außer Welcome) -->
+            <!-- Zurück (alle Schritte außer Welcome und Done — auf Done ist bereits gespeichert) -->
             <Button Grid.Column="2" Content="{l:Tr Onboarding.Back}"
                     Command="{Binding BackCommand}"
                     Margin="0,0,8,0"
                     IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
-                                ConverterParameter='Calibration,Devices,ChooseProfile,Done'}" />
+                                ConverterParameter='Calibration,Devices,ChooseProfile'}" />
 
             <!-- Weiter (Welcome + Calibration + Devices) -->
             <Button Grid.Column="3" Content="{l:Tr Onboarding.Next}"
@@ -281,13 +336,18 @@
                     IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                 ConverterParameter='Welcome,Calibration,Devices'}" />
 
-            <!-- Fertigstellen (ChooseProfile + Done) -->
+            <!-- Fertigstellen (nur ChooseProfile — speichert und wechselt zur Done-Seite) -->
             <Button Grid.Column="4" Content="{l:Tr Onboarding.Finish}"
                     Command="{Binding FinishCommand}"
-                    IsEnabled="{Binding SelectedPrimarySensor,
-                                Converter={x:Static acv:ObjectConverters.IsNotNull}}"
+                    IsEnabled="{Binding CanFinish}"
                     IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
-                                ConverterParameter='ChooseProfile,Done'}" />
+                                ConverterParameter=ChooseProfile}" />
+
+            <!-- Schließen (nur Done — Config ist gespeichert) -->
+            <Button Grid.Column="5" Content="{l:Tr Onboarding.Close}"
+                    Command="{Binding CloseCommand}"
+                    IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
+                                ConverterParameter=Done}" />
 
         </Grid>
     </Grid>

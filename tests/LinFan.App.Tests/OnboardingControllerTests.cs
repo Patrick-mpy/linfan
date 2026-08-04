@@ -288,6 +288,12 @@ public sealed class OnboardingControllerTests
         Assert.Contains(cfg.Profiles, p => p.Id == "silent");
         Assert.Contains(cfg.Profiles, p => p.Id == "balanced");
         Assert.Contains(cfg.Profiles, p => p.Id == "performance");
+
+        // Finish no longer closes — it navigates to the Done receipt page; Close ends the wizard.
+        Assert.False(closeCalled);
+        Assert.Equal(OnboardingStep.Done, ctrl.CurrentStep);
+
+        ctrl.CloseCommand.Execute(null);
         Assert.True(closeCalled);
     }
 
@@ -390,6 +396,112 @@ public sealed class OnboardingControllerTests
     }
 
     // ---------------------------------------------------------------------------
+    // Airflow mode in the profile step: positions → role-based profiles (fallback = primary sensor)
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void EnterChooseProfile_WithRoleLocation_EnablesAirflowMode_AndFillsSummary()
+    {
+        var (ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
+
+        ctrl.CurrentStep = OnboardingStep.ChooseProfile;
+
+        Assert.True(ctrl.UseAirflowProfiles);
+        Assert.NotEqual("", ctrl.AirflowPressureText);
+        // Summary lists only controllable fans (pwm1, pwm2) — the read-only pwm3 gets no assignment.
+        Assert.Equal(new[] { "hwmon0/pwm1", "hwmon0/pwm2" }, ctrl.AirflowSummary.Select(r => r.FanId));
+    }
+
+    [Fact]
+    public void EnterChooseProfile_WithoutRoleLocations_StaysInFallbackMode()
+    {
+        var (ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot()); // all locations Unspecified
+
+        ctrl.CurrentStep = OnboardingStep.ChooseProfile;
+
+        Assert.False(ctrl.UseAirflowProfiles);
+        Assert.Empty(ctrl.AirflowSummary);
+        Assert.Equal("", ctrl.AirflowPressureText);
+    }
+
+    [Fact]
+    public async Task Finish_AirflowMode_BuildsThreeAirflowProfiles_AssignsByRole()
+    {
+        var (ctrl, sent) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm2").Location = FanLocationOption.For(FanLocation.CaseRearExhaust);
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        AppConfig cfg = Assert.Single(sent);
+        Assert.Equal(new[] { "silent", "balanced", "performance" }, cfg.Profiles.Select(p => p.Id));
+        Assert.All(cfg.Profiles, p =>
+        {
+            Assert.Contains(p.Curves, c => c.Id == "airflow-cpu");
+            Assert.Contains(p.Curves, c => c.Id == "airflow-exhaust");
+            Assert.Equal("airflow-cpu", p.Assignments.Single(a => a.FanId == "hwmon0/pwm1").CurveId);
+            Assert.Equal("airflow-exhaust", p.Assignments.Single(a => a.FanId == "hwmon0/pwm2").CurveId);
+            // read-only pwm3 gets no assignment in any profile
+            Assert.DoesNotContain(p.Assignments, a => a.FanId == "hwmon0/pwm3");
+        });
+        // ProfileService.Apply materialized the balanced default into the fans.
+        Assert.Equal("airflow-cpu", cfg.Fans.Single(f => f.FanId == "hwmon0/pwm1").AssignedCurveId);
+        Assert.Equal("airflow-exhaust", cfg.Fans.Single(f => f.FanId == "hwmon0/pwm2").AssignedCurveId);
+        Assert.Null(cfg.Fans.Single(f => f.FanId == "hwmon0/pwm3").AssignedCurveId);
+    }
+
+    [Fact]
+    public async Task Finish_AirflowMode_DoesNotRequirePrimarySensor()
+    {
+        var (ctrl, sent) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
+        ctrl.SelectedPrimarySensor = null;
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        Assert.Single(sent); // sent despite missing primary sensor — sources come from the heuristic
+    }
+
+    [Fact]
+    public async Task Finish_AirflowMode_AllSensorsHidden_BlocksWithMessage()
+    {
+        // With every temperature sensor hidden the role curves would get empty source lists and
+        // silently regulate nothing — Finish must block like the fallback branch does.
+        var (ctrl, sent) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
+        foreach (SensorOption sensor in ctrl.TemperatureSensors)
+            sensor.Visible = false;
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        Assert.Empty(sent);
+        Assert.False(string.IsNullOrEmpty(ctrl.StatusMessage));
+        Assert.NotEqual(OnboardingStep.Done, ctrl.CurrentStep);
+    }
+
+    [Fact]
+    public void CanFinish_TracksModeAndSensor()
+    {
+        var (ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+
+        Assert.True(ctrl.CanFinish); // fallback mode with auto-picked primary sensor
+
+        ctrl.SelectedPrimarySensor = null;
+        Assert.False(ctrl.CanFinish); // fallback mode without sensor
+
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
+        ctrl.CurrentStep = OnboardingStep.ChooseProfile; // gate re-evaluates on step entry
+        Assert.True(ctrl.CanFinish); // airflow mode needs no sensor
+    }
+
+    // ---------------------------------------------------------------------------
     // Skip: sendet nur OnboardingCompleted = true, keine Profiländerung
     // ---------------------------------------------------------------------------
 
@@ -461,8 +573,9 @@ public sealed class OnboardingControllerTests
         ctrl.NextCommand.Execute(null);
         Assert.Equal(OnboardingStep.ChooseProfile, ctrl.CurrentStep);
 
+        // Done is a receipt page reachable only via a successful Finish — Next stops here.
         ctrl.NextCommand.Execute(null);
-        Assert.Equal(OnboardingStep.Done, ctrl.CurrentStep);
+        Assert.Equal(OnboardingStep.ChooseProfile, ctrl.CurrentStep);
     }
 
     [Fact]
@@ -483,16 +596,36 @@ public sealed class OnboardingControllerTests
     [Fact]
     public async Task Finish_ThenSkipOnClose_DoesNotResendProfilelessConfig()
     {
-        var (ctrl, sent) = MakeController();
+        bool closeCalled = false;
+        var (ctrl, sent) = MakeController(onClose: () => closeCalled = true);
         ctrl.Apply(MakeSnapshot(config: new AppConfig { Fans = [new FanConfig { FanId = "f1", Name = "Fan" }] }));
 
         await ctrl.FinishCommand.ExecuteAsync(null);
-        // Das Schließen des Fensters ruft OnClosing → SkipCommand; der Latch muss das unterdrücken,
-        // sonst überschriebe eine profillose Config die gerade gesendeten Profile.
+        // Das Schließen des Fensters (X auf der Done-Seite) ruft OnClosing → SkipCommand; der Latch muss
+        // das Senden unterdrücken, sonst überschriebe eine profillose Config die gesendeten Profile —
+        // aber der Wizard muss trotzdem sauber schließen (Localizer-Abo lösen, Besitzer zurücksetzen).
         await ctrl.SkipCommand.ExecuteAsync(null);
 
         AppConfig cfg = Assert.Single(sent);  // nur EINE Sendung (Finish)
         Assert.Equal(3, cfg.Profiles.Count);  // und es ist die Profil-Config, nicht profillos
+        Assert.True(closeCalled);             // Fenster-X auf Done schließt trotzdem
+    }
+
+    [Fact]
+    public async Task Finish_PopulatesDoneSummary()
+    {
+        var (ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot()); // 2 controllable fans (pwm1, pwm2) + 1 read-only, no calibration run
+        ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        Assert.Equal(OnboardingStep.Done, ctrl.CurrentStep);
+        Assert.Contains("0", ctrl.DoneCalibrationSummary);  // nothing calibrated in this run
+        Assert.Contains("2", ctrl.DoneCalibrationSummary);  // of 2 controllable fans
+        Assert.Contains("1", ctrl.DonePositionsSummary);    // one position assigned (of 3 fans)
+        Assert.Contains("3", ctrl.DonePositionsSummary);
+        Assert.False(string.IsNullOrWhiteSpace(ctrl.DoneProfileSummary));
     }
 
     // ---------------------------------------------------------------------------
@@ -752,6 +885,228 @@ public sealed class OnboardingControllerTests
         }
 
         Assert.Equal(before, LocalizerProbe.SubscriberCount());
+    }
+
+    // ---------------------------------------------------------------------------
+    // Hidden devices: primary-sensor combo/heuristic filter + hidden fans stay out of the wizard
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void SelectPrimarySensorId_SkipsHiddenSensors()
+    {
+        var sensors = new[]
+        {
+            new SensorOption("cpu/temp1", "cpu package", visible: false), // hidden CPU match
+            new SensorOption("mb/temp1", "Motherboard"),
+        };
+        var readings = new[]
+        {
+            new SensorReading("cpu/temp1", "cpu package", SensorKind.Temperature, "°C", 70),
+            new SensorReading("mb/temp1", "Motherboard", SensorKind.Temperature, "°C", 40),
+        };
+
+        Assert.Equal("mb/temp1", OnboardingController.SelectPrimarySensorId(sensors, readings));
+    }
+
+    [Fact]
+    public void SelectPrimarySensorId_AllHidden_FallsBackToAll()
+    {
+        var sensors = new[]
+        {
+            new SensorOption("cpu/temp1", "cpu package", visible: false),
+            new SensorOption("mb/temp1", "Motherboard", visible: false),
+        };
+
+        // Everything hidden → fall back so Finish cannot dead-end without a primary sensor.
+        Assert.Equal("cpu/temp1", OnboardingController.SelectPrimarySensorId(sensors, Array.Empty<SensorReading>()));
+    }
+
+    [Fact]
+    public void Apply_ExcludesHiddenSensor_FromPrimarySensorChoices()
+    {
+        (OnboardingController ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot(config: new AppConfig
+        {
+            Sensors = new[] { new SensorConfig { SensorId = "hwmon0/temp2", Name = "GPU Temp", Hidden = true } },
+        }));
+
+        Assert.Equal(2, ctrl.TemperatureSensors.Count); // visibility checkbox list keeps everything
+        Assert.Equal("hwmon0/temp1", Assert.Single(ctrl.PrimarySensorChoices).Id);
+    }
+
+    [Fact]
+    public void SensorVisibilityToggle_UpdatesPrimarySensorChoices_Live()
+    {
+        (OnboardingController ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+        Assert.Equal(2, ctrl.PrimarySensorChoices.Count);
+
+        SensorOption gpu = ctrl.TemperatureSensors.First(s => s.Id == "hwmon0/temp2");
+        gpu.Visible = false;
+        Assert.Equal("hwmon0/temp1", Assert.Single(ctrl.PrimarySensorChoices).Id);
+
+        gpu.Visible = true; // re-inserted at its original position, not appended
+        Assert.Equal(new[] { "hwmon0/temp1", "hwmon0/temp2" }, ctrl.PrimarySensorChoices.Select(s => s.Id));
+    }
+
+    [Fact]
+    public void HidingSelectedPrimarySensor_KeepsItInChoices_UntilReplaced()
+    {
+        (OnboardingController ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot());
+
+        SensorOption cpu = ctrl.TemperatureSensors.First(s => s.Id == "hwmon0/temp1");
+        SensorOption gpu = ctrl.TemperatureSensors.First(s => s.Id == "hwmon0/temp2");
+        ctrl.SelectedPrimarySensor = gpu;
+
+        gpu.Visible = false; // hidden but selected → stays offered (and selected)
+        Assert.Contains(gpu, ctrl.PrimarySensorChoices);
+        Assert.Same(gpu, ctrl.SelectedPrimarySensor);
+
+        ctrl.SelectedPrimarySensor = cpu; // replacing the selection drops the hidden sensor
+        Assert.DoesNotContain(gpu, ctrl.PrimarySensorChoices);
+    }
+
+    [Fact]
+    public void Apply_InitialPrimarySelection_IgnoresHiddenCpuSensor()
+    {
+        (OnboardingController ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot(config: new AppConfig
+        {
+            Sensors = new[] { new SensorConfig { SensorId = "hwmon0/temp1", Name = "CPU Package", Hidden = true } },
+        }));
+
+        Assert.Equal("hwmon0/temp2", ctrl.SelectedPrimarySensor?.Id);
+    }
+
+    [Fact]
+    public void Apply_ExcludesHiddenFans_FromPositionAndCalibrationLists()
+    {
+        (OnboardingController ctrl, _) = MakeController();
+        ctrl.Apply(MakeSnapshot(config: new AppConfig
+        {
+            Fans = new[] { new FanConfig { FanId = "hwmon0/pwm2", Name = "Case Fan", Hidden = true } },
+        }));
+
+        Assert.DoesNotContain(ctrl.Fans, f => f.FanId == "hwmon0/pwm2");
+        Assert.Equal("hwmon0/pwm1", Assert.Single(ctrl.ControllableFans).FanId);
+        Assert.Contains(ctrl.Fans, f => f.FanId == "hwmon0/pwm3"); // read-only but visible stays listed
+    }
+
+    [Fact]
+    public async Task Finish_KeepsHiddenFanConfig_NoDataLoss()
+    {
+        var hidden = new FanConfig
+        {
+            FanId = "hwmon0/pwm2",
+            Name = "Ghost",
+            Hidden = true,
+            Location = FanLocation.CaseFrontIntake,
+            MinPwm = 30,
+            MaxPwm = 200,
+            Calibration = new FanCalibration { StartPwm = 40, MinRpm = 500, MaxRpm = 1800 },
+        };
+        (OnboardingController ctrl, List<AppConfig> sent) = MakeController();
+        ctrl.Apply(MakeSnapshot(config: new AppConfig { Fans = new[] { hidden } }));
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        AppConfig result = Assert.Single(sent);
+        FanConfig kept = result.Fans.Single(f => f.FanId == "hwmon0/pwm2");
+        Assert.True(kept.Hidden);
+        Assert.Equal("Ghost", kept.Name);
+        Assert.Equal(FanLocation.CaseFrontIntake, kept.Location);
+        Assert.Equal((byte)30, kept.MinPwm);
+        Assert.Equal((byte)200, kept.MaxPwm);
+        Assert.Equal((byte)40, kept.Calibration?.StartPwm);
+    }
+
+    [Fact]
+    public async Task Finish_NullsDanglingCurveId_OnHiddenFan()
+    {
+        var hidden = new FanConfig
+        {
+            FanId = "hwmon0/pwm2",
+            Name = "Ghost",
+            Hidden = true,
+            AssignedCurveId = "old-curve",
+        };
+        (OnboardingController ctrl, List<AppConfig> sent) = MakeController();
+        ctrl.Apply(MakeSnapshot(config: new AppConfig { Fans = new[] { hidden } }));
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        // Finish replaces the whole curve set → "old-curve" no longer exists. The persisted config
+        // must not keep the dangling reference: null = hardware auto, a regular state. (The
+        // ControlLoop additionally treats dangling ids like null at runtime — defense in depth.)
+        AppConfig result = Assert.Single(sent);
+        Assert.Null(result.Fans.Single(f => f.FanId == "hwmon0/pwm2").AssignedCurveId);
+    }
+
+    [Fact]
+    public async Task Finish_KeepsConfigOfUndiscoveredSensor()
+    {
+        // A config entry whose sensor is missing from the current discovery (unplugged, EIO) has no
+        // wizard row — Finish must carry it over verbatim instead of dropping name/group/visibility.
+        var gone = new SensorConfig { SensorId = "gone/temp1", Name = "USB Probe", Group = "Extern", Hidden = true };
+        (OnboardingController ctrl, List<AppConfig> sent) = MakeController();
+        ctrl.Apply(MakeSnapshot(config: new AppConfig { Sensors = new[] { gone } }));
+
+        await ctrl.FinishCommand.ExecuteAsync(null);
+
+        AppConfig result = Assert.Single(sent);
+        SensorConfig kept = result.Sensors.Single(s => s.SensorId == "gone/temp1");
+        Assert.Equal("USB Probe", kept.Name);
+        Assert.Equal("Extern", kept.Group);
+        Assert.True(kept.Hidden);
+    }
+
+    [Fact]
+    public async Task WindowClose_DuringFinishSend_DoesNotSendProfilelessConfig()
+    {
+        // Closing the window while Finish's send is in flight runs OnClosing→Skip. The latch must
+        // already be set, otherwise Skip races a profile-less config against the profile config.
+        var sent = new List<AppConfig>();
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool closeCalled = false;
+        var ctrl = new OnboardingController(
+            sendStartCalibration: _ => Task.CompletedTask,
+            sendCancelCalibration: () => Task.CompletedTask,
+            sendConfig: cfg => { sent.Add(cfg); return gate.Task; },
+            onClose: () => closeCalled = true);
+        ctrl.Apply(MakeSnapshot(config: new AppConfig { Fans = [new FanConfig { FanId = "f1", Name = "Fan" }] }));
+
+        Task finish = ctrl.FinishCommand.ExecuteAsync(null); // blocks on the in-flight send
+        await ctrl.SkipCommand.ExecuteAsync(null);           // window-X while sending
+
+        gate.SetResult(true);
+        await finish;
+
+        AppConfig cfg = Assert.Single(sent);   // only Finish's config went out
+        Assert.Equal(3, cfg.Profiles.Count);
+        Assert.True(closeCalled);              // and the wizard still tore down
+    }
+
+    [Fact]
+    public async Task Finish_SendFails_ReArmsLatch_SoSkipStillSends()
+    {
+        var results = new Queue<bool>([false, true]);
+        var sent = new List<AppConfig>();
+        var ctrl = new OnboardingController(
+            sendStartCalibration: _ => Task.CompletedTask,
+            sendCancelCalibration: () => Task.CompletedTask,
+            sendConfig: cfg => { sent.Add(cfg); return Task.FromResult(results.Dequeue()); },
+            onClose: () => { });
+        ctrl.Apply(MakeSnapshot(config: new AppConfig { Fans = [new FanConfig { FanId = "f1", Name = "Fan" }] }));
+
+        await ctrl.FinishCommand.ExecuteAsync(null); // save fails → stays on the profile step
+        Assert.NotEqual(OnboardingStep.Done, ctrl.CurrentStep);
+        Assert.False(string.IsNullOrEmpty(ctrl.StatusMessage));
+
+        await ctrl.SkipCommand.ExecuteAsync(null);   // latch was re-armed → Skip can still persist
+
+        Assert.Equal(2, sent.Count);
+        Assert.True(sent[^1].OnboardingCompleted);
     }
 
     // ---------------------------------------------------------------------------

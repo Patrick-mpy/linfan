@@ -140,7 +140,7 @@ public sealed class DefaultProfilesTests
 
         Assert.Equal(5, curve.Points.Count);
         Assert.Equal(new CurvePoint(35, 0), curve.Points[0]);
-        Assert.Equal(new CurvePoint(88, 100), curve.Points[4]);
+        Assert.Equal(new CurvePoint(86, 100), curve.Points[4]);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class DefaultProfilesTests
 
         Assert.Equal(5, curve.Points.Count);
         Assert.Equal(new CurvePoint(30, 20), curve.Points[0]);
-        Assert.Equal(new CurvePoint(90, 100), curve.Points[4]);
+        Assert.Equal(new CurvePoint(86, 100), curve.Points[4]);
     }
 
     [Fact]

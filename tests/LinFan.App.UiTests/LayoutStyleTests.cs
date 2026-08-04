@@ -22,6 +22,7 @@ public class LayoutStyleTests
     [InlineData("chip", 6, 4, 1, 4, 1)]
     [InlineData("itemCard", 10, 12, 12, 12, 12)]
     [InlineData("inset", 6, 8, 2, 8, 2)]
+    [InlineData("toast", 10, 12, 10, 12, 10)]
     public void Border_class_applies_corner_padding_and_background(
         string cls, double radius, double left, double top, double right, double bottom)
     {

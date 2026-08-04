@@ -43,12 +43,22 @@ public class MainWindowSmokeTests
             .Single(t => t.Text == "● Nicht gespeicherte Änderungen");
 
         // Frisch initialisiert → nicht „dirty" → ausgeblendet. (IsEffectivelyVisible, da das IsVisible-Binding
-        // am umschließenden Banner-StackPanel mit dem „Übernehmen"-Button sitzt, nicht am TextBlock selbst.)
+        // am umschließenden Toast-Border mit dem „Übernehmen"-Button sitzt, nicht am TextBlock selbst.)
         Assert.False(controller.Editor.HasUnsavedChanges);
         Assert.False(dirty.IsEffectivelyVisible);
 
         // Dirty setzen → Indikator sichtbar (das Binding greift, nicht nur kompiliert).
         controller.Editor.HasUnsavedChanges = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(dirty.IsEffectivelyVisible);
+
+        // X on the toast -> hidden although still dirty; the next edit re-shows it.
+        controller.Editor.HideUnsavedToastCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(controller.Editor.HasUnsavedChanges);
+        Assert.False(dirty.IsEffectivelyVisible);
+
+        controller.Editor.SelectedCurve!.AddPointRow(95, 90); // real edit path (MarkDirty) re-arms the toast
         Dispatcher.UIThread.RunJobs();
         Assert.True(dirty.IsEffectivelyVisible);
 

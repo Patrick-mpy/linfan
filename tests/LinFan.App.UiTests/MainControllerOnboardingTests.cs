@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using LinFan.App.Controllers;
 using LinFan.App.Services;
 using LinFan.Core.Models;
+using LinFan.Ipc.Messages;
 using Xunit;
 
 namespace LinFan.App.UiTests;
@@ -125,6 +126,41 @@ public class MainControllerOnboardingTests
 
             UiTestHelpers.PumpUntil(() => ctrl.Editor.Fans.Any(f => f.Location.Value == FanLocation.CpuCooler));
             Assert.Equal(FanLocation.CpuCooler, Assert.Single(ctrl.Editor.Fans).Location.Value);
+        }
+        finally { ctrl.Dispose(); }
+    }
+
+    /// <summary>
+    /// Regression: the manual re-run ("Settings → Onboarding") must wire the tach-mapping delegates just
+    /// like the first-run path — without them the wizard silently falls back to the legacy no-coupling
+    /// calibration and never pairs tach sensors.
+    /// </summary>
+    [AvaloniaFact]
+    public void RepeatedOnboarding_CalibrationStartsTachCoupling()
+    {
+        var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot());
+        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        try
+        {
+            UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+
+            ctrl.StartOnboardingCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => ctrl.Onboarding?.ControllableFans.Count > 0);
+
+            OnboardingController wizard = ctrl.Onboarding!;
+            wizard.CalibrateAllCommand.Execute(null);
+
+            // Coupling must run as phase 1 (fails before the fix: calibration starts directly).
+            UiTestHelpers.PumpUntil(() => fake.TachMappingCalls.Count > 0);
+            Assert.Contains("hwmon0/pwm1", fake.TachMappingCalls);
+
+            // Let the coupling fail so the single-fan sequence terminates cleanly.
+            fake.Current = fake.Current with
+            {
+                TachMapping = new TachMappingStatus("hwmon0/pwm1", TachMappingPhase.Failed, Running: false),
+            };
+            UiTestHelpers.PumpUntil(() => !wizard.IsCalibrating);
+            Assert.False(wizard.IsCalibrating);
         }
         finally { ctrl.Dispose(); }
     }

@@ -180,7 +180,7 @@
     <value>Temperatursensoren</value>
   </data>
   <data name="MainWindow.SensorListSubtitle" xml:space="preserve">
-    <value>Live-Temperatur · Anzeigename, Gruppe &amp; Sichtbarkeit im Dashboard</value>
+    <value>Live-Temperatur · Anzeigename, Gruppe &amp; Sichtbarkeit</value>
   </data>
   <data name="MainWindow.SearchPlaceholder" xml:space="preserve">
     <value>Suchen…</value>
@@ -189,19 +189,16 @@
     <value>Versteckte aus</value>
   </data>
   <data name="MainWindow.HideHiddenSensorsTooltip" xml:space="preserve">
-    <value>Blendet im Dashboard ausgeblendete Sensoren aus dieser Liste aus (löscht sie nicht).</value>
+    <value>Blendet ausgeblendete Sensoren auch aus dieser Liste aus (löscht sie nicht).</value>
   </data>
   <data name="MainWindow.NameRequired" xml:space="preserve">
     <value>Name erforderlich</value>
   </data>
   <data name="MainWindow.ToggleVisibleSensorTooltip" xml:space="preserve">
-    <value>Im Dashboard ein-/ausblenden (gemessen wird weiterhin).</value>
-  </data>
-  <data name="MainWindow.Group" xml:space="preserve">
-    <value>Gruppe</value>
+    <value>Überall außer in den Einstellungen ein-/ausblenden (gemessen wird weiterhin).</value>
   </data>
   <data name="MainWindow.GroupSensorTooltip" xml:space="preserve">
-    <value>Fasst Sensoren im Dashboard zu einem Block zusammen — gleicher Name = ein Block. Leer → „Ungruppiert“.</value>
+    <value>Fasst Sensoren zu einem Block zusammen — gleicher Name = ein Block, im Dashboard und in der Sensor-Auswahl der Kurven. Leer → „Ungruppiert“.</value>
   </data>
   <data name="MainWindow.Optional" xml:space="preserve">
     <value>optional</value>
@@ -213,19 +210,16 @@
     <value>Hardware-Adresse (Kernel-/hwmon-Pfad).</value>
   </data>
   <data name="MainWindow.FanListSubtitle" xml:space="preserve">
-    <value>Live-Drehzahl · Name, Position, Gruppe &amp; Sichtbarkeit im Dashboard</value>
+    <value>Live-Drehzahl · Name, Position, Gruppe &amp; Sichtbarkeit</value>
   </data>
   <data name="MainWindow.HideHiddenFansTooltip" xml:space="preserve">
-    <value>Blendet im Dashboard ausgeblendete Lüfter aus dieser Liste aus (geregelt werden sie weiter).</value>
+    <value>Blendet ausgeblendete Lüfter auch aus dieser Liste aus (geregelt werden sie weiter).</value>
   </data>
   <data name="MainWindow.CalibrationFailed" xml:space="preserve">
     <value>Kalibrierung fehlgeschlagen oder abgebrochen.</value>
   </data>
   <data name="MainWindow.ToggleVisibleFanTooltip" xml:space="preserve">
-    <value>Im Dashboard ein-/ausblenden (geregelt wird er weiterhin).</value>
-  </data>
-  <data name="MainWindow.GroupFanTooltip" xml:space="preserve">
-    <value>Fasst Lüfter im Dashboard zu einem Block zusammen — gleicher Name = ein Block. Leer → nach Position bzw. „Ungruppiert“.</value>
+    <value>Überall außer in den Einstellungen ein-/ausblenden (geregelt wird er weiterhin).</value>
   </data>
   <data name="MainWindow.Position" xml:space="preserve">
     <value>Position</value>
@@ -372,7 +366,7 @@
     <value>Interpolation</value>
   </data>
   <data name="MainWindow.InterpolationTooltip" xml:space="preserve">
-    <value>Linear = geradlinig zwischen den Punkten. Spline = weicher Verlauf, nie weniger Kühlung als die gerade Verbindung.</value>
+    <value>Linear = geradlinig zwischen den Punkten. Stufen = hält den Wert und springt am nächsten Punkt. Spline = weich gerundeter Verlauf durch die Punkte.</value>
   </data>
   <data name="MainWindow.Hysteresis" xml:space="preserve">
     <value>Hysterese</value>
@@ -437,14 +431,17 @@
   <data name="Onboarding.CalibrateButton" xml:space="preserve">
     <value>Kalibrieren (empfohlen)</value>
   </data>
-  <data name="Onboarding.Skip" xml:space="preserve">
-    <value>Überspringen</value>
+  <data name="Onboarding.SkipWizard" xml:space="preserve">
+    <value>Einrichtung überspringen</value>
+  </data>
+  <data name="Onboarding.SkipCalibration" xml:space="preserve">
+    <value>Kalibrierung überspringen</value>
   </data>
   <data name="Onboarding.DevicesTitle" xml:space="preserve">
     <value>Geräte einrichten</value>
   </data>
   <data name="Onboarding.DevicesIntro" xml:space="preserve">
-    <value>Optional: Ordne deinen Lüftern ihre Einbau-Position zu (Grundlage für den Airflow-Abgleich) und wähle, welche Sensoren im Dashboard erscheinen.</value>
+    <value>Optional: Ordne deinen Lüftern ihre Einbau-Position zu (Grundlage für den Airflow-Abgleich) und wähle, welche Sensoren LinFan anzeigt.</value>
   </data>
   <data name="Onboarding.FanPositionsLabel" xml:space="preserve">
     <value>Lüfter-Positionen (optional)</value>
@@ -465,13 +462,19 @@
     <value>Lüfter vorübergehend von Hand regeln (0 % = Hardware-Untergrenze, manche Lüfter halten dort eine Mindestdrehzahl). Beim Verlassen des Schritts zurück auf Auto.</value>
   </data>
   <data name="Onboarding.SensorsLabel" xml:space="preserve">
-    <value>Sensoren im Dashboard</value>
+    <value>Sichtbare Sensoren</value>
   </data>
   <data name="Onboarding.SensorsHint" xml:space="preserve">
-    <value>Abgewählte Sensoren werden im Dashboard ausgeblendet. Sensoren ohne aktuellen Messwert sind vorab ausgeblendet.</value>
+    <value>Abgewählte Sensoren werden überall außer in den Einstellungen ausgeblendet (gemessen wird weiterhin). Sensoren ohne aktuellen Messwert sind vorab ausgeblendet.</value>
   </data>
   <data name="Onboarding.ProfileTitle" xml:space="preserve">
-    <value>Profil &amp; Primärsensor wählen</value>
+    <value>Profil wählen</value>
+  </data>
+  <data name="Onboarding.AirflowProfilesIntro" xml:space="preserve">
+    <value>Lüfter-Positionen erkannt: Alle drei Profile entstehen aus der Airflow-Analyse — jeder Lüfter folgt einer Kurve für seine Rolle (CPU, GPU, Einlass, Auslass).</value>
+  </data>
+  <data name="Onboarding.AirflowFansLabel" xml:space="preserve">
+    <value>Rolle und Kurve je Lüfter</value>
   </data>
   <data name="Onboarding.PrimarySensorLabel" xml:space="preserve">
     <value>Primärer Temperatursensor</value>
@@ -488,14 +491,29 @@
   <data name="Onboarding.DoneIntro" xml:space="preserve">
     <value>LinFan ist jetzt eingerichtet. So findest du dich im Hauptfenster zurecht:</value>
   </data>
-  <data name="Onboarding.DoneDashboard" xml:space="preserve">
-    <value>• Dashboard — Live-Temperaturen und Drehzahlen im Blick.</value>
+  <data name="Onboarding.DoneOverview" xml:space="preserve">
+    <value>• Übersicht — Live-Temperaturen, Drehzahlen und die aktiven Kurven im Blick.</value>
   </data>
   <data name="Onboarding.DoneCurves" xml:space="preserve">
-    <value>• Kurven — Lüfterkurven anpassen und Profile wechseln.</value>
+    <value>• Kurven &amp; Zuordnung — Lüfterkurven anpassen, Lüfter zuordnen und Profile wechseln.</value>
   </data>
-  <data name="Onboarding.DoneDevices" xml:space="preserve">
-    <value>• Geräte — Namen, Positionen und Sichtbarkeit ändern; Airflow-Abgleich aus den Positionen vorschlagen lassen.</value>
+  <data name="Onboarding.DoneSettings" xml:space="preserve">
+    <value>• Einstellungen — Geräte umbenennen, Positionen und Sichtbarkeit anpassen, Airflow-Analyse oder diesen Assistenten erneut starten.</value>
+  </data>
+  <data name="Onboarding.Close" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
+  <data name="OnboardingCtrl.DoneCalibrated" xml:space="preserve">
+    <value>Kalibrierte Lüfter: {0} von {1}</value>
+  </data>
+  <data name="OnboardingCtrl.DonePositions" xml:space="preserve">
+    <value>Positionen zugeordnet: {0} von {1}</value>
+  </data>
+  <data name="OnboardingCtrl.DoneProfileAirflow" xml:space="preserve">
+    <value>Aktives Profil: {0} — rollenbasierte Airflow-Kurven</value>
+  </data>
+  <data name="OnboardingCtrl.DoneProfileFallback" xml:space="preserve">
+    <value>Aktives Profil: {0} — gesteuert vom Primärsensor {1}</value>
   </data>
   <data name="Onboarding.Back" xml:space="preserve">
     <value>Zurück</value>
@@ -713,6 +731,9 @@
   <data name="InterpolationOption.Spline" xml:space="preserve">
     <value>Spline (weich, monoton)</value>
   </data>
+  <data name="InterpolationOption.Step" xml:space="preserve">
+    <value>Stufen (hält bis zum nächsten Punkt)</value>
+  </data>
   <data name="AggregationOption.Max" xml:space="preserve">
     <value>Maximum (heißester Sensor)</value>
   </data>
@@ -766,6 +787,9 @@
   </data>
   <data name="FanLocationOption.Other" xml:space="preserve">
     <value>Sonstige</value>
+  </data>
+  <data name="Group.Ungrouped" xml:space="preserve">
+    <value>Ungruppiert</value>
   </data>
   <data name="FanLocationOption.Group.CpuCooler" xml:space="preserve">
     <value>CPU-Kühler</value>

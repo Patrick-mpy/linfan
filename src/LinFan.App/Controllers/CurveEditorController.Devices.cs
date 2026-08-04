@@ -29,6 +29,11 @@ public partial class CurveEditorController
         else if (!s.Visible)
             VisibleSensors.Remove(s);
         RebuildFilteredSensors(); // „Versteckte ausblenden" muss die getoggelte Zeile sofort ein-/ausblenden
+
+        // The eye toggle must update every curve's source checkbox list immediately — each
+        // CurveEditRow owns its own list (mirror of RebuildSelectedCurveFans for the fan side).
+        foreach (CurveEditRow curve in Curves)
+            curve.RebuildSensorChecks();
     }
 
     // --- Geräte-Tab-Filter (Suche + „Versteckte ausblenden") -------------------

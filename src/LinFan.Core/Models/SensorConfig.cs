@@ -8,9 +8,9 @@ public sealed record SensorConfig
     public string SensorId { get; init; } = "";
     public string Name { get; init; } = "";
 
-    /// <summary>Frei benennbare Gruppe zum Organisieren im Dashboard, oder <c>null</c>.</summary>
+    /// <summary>Free-form group for organizing (dashboard blocks and curve sensor pickers), or <c>null</c>.</summary>
     public string? Group { get; init; }
 
-    /// <summary>Im Dashboard ausgeblendet (nur Anzeige).</summary>
+    /// <summary>Hidden app-wide except in the settings' device lists (display/selection only — the sensor keeps being measured).</summary>
     public bool Hidden { get; init; }
 }

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using LinFan.App.Controllers;
 using LinFan.App.Services;
@@ -44,9 +47,9 @@ public class MainWindowInteractionSmokeTests
     }
 
     [AvaloniaTheory]
-    [InlineData(true)]   // verbunden → Banner aus
-    [InlineData(false)]  // getrennt → Banner an
-    public void Header_DisconnectBanner_TracksConnected(bool connected)
+    [InlineData(true)]   // connected -> toast hidden
+    [InlineData(false)]  // disconnected -> toast shown
+    public void DisconnectToast_TracksConnected(bool connected)
     {
         MonitorSnapshot snap = connected
             ? UiTestHelpers.SampleSnapshot()
@@ -59,6 +62,33 @@ public class MainWindowInteractionSmokeTests
             .Single(t => t.Text != null && t.Text.Contains("Hintergrunddienst nicht erreichbar"));
 
         Assert.Equal(!connected, banner.IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public void DisconnectToast_HiddenByX_RearmsOnNextDisconnect()
+    {
+        var snap = new MonitorSnapshot("getrennt", Array.Empty<SensorReading>(), Array.Empty<FanReading>(),
+            AppConfig.Empty, Connected: false);
+        var (ctrl, window) = ShowMain(snap);
+        UiTestHelpers.PumpUntil(() => ctrl.Status == "getrennt");
+
+        TextBlock toast = window.Find<TextBlock>()
+            .Single(t => t.Text != null && t.Text.Contains("Hintergrunddienst nicht erreichbar"));
+        Assert.True(toast.IsEffectivelyVisible);
+
+        // X hides the toast while still disconnected.
+        ctrl.HideDisconnectedToastCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(toast.IsEffectivelyVisible);
+
+        // Reconnect, then the next disconnect transition re-arms the toast.
+        ctrl.Connected = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(toast.IsEffectivelyVisible);
+
+        ctrl.Connected = false;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(toast.IsEffectivelyVisible);
     }
 
     [AvaloniaFact]
@@ -266,13 +296,13 @@ public class MainWindowInteractionSmokeTests
     }
 
     [AvaloniaFact]
-    public void Geraete_GroupSelect_BindsToSharedAvailableGroups()
+    public void Geraete_GroupSelect_BindsToAvailableGroups_AndFansHaveNone()
     {
-        // Sensor- und Lüfter-Gruppe aus der Config → speisen die Auto-Vervollständigung.
+        // Only sensor groups feed the auto-completion now; fans group via their location.
         var config = new AppConfig
         {
             Sensors = new[] { new SensorConfig { SensorId = "hwmon0/temp1", Name = "CPU", Group = "CPU" } },
-            Fans = new[] { new FanConfig { FanId = "hwmon0/pwm1", Name = "CPU Fan", Group = "Gehäuse" } },
+            Fans = new[] { new FanConfig { FanId = "hwmon0/pwm1", Name = "CPU Fan" } },
         };
         var snap = new MonitorSnapshot(
             "Verbunden",
@@ -284,16 +314,167 @@ public class MainWindowInteractionSmokeTests
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
         SelectTab(window, TabSettings);
 
-        // Sensoren- und Lüfter-Gruppen leben jetzt in getrennten Sektionen (eine sichtbar zur Zeit) → je Sektion prüfen.
         SelectSettingsSection(ctrl, SettingsSection.Sensors);
         AutoCompleteBox sensorBox = window.Find<AutoCompleteBox>().Single(b => b.DataContext is SensorOption);
         Assert.Same(ctrl.Editor.AvailableGroups, sensorBox.ItemsSource);
+        Assert.Equal(new[] { "CPU" }, ctrl.Editor.AvailableGroups);
 
+        // The fan group field is gone — a reappearing AutoCompleteBox in the fans section would be a regression.
         SelectSettingsSection(ctrl, SettingsSection.Fans);
-        AutoCompleteBox fanBox = window.Find<AutoCompleteBox>().Single(b => b.DataContext is FanAssignRow);
-        // Beide Felder hängen an der EINEN Vorschlagsliste des Controllers (Binding hat wirklich aufgelöst,
-        // nicht nur kompiliert) und sehen damit dieselben vorhandenen Gruppen.
-        Assert.Same(ctrl.Editor.AvailableGroups, fanBox.ItemsSource);
-        Assert.Equal(new[] { "CPU", "Gehäuse" }, ctrl.Editor.AvailableGroups);
+        Assert.DoesNotContain(window.Find<AutoCompleteBox>(), b => b.DataContext is FanAssignRow);
+    }
+
+    /// <summary>Opens the sensors section and returns the group chip together with its sensor row.</summary>
+    private static (AutoCompleteBox box, SensorOption row) FindGroupChip(MainController ctrl, MainWindow window)
+    {
+        SelectSettingsSection(ctrl, SettingsSection.Sensors);
+        AutoCompleteBox box = window.Find<AutoCompleteBox>().First(b => b.DataContext is SensorOption);
+        return (box, (SensorOption)box.DataContext!);
+    }
+
+    /// <summary>Two sensors: one ungrouped (the chip under test), one with existing group "Zone A" (the suggestion).</summary>
+    private static MonitorSnapshot SnapshotWithGroupedSensor()
+    {
+        var config = new AppConfig
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "hwmon0/temp1", Name = "CPU" },
+                new SensorConfig { SensorId = "hwmon0/temp2", Name = "Board", Group = "Zone A" },
+            },
+        };
+        return new MonitorSnapshot(
+            "Verbunden",
+            new[]
+            {
+                new SensorReading("hwmon0/temp1", "CPU", SensorKind.Temperature, "°C", 45.0),
+                new SensorReading("hwmon0/temp2", "Board", SensorKind.Temperature, "°C", 40.0),
+            },
+            Array.Empty<FanReading>(),
+            config, Connected: true);
+    }
+
+    [AvaloniaFact]
+    public void Geraete_GroupChip_CommitsSuggestion_OnDropDownClose()
+    {
+        var (ctrl, window) = ShowMain(SnapshotWithGroupedSensor());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        SelectTab(window, TabSettings);
+        SelectSettingsSection(ctrl, SettingsSection.Sensors);
+        AutoCompleteBox box = window.Find<AutoCompleteBox>()
+            .First(b => b.DataContext is SensorOption { Group: "" });
+        var row = (SensorOption)box.DataContext!;
+
+        // Deterministic stand-in for a popup click: type a prefix, open the popup, let the adapter
+        // write the picked suggestion into Text (SelectedItem), then the popup closes -> the
+        // DropDownClosed handler must commit the SUGGESTION, not the typed prefix.
+        box.Focus();
+        box.Text = "Zo";
+        Dispatcher.UIThread.RunJobs();
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        box.SelectedItem = "Zone A";
+        box.IsDropDownOpen = false; // raises DropDownClosed
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Zone A", row.Group);
+    }
+
+    [AvaloniaFact]
+    public void Geraete_GroupChip_CommitsFreeText_OnFocusLoss()
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        SelectTab(window, TabSettings);
+        (AutoCompleteBox box, SensorOption row) = FindGroupChip(ctrl, window);
+
+        box.Focus();
+        box.Text = "Zone neu";
+        Dispatcher.UIThread.RunJobs();
+
+        // Click-away: focus moves to another focusable control. Depending on whether typing opened the
+        // popup, the commit runs via LostFocus (closed) or via the DropDownClosed that the focus loss
+        // triggers — either path must land the typed text in the row.
+        window.Find<TextBox>().First(t => t.Name == "SensorSearchBox").Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Zone neu", row.Group);
+        Assert.Contains("Zone neu", ctrl.Editor.AvailableGroups);
+    }
+
+    [AvaloniaFact]
+    public void ClickOnEmptySpace_ReleasesInputFocus()
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        SelectTab(window, TabSettings);
+        SelectSettingsSection(ctrl, SettingsSection.Sensors);
+
+        TextBox search = window.Find<TextBox>().First(t => t.Name == "SensorSearchBox");
+        search.Focus();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(search, window.FocusManager!.GetFocusedElement());
+
+        // Press on empty header space (no focusable ancestor there) -> the window takes focus and the
+        // TextBox gets LostFocus; before the global handler, focus stuck on the TextBox forever.
+        window.MouseDown(new Point(500, 30), MouseButton.Left);
+        window.MouseUp(new Point(500, 30), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotSame(search, window.FocusManager!.GetFocusedElement());
+    }
+
+    [AvaloniaFact]
+    public void ClickOnEmptySpace_CommitsPendingGroupEdit()
+    {
+        var (ctrl, window) = ShowMain(SnapshotWithGroupedSensor());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        SelectTab(window, TabSettings);
+        SelectSettingsSection(ctrl, SettingsSection.Sensors);
+        AutoCompleteBox box = window.Find<AutoCompleteBox>()
+            .First(b => b.DataContext is SensorOption { Group: "" });
+        var row = (SensorOption)box.DataContext!;
+
+        box.Focus();
+        box.Text = "Zone frei";
+        Dispatcher.UIThread.RunJobs();
+
+        // Click-away must both release the focus AND land the typed group in the row (end to end:
+        // global press handler -> window focus -> chip LostFocus/DropDownClosed commit).
+        window.MouseDown(new Point(500, 30), MouseButton.Left);
+        window.MouseUp(new Point(500, 30), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Zone frei", row.Group);
+    }
+
+    [AvaloniaFact]
+    public void Dashboard_SensorGroups_MergeCaseInsensitively()
+    {
+        var config = new AppConfig
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "hwmon0/temp1", Name = "A", Group = "CPU" },
+                new SensorConfig { SensorId = "hwmon0/temp2", Name = "B", Group = "cpu" },
+            },
+        };
+        var snap = new MonitorSnapshot(
+            "Verbunden",
+            new[]
+            {
+                new SensorReading("hwmon0/temp1", "A", SensorKind.Temperature, "°C", 40.0),
+                new SensorReading("hwmon0/temp2", "B", SensorKind.Temperature, "°C", 41.0),
+            },
+            Array.Empty<FanReading>(),
+            config, Connected: true);
+
+        using var ctrl = new MainController(new FakeLiveMonitor(snap));
+        UiTestHelpers.PumpUntil(() => ctrl.SensorGroups.Count > 0);
+
+        // "CPU" and "cpu" must merge into ONE dashboard block (first-seen casing names the header).
+        SensorGroup group = Assert.Single(ctrl.SensorGroups);
+        Assert.Equal("CPU", group.Name);
+        Assert.Equal(2, group.Sensors.Count);
     }
 }

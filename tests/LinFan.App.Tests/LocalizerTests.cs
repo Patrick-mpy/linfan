@@ -45,4 +45,17 @@ public sealed class LocalizerTests : IDisposable
         Localizer.Instance.SetLanguage(LanguageChoice.German);
         Assert.Equal("max 80", Localizer.Instance.Format("MainCtrl.MaxTemp", 80));
     }
+
+    [Fact]
+    public void UngroupedLabel_FollowsLanguage()
+    {
+        // Was a hardcoded German const before — the fallback group label must switch with the language.
+        Localizer.Instance.SetLanguage(LanguageChoice.German);
+        Assert.Equal("Ungruppiert", Controllers.FanGroup.Ungrouped);
+        Assert.Equal("Ungruppiert", Controllers.SensorGroup.Ungrouped);
+
+        Localizer.Instance.SetLanguage(LanguageChoice.English);
+        Assert.Equal("Ungrouped", Controllers.FanGroup.Ungrouped);
+        Assert.Equal("Ungrouped", Controllers.SensorGroup.Ungrouped);
+    }
 }

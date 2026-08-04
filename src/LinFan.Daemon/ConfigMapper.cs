@@ -17,7 +17,7 @@ internal static class ConfigMapper
     public static IpcConfig ToIpc(AppConfig config) => new(
         config.Curves.Select(ToIpcCurve).ToList(),
         config.Fans.Select(f => new IpcFanAssignment(
-            f.FanId, f.Name, f.MinPwm, f.MaxPwm, f.AssignedCurveId, f.Location.ToString(), f.Group, f.Hidden,
+            f.FanId, f.Name, f.MinPwm, f.MaxPwm, f.AssignedCurveId, f.Location.ToString(), f.Hidden,
             f.Calibration is { } cal ? new IpcFanCalibration(cal.StartPwm, cal.MinRpm, cal.MaxRpm) : null,
             f.RpmSource)).ToList(),
         config.Sensors.Select(s => new IpcSensorName(s.SensorId, s.Name, s.Group, s.Hidden)).ToList(),
@@ -51,7 +51,6 @@ internal static class ConfigMapper
                 MaxPwm = (byte)Math.Clamp(a.MaxPwm, 0, 255),
                 AssignedCurveId = a.AssignedCurveId,
                 Location = Enum.TryParse(a.Location, out FanLocation loc) ? loc : FanLocation.Unspecified,
-                Group = string.IsNullOrWhiteSpace(a.Group) ? null : a.Group.Trim(),
                 Hidden = a.Hidden,
             };
         }
@@ -109,7 +108,6 @@ internal static class ConfigMapper
             MaxPwm = (byte)Math.Clamp(a.MaxPwm, 0, 255),
             AssignedCurveId = a.AssignedCurveId,
             Location = Enum.TryParse(a.Location, out FanLocation loc) ? loc : FanLocation.Unspecified,
-            Group = string.IsNullOrWhiteSpace(a.Group) ? null : a.Group.Trim(),
             Hidden = a.Hidden,
             // Restore trägt die Tacho-Zuordnung originalgetreu zurück (wie die Kalibrierung).
             RpmSource = string.IsNullOrWhiteSpace(a.RpmSource) ? null : a.RpmSource,

@@ -114,7 +114,7 @@ public partial class CurveEditorController
     {
         Curves.Clear();
         foreach (CurveConfig c in curves)
-            Curves.Add(CurveEditRow.From(c, Sensors, VisibleSensors, Fans));
+            Curves.Add(CurveEditRow.From(c, Sensors, Fans));
 
         Dictionary<string, string?> map = assignments.ToDictionary(a => a.FanId, a => a.CurveId);
         foreach (FanAssignRow fan in Fans)

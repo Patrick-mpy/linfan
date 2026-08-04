@@ -5,8 +5,8 @@ using LinFan.Core.Models;
 namespace LinFan.Core.Services;
 
 /// <summary>
-/// Rechnet Temperatur → Lüfterleistung. Interpolation zwischen den Stützpunkten (linear oder monotone
-/// Spline), Clamping unterhalb des ersten bzw. oberhalb des letzten Punkts. Reine, deterministische,
+/// Rechnet Temperatur → Lüfterleistung. Interpolation zwischen den Stützpunkten (linear, Stufen oder
+/// monotone Spline), Clamping unterhalb des ersten bzw. oberhalb des letzten Punkts. Reine, deterministische,
 /// seiteneffektfreie Logik ohne Hardware (deshalb hier im Core und voll unit-testbar).
 /// </summary>
 public static class CurveEngine
@@ -35,6 +35,7 @@ public static class CurveEngine
         return curve.InterpolationMode switch
         {
             InterpolationMode.Spline => Clamp(EvaluateSpline(ordered, temperatureC)),
+            InterpolationMode.Step => Clamp(EvaluateStep(ordered, temperatureC)),
             _ => Clamp(EvaluateLinear(ordered, temperatureC)),
         };
     }
@@ -67,16 +68,34 @@ public static class CurveEngine
     }
 
     /// <summary>
+    /// Stufen-Interpolation: Die Punkte wirken als Schwellwerte — zwischen zwei Stützpunkten gilt der
+    /// Wert des unteren Punkts, erst beim Erreichen des nächsten Punkts springt die Leistung auf dessen
+    /// Wert. Monoton bei monotonen Stützpunkten; bei doppelter Temperatur gewinnt der spätere Punkt
+    /// (deterministisch, wie bei der Spline).
+    /// </summary>
+    private static double EvaluateStep(IReadOnlyList<CurvePoint> ordered, double temperatureC)
+    {
+        for (int i = ordered.Count - 1; i >= 0; i--)
+        {
+            if (temperatureC >= ordered[i].TemperatureC)
+                return ordered[i].Percent;
+        }
+
+        return ordered[0].Percent; // unerreichbar (unterhalb des ersten Punkts klemmt Evaluate), Sicherheitsnetz
+    }
+
+    /// <summary>
     /// Monotone kubische Hermite-Interpolation nach Fritsch-Carlson. Die Tangenten werden so beschnitten,
     /// dass die Kurve die Monotonie der Stützpunkte erhält und nicht über den Wertebereich der
-    /// einschließenden Punkte hinausschwingt; ein flaches Segment bleibt exakt flach.
+    /// einschließenden Punkte hinausschwingt; ein flaches Segment bleibt exakt flach, jeder Stützpunkt
+    /// wird exakt getroffen.
     /// <para>
-    /// Hardware-konservativ: Das Ergebnis wird zusätzlich nie unter die lineare Verbindung (Sehne)
-    /// gedrückt (<c>Math.Max(spline, linear)</c>). Fritsch-Carlson allein garantiert nur Monotonie und
-    /// das Bleiben im Stützpunkt-Wertebereich — auf <i>konvexen</i> Segmenten läge die glatte Spline
-    /// sonst unter der Sehne, also weniger PWM als der Nutzer gezeichnet hat (Unterkühlungs-/
-    /// Übertemp-Risiko). Mit der Schranke gilt garantiert PWM(Spline) ≥ PWM(linear) an jeder Stelle;
-    /// die Glättung bleibt dort erhalten, wo die Spline ohnehin oberhalb liegt (konkave Segmente).
+    /// Bewusst <b>ohne</b> Sehnen-Untergrenze: Eine frühere Fassung klemmte das Ergebnis per
+    /// <c>Math.Max(spline, linear)</c> nie unter die lineare Verbindung — auf konvexen Segmenten (der
+    /// Normalfall bei Lüfterkurven) degenerierte die Spline damit exakt zur Linearen und der Modus hatte
+    /// praktisch keinen Effekt. Die Fritsch-Carlson-Garantien tragen die Sicherheit auch ohne Klammer:
+    /// Zwischen zwei Punkten bleibt der Wert immer ≥ dem unteren gezeichneten Stützpunkt, und der
+    /// Übertemperatur-Watchdog greift unabhängig von der Kurvenform.
     /// </para>
     /// </summary>
     private static double EvaluateSpline(IReadOnlyList<CurvePoint> ordered, double temperatureC)
@@ -112,9 +131,20 @@ public static class CurveEngine
             double alpha = tangent[i] / slope[i];
             double beta = tangent[i + 1] / slope[i];
 
-            // Gegenläufige Tangente (Vorzeichenwechsel) → lokales Extremum verhindern.
-            if (alpha < 0.0) tangent[i] = 0.0;
-            if (beta < 0.0) tangent[i + 1] = 0.0;
+            // Gegenläufige Tangente (Vorzeichenwechsel) → lokales Extremum verhindern. alpha/beta
+            // mitnullen, sonst reanimiert der Radius-3-Zweig darunter die Tangente aus den alten
+            // Werten mit falschem Vorzeichen (Unterschwingen unter den unteren Stützpunkt).
+            if (alpha < 0.0)
+            {
+                tangent[i] = 0.0;
+                alpha = 0.0;
+            }
+
+            if (beta < 0.0)
+            {
+                tangent[i + 1] = 0.0;
+                beta = 0.0;
+            }
 
             double s = alpha * alpha + beta * beta;
             if (s > 9.0)
@@ -146,14 +176,10 @@ public static class CurveEngine
             double h01 = -2 * t3 + 3 * t2;
             double h11 = t3 - t2;
 
-            double spline = h00 * ordered[i].Percent
-                          + h10 * h * tangent[i]
-                          + h01 * ordered[i + 1].Percent
-                          + h11 * h * tangent[i + 1];
-
-            // Untere Schranke: nie unter die lineare Verbindung (Sehne) fallen — siehe Methoden-Doc.
-            double linear = ordered[i].Percent + t * (ordered[i + 1].Percent - ordered[i].Percent);
-            return Math.Max(spline, linear);
+            return h00 * ordered[i].Percent
+                 + h10 * h * tangent[i]
+                 + h01 * ordered[i + 1].Percent
+                 + h11 * h * tangent[i + 1];
         }
 
         return ordered[^1].Percent; // unerreichbar, Sicherheitsnetz

@@ -26,6 +26,7 @@ public partial class CurveEditorController
     /// </summary>
     private void MarkDirty()
     {
+        UnsavedToastHidden = false; // any new edit re-shows a previously dismissed unsaved toast
         if (HasUnsavedChanges && _savedConfigJson is not null)
         {
             _dirtyCheckDeferred = true;
@@ -132,7 +133,16 @@ public partial class CurveEditorController
     /// <summary>Nur etwas zu verwerfen, solange ungespeicherte Änderungen vorliegen.</summary>
     private bool CanRevert() => HasUnsavedChanges;
 
-    partial void OnHasUnsavedChangesChanged(bool value) => RevertCommand.NotifyCanExecuteChanged();
+    partial void OnHasUnsavedChangesChanged(bool value)
+    {
+        RevertCommand.NotifyCanExecuteChanged();
+        if (!value)
+            UnsavedToastHidden = false; // clean again -> the next dirty transition shows the toast fresh
+    }
+
+    /// <summary>Hides the unsaved-changes toast until the next edit (the dirty state itself is untouched).</summary>
+    [RelayCommand]
+    private void HideUnsavedToast() => UnsavedToastHidden = true;
 
     /// <summary>
     /// Verwirft alle Änderungen seit dem letzten Speichern/Laden und stellt den Editor vollständig aus der
@@ -182,12 +192,12 @@ public partial class CurveEditorController
         // Vor dem ersten Snapshot sind Kurven/Lüfter leer — nicht speichern, sonst Datenverlust.
         if (!_initialized)
         {
-            SetStatus(Localizer.Instance["CurveEditorCtrl.NotConnected"]);
+            SetStatus(Localizer.Instance["CurveEditorCtrl.NotConnected"], isError: true);
             return;
         }
         if (_save is null)
         {
-            SetStatus(Localizer.Instance["CurveEditorCtrl.NoSaveTarget"]);
+            SetStatus(Localizer.Instance["CurveEditorCtrl.NoSaveTarget"], isError: true);
             return;
         }
 
@@ -208,7 +218,7 @@ public partial class CurveEditorController
         }
         else
         {
-            SetStatus(Localizer.Instance["CurveEditorCtrl.SaveFailed"]);
+            SetStatus(Localizer.Instance["CurveEditorCtrl.SaveFailed"], isError: true);
         }
     }
 
@@ -234,40 +244,7 @@ public partial class CurveEditorController
         };
     }
 
-    private CancellationTokenSource? _statusCts;
-
     /// <summary>Setzt die Statuszeile; mit <paramref name="autoHide"/> blendet sie nach ein paar Sekunden aus.</summary>
-    private void SetStatus(string text, bool autoHide = false)
-    {
-        Status = text;
-        _statusCts?.Cancel(); // einen früheren Auto-Hide abbrechen
-        _statusCts = null;
-        if (!autoHide)
-            return;
-
-        _statusCts = new CancellationTokenSource();
-        _ = ClearStatusAfterAsync(_statusCts);
-    }
-
-    private async Task ClearStatusAfterAsync(CancellationTokenSource cts)
-    {
-        try
-        {
-            await Task.Delay(_statusAutoHide, cts.Token);
-            Status = "";
-        }
-        catch (OperationCanceledException)
-        {
-            // durch einen neueren Status abgelöst
-        }
-        finally
-        {
-            // Feld freigeben, falls es noch auf genau dieses (jetzt entsorgte) CTS zeigt — sonst würde
-            // der nächste SetStatus auf einem disposed CTS Cancel() aufrufen (ObjectDisposedException).
-            // Single-threaded UI-Dispatch: kein Race, ReferenceEquals genügt.
-            if (ReferenceEquals(_statusCts, cts))
-                _statusCts = null;
-            cts.Dispose();
-        }
-    }
+    private void SetStatus(string text, bool autoHide = false, bool isError = false) =>
+        Status.Set(text, autoHide, isError);
 }

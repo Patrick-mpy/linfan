@@ -19,9 +19,6 @@ public partial class CurveEditRow : ObservableObject
     /// <summary>Alle Sensoren (zum Auflösen der Quellen) — Referenz auf die Liste des Controllers.</summary>
     public ObservableCollection<SensorOption> Sensors { get; }
 
-    /// <summary>Nur sichtbare Sensoren (Grundlage der Quell-Checkbox-Liste).</summary>
-    public ObservableCollection<SensorOption> VisibleSensors { get; }
-
     /// <summary>Alle Lüfter (gemeinsame Liste des Controllers) — für das Aktiv-Badge (ist dieser Kurve ein Lüfter zugeordnet?).</summary>
     public ObservableCollection<FanAssignRow> Fans { get; }
 
@@ -193,7 +190,6 @@ public partial class CurveEditRow : ObservableObject
 
     public CurveEditRow(string id, string name, IEnumerable<string> sourceIds, SensorAggregation aggregation,
                         decimal hysteresis, ObservableCollection<SensorOption> sensors,
-                        ObservableCollection<SensorOption> visibleSensors,
                         InterpolationMode interpolationMode = InterpolationMode.Linear,
                         ObservableCollection<FanAssignRow>? fans = null)
     {
@@ -203,17 +199,37 @@ public partial class CurveEditRow : ObservableObject
         _hysteresis = hysteresis;
         _interpolationMode = interpolationMode;
         Sensors = sensors;
-        VisibleSensors = visibleSensors;
         Fans = fans ?? new ObservableCollection<FanAssignRow>();
 
-        // Nur global sichtbare Sensoren zur Auswahl anbieten. Ein im Geräte-Tab ausgeblendeter Sensor
-        // erscheint hier nicht und wird damit beim Speichern auch nicht (mehr) als Quelle übernommen.
-        var selected = new HashSet<string>(sourceIds);
-        foreach (SensorOption opt in visibleSensors)
-            SensorChecks.Add(new SensorCheck(opt, selected.Contains(opt.Id)) { SelectionChanged = OnSourceSelectionChanged });
-        RebuildDisplayedSensors();
+        BuildSensorChecks(new HashSet<string>(sourceIds));
 
         Points.CollectionChanged += OnPointsChanged;
+    }
+
+    /// <summary>
+    /// Rebuilds the source checkboxes after a global visibility change; keeps the current selection.
+    /// Called by the controller when a sensor's eye toggle flips (mirror of the fan list, a057c3d).
+    /// </summary>
+    public void RebuildSensorChecks()
+    {
+        // Collect the selection BEFORE clearing — Sources reads SensorChecks.
+        BuildSensorChecks(new HashSet<string>(Sources.Select(s => s.Id)));
+        // Both are plain getters over SensorChecks.Count; the count is no longer constant.
+        OnPropertyChanged(nameof(HasCollapsibleSensors));
+        OnPropertyChanged(nameof(ToggleSensorsLabel));
+    }
+
+    /// <summary>
+    /// Hidden sensors are not offered — unless they are a source of THIS curve: hidden is display-only
+    /// (regulation keeps running), so an active source stays visible and removable instead of being
+    /// silently dropped on save. Iterates the full list to preserve discovery order.
+    /// </summary>
+    private void BuildSensorChecks(HashSet<string> selected)
+    {
+        SensorChecks.Clear();
+        foreach (SensorOption opt in Sensors.Where(o => o.Visible || selected.Contains(o.Id)))
+            SensorChecks.Add(new SensorCheck(opt, selected.Contains(opt.Id)) { SelectionChanged = OnSourceSelectionChanged });
+        RebuildDisplayedSensors();
     }
 
     private void OnSourceSelectionChanged()
@@ -253,7 +269,8 @@ public partial class CurveEditRow : ObservableObject
         IEnumerable<SensorCheck> ordered = DisplayedSensorChecks
             .OrderBy(c => Key(c) == SensorGroup.Ungrouped ? "￿" : Key(c), StringComparer.OrdinalIgnoreCase)
             .ThenBy(c => c.Sensor.Name, StringComparer.OrdinalIgnoreCase);
-        foreach (IGrouping<string, SensorCheck> grp in ordered.GroupBy(Key))
+        // Case-insensitive so "cpu"/"CPU" merge into one block (first-seen casing names the header).
+        foreach (IGrouping<string, SensorCheck> grp in ordered.GroupBy(Key, StringComparer.OrdinalIgnoreCase))
         {
             var group = new SensorCheckGroup(grp.Key);
             foreach (SensorCheck c in grp)
@@ -318,14 +335,13 @@ public partial class CurveEditRow : ObservableObject
     private void AddPoint() => AddPointRow(50, 50);
 
     public static CurveEditRow From(CurveConfig c, ObservableCollection<SensorOption> sensors,
-                                    ObservableCollection<SensorOption> visibleSensors,
                                     ObservableCollection<FanAssignRow>? fans = null)
     {
         // Schema-2-Quellen bevorzugen; sonst (Altbestand) aus dem alten Einzelfeld migrieren.
         IEnumerable<string> sourceIds = CurveSourceResolver.ResolveSources(c.SourceSensorId, c.SourceSensorIds);
 
         var row = new CurveEditRow(c.Id, c.Name, sourceIds, c.Aggregation, (decimal)c.HysteresisC,
-                                   sensors, visibleSensors, c.InterpolationMode, fans)
+                                   sensors, c.InterpolationMode, fans)
         {
             Enabled = c.Enabled,
         };

@@ -77,4 +77,29 @@
         <Setter Property="Padding" Value="8,2" />
         <Setter Property="Background" Value="{DynamicResource BgInset}" />
     </Style>
+
+    <!-- Overlay-Toast (oben rechts): solide Karte, damit sie über beliebigem Inhalt lesbar bleibt;
+         Severity über den linken Akzentstreifen (toastStripe) statt über gefärbte Flächen. -->
+    <Style Selector="Border.toast">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Background" Value="{DynamicResource BgCardAlt}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Divider}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BoxShadow" Value="0 4 16 0 #40000000" />
+    </Style>
+    <Style Selector="Border.toast Border.toastStripe">
+        <Setter Property="Width" Value="3" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="Background" Value="{DynamicResource InfoAccent}" />
+    </Style>
+    <Style Selector="Border.toast.warning Border.toastStripe">
+        <Setter Property="Background" Value="{DynamicResource Warning}" />
+    </Style>
+    <Style Selector="Border.toast.danger Border.toastStripe">
+        <Setter Property="Background" Value="{DynamicResource DangerAccent}" />
+    </Style>
+    <Style Selector="Border.toast.success Border.toastStripe">
+        <Setter Property="Background" Value="{DynamicResource Success}" />
+    </Style>
 </Styles>

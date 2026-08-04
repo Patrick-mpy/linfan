@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+using System.Collections.Specialized;
 using LinFan.App.Controllers;
 using LinFan.App.Services;
 using LinFan.Core.Models;
@@ -61,13 +62,12 @@ public sealed class CurveEditorControllerTests
         Assert.Equal("Quiet", curve.Name);
         Assert.Equal(2, curve.Points.Count);
 
-        // Bearbeiten: umbenennen, Punkt hinzufügen, Lüfter zuordnen + Position/Gruppe + Namen setzen.
+        // Bearbeiten: umbenennen, Punkt hinzufügen, Lüfter zuordnen + Position + Namen setzen.
         curve.Name = "Silent";
         curve.AddPointRow(55, 50);
         FanAssignRow fanRow = Assert.Single(ctrl.Fans);
         fanRow.Selected = curve;
         fanRow.Location = FanLocationOption.For(FanLocation.CaseRearExhaust);
-        fanRow.Group = "Gehäuse";
         fanRow.Name = "CPU-Lüfter";
         fanRow.Visible = false; // Lüfter im Dashboard ausblenden
         SensorOption tctl = ctrl.Sensors.First(s => s.Id == "hwmon6/temp1");
@@ -86,7 +86,6 @@ public sealed class CurveEditorControllerTests
         Assert.Equal("c1", rf.AssignedCurveId);
         Assert.Equal((byte)40, rf.MinPwm); // unveränderte Felder (MinPwm) bleiben erhalten
         Assert.Equal(FanLocation.CaseRearExhaust, rf.Location);
-        Assert.Equal("Gehäuse", rf.Group);
         Assert.Equal("CPU-Lüfter", rf.Name);
         Assert.True(rf.Hidden);
         Assert.Contains(sent.Sensors,
@@ -209,7 +208,7 @@ public sealed class CurveEditorControllerTests
     }
 
     [Fact]
-    public void From_GloballyHiddenSensor_NotOfferedInSensorChecks()
+    public async Task From_GloballyHiddenSensor_StaysOffered_WhileCurveSource()
     {
         var config = new AppConfig
         {
@@ -226,13 +225,20 @@ public sealed class CurveEditorControllerTests
             Fans = new[] { new FanConfig { FanId = "hwmon7/pwm1", Name = "pwm1" } },
         };
 
-        var ctrl = new CurveEditorController();
+        var sink = new SaveSink();
+        var ctrl = new CurveEditorController(sink.SaveAsync);
         ctrl.Initialize(Snapshot(config));
 
         CurveEditRow curve = Assert.Single(ctrl.Curves);
-        // Der ausgeblendete Sensor taucht nicht in der Auswahl auf; nur der sichtbare ist wählbar.
-        Assert.DoesNotContain(curve.SensorChecks, c => c.Sensor.Id == "hwmon6/temp1");
+        // The hidden source stays offered and checked (mirror of the fan list): hidden is display-only,
+        // so an active source must remain visible/removable — never silently dropped on save.
+        SensorCheck hidden = curve.SensorChecks.Single(c => c.Sensor.Id == "hwmon6/temp1");
+        Assert.True(hidden.Selected);
         Assert.Contains(curve.SensorChecks, c => c.Sensor.Id == "hwmon7/temp1");
+
+        await ctrl.SaveCommand.ExecuteAsync(null);
+        CurveConfig saved = Assert.Single(Assert.Single(sink.Saved).Curves);
+        Assert.Contains("hwmon6/temp1", saved.SourceSensorIds);
     }
 
     [Fact]
@@ -299,7 +305,7 @@ public sealed class CurveEditorControllerTests
 
         await ctrl.SaveCommand.ExecuteAsync(null);
 
-        Assert.Contains("nicht erreichbar", ctrl.Status);
+        Assert.Contains("nicht erreichbar", ctrl.Status.Text);
     }
 
     [Fact]
@@ -691,14 +697,6 @@ public sealed class CurveEditorControllerTests
     {
         CurveEditorController ctrl = CleanEditor();
         ctrl.Fans.Single().Location = FanLocationOption.For(FanLocation.CaseRearExhaust);
-        Assert.True(ctrl.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public void Edit_FanGroup_MarksDirty()
-    {
-        CurveEditorController ctrl = CleanEditor();
-        ctrl.Fans.Single().Group = "Gehäuse";
         Assert.True(ctrl.HasUnsavedChanges);
     }
 
@@ -1160,7 +1158,79 @@ public sealed class CurveEditorControllerTests
         await ctrl.SaveCommand.ExecuteAsync(null); // setzt erneut einen Auto-Hide-Status
 
         Assert.Single(sink.Saved);
-        Assert.Contains("Gespeichert", ctrl.Status);
+        Assert.Contains("Gespeichert", ctrl.Status.Text);
+    }
+
+    // --- Status toast severity + unsaved toast lifecycle ---------------------------------------
+
+    [Fact]
+    public async Task Save_Failure_SetsErrorStatus_DismissClears()
+    {
+        var sink = new SaveSink { Result = false };
+        var ctrl = new CurveEditorController(sink.SaveAsync);
+        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+
+        await ctrl.SaveCommand.ExecuteAsync(null);
+
+        Assert.NotEqual("", ctrl.Status.Text);
+        Assert.True(ctrl.Status.IsError);
+
+        ctrl.Status.DismissCommand.Execute(null);
+        Assert.Equal("", ctrl.Status.Text);
+    }
+
+    [Fact]
+    public async Task Save_Success_SetsNonErrorStatus()
+    {
+        var sink = new SaveSink();
+        var ctrl = new CurveEditorController(sink.SaveAsync);
+        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+
+        await ctrl.SaveCommand.ExecuteAsync(null);
+
+        Assert.Contains("Gespeichert", ctrl.Status.Text);
+        Assert.False(ctrl.Status.IsError);
+    }
+
+    [Fact]
+    public void UnsavedToast_HiddenByX_ReappearsOnNextEdit()
+    {
+        var ctrl = new CurveEditorController(new SaveSink().SaveAsync);
+        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+        Assert.False(ctrl.ShowUnsavedToast);
+
+        CurveEditRow curve = Assert.Single(ctrl.Curves);
+        curve.Name = "Geändert";
+        Assert.True(ctrl.HasUnsavedChanges);
+        Assert.True(ctrl.ShowUnsavedToast);
+
+        ctrl.HideUnsavedToastCommand.Execute(null);
+        Assert.True(ctrl.HasUnsavedChanges); // hiding the toast leaves the dirty state untouched
+        Assert.False(ctrl.ShowUnsavedToast);
+
+        curve.Name = "Nochmal geändert"; // the next edit re-shows the toast
+        Assert.True(ctrl.ShowUnsavedToast);
+    }
+
+    [Fact]
+    public void UnsavedToast_HiddenFlagResets_OnCleanTransition()
+    {
+        var ctrl = new CurveEditorController(new SaveSink().SaveAsync);
+        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+
+        CurveEditRow curve = Assert.Single(ctrl.Curves);
+        curve.Name = "Geändert";
+        ctrl.HideUnsavedToastCommand.Execute(null);
+
+        ctrl.RevertCommand.Execute(null); // back to baseline -> clean resets the hidden flag
+
+        Assert.False(ctrl.HasUnsavedChanges);
+        Assert.False(ctrl.ShowUnsavedToast);
+
+        // Revert rebuilds the curve rows -> re-fetch before editing again.
+        CurveEditRow reloaded = Assert.Single(ctrl.Curves);
+        reloaded.Name = "Neu geändert";
+        Assert.True(ctrl.ShowUnsavedToast);
     }
 
     // --- Verwerfen (Revert) + Aktiv-Badge ------------------------------------------------------
@@ -1307,20 +1377,23 @@ public sealed class CurveEditorControllerTests
 
     private static AppConfig ConfigWithGroups() => new()
     {
-        Sensors = new[] { new SensorConfig { SensorId = "hwmon6/temp1", Name = "Tctl", Group = "CPU" } },
-        Fans = new[] { new FanConfig { FanId = "hwmon7/pwm1", Name = "Fan", Group = "Gehäuse" } },
+        Sensors = new[]
+        {
+            new SensorConfig { SensorId = "hwmon6/temp1", Name = "Tctl", Group = "CPU" },
+            new SensorConfig { SensorId = "hwmon7/temp1", Name = "Board", Group = "Gehäuse" },
+        },
+        Fans = new[] { new FanConfig { FanId = "hwmon7/pwm1", Name = "Fan" } },
     };
 
     [Fact]
-    public void Initialize_PopulatesAvailableGroups_FromSensorsAndFans_DistinctSorted()
+    public void Initialize_PopulatesAvailableGroups_FromSensors_DistinctSorted()
     {
         var ctrl = new CurveEditorController();
         ctrl.Initialize(Snapshot(ConfigWithGroups()));
 
-        // Vereinigung beider Quellen, sortiert; jede Zeile teilt dieselbe Instanz.
+        // Distinct sensor groups, sorted; every sensor row shares the one controller instance.
         Assert.Equal(new[] { "CPU", "Gehäuse" }, ctrl.AvailableGroups);
         Assert.Same(ctrl.AvailableGroups, ctrl.Sensors[0].AvailableGroups);
-        Assert.Same(ctrl.AvailableGroups, ctrl.Fans[0].AvailableGroups);
     }
 
     [Fact]
@@ -1331,13 +1404,24 @@ public sealed class CurveEditorControllerTests
             Sensors = new[]
             {
                 new SensorConfig { SensorId = "hwmon6/temp1", Name = "A", Group = "CPU" },
-                new SensorConfig { SensorId = "hwmon7/temp1", Name = "B", Group = "  " }, // leer → kein Vorschlag
+                new SensorConfig { SensorId = "hwmon7/temp1", Name = "B", Group = "cpu" }, // Dublette (Groß/klein)
+                new SensorConfig { SensorId = "hwmon8/temp1", Name = "C", Group = "  " }, // leer → kein Vorschlag
             },
-            Fans = new[] { new FanConfig { FanId = "hwmon7/pwm1", Name = "F", Group = "cpu" } }, // Dublette (Groß/klein)
         };
+        // Dedicated snapshot with three temperature readings — Snapshot() only yields two sensor rows.
+        var snap = new MonitorSnapshot(
+            "test",
+            new[]
+            {
+                new SensorReading("hwmon6/temp1", "A", SensorKind.Temperature, "°C", 40),
+                new SensorReading("hwmon7/temp1", "B", SensorKind.Temperature, "°C", 41),
+                new SensorReading("hwmon8/temp1", "C", SensorKind.Temperature, "°C", 42),
+            },
+            Array.Empty<FanReading>(),
+            config);
 
         var ctrl = new CurveEditorController();
-        ctrl.Initialize(Snapshot(config));
+        ctrl.Initialize(snap);
 
         Assert.Equal(new[] { "CPU" }, ctrl.AvailableGroups); // nur einmal, Whitespace raus
     }
@@ -1348,9 +1432,41 @@ public sealed class CurveEditorControllerTests
         var ctrl = new CurveEditorController();
         ctrl.Initialize(Snapshot(ConfigWithGroups()));
 
-        ctrl.Fans[0].Group = "Gehäuse oben"; // neuer Name auf einer Lüfter-Zeile
+        ctrl.Sensors[0].Group = "Gehäuse oben"; // neuer Name auf einer Sensor-Zeile
 
         Assert.Contains("Gehäuse oben", ctrl.AvailableGroups); // steht den anderen Zeilen sofort als Vorschlag bereit
+    }
+
+    [Fact]
+    public void RefreshAvailableGroups_NeverRaisesReset()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(Snapshot(ConfigWithGroups())); // groups: CPU, Gehäuse
+
+        // A Reset on the shared ItemsSource would rebuild every bound suggestion popup mid-edit
+        // (the historical "clicking a suggestion creates a new group" bug) -> diff-only updates.
+        var actions = new List<NotifyCollectionChangedAction>();
+        ctrl.AvailableGroups.CollectionChanged += (_, e) => actions.Add(e.Action);
+
+        ctrl.Sensors[0].Group = "Aggregat"; // rename CPU -> Aggregat
+        ctrl.Sensors[1].Group = "";         // drop Gehäuse
+        ctrl.Sensors[1].Group = "Zone";     // add a fresh name
+
+        Assert.DoesNotContain(NotifyCollectionChangedAction.Reset, actions);
+        Assert.Equal(new[] { "Aggregat", "Zone" }, ctrl.AvailableGroups);
+    }
+
+    [Fact]
+    public void RefreshAvailableGroups_CasingOnlyRename_UpdatesSuggestion()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(Snapshot(ConfigWithGroups()));
+
+        // The change gate is deliberately case-sensitive: a casing-only rename must reach the list.
+        ctrl.Sensors[0].Group = "cpu";
+
+        Assert.Contains("cpu", ctrl.AvailableGroups);
+        Assert.DoesNotContain("CPU", ctrl.AvailableGroups);
     }
 
     [Fact]
@@ -1565,9 +1681,89 @@ public sealed class CurveEditorControllerTests
         Assert.Equal("cpu", Assert.Single(ctrl.SelectedCurveFans).Fan.FanId);
     }
 
+    // --- Hidden sensors in the curve source checkbox list (mirror of the fan section above) -------
+
+    // Two sensors, "hwmon6/temp2" is globally hidden (optionally the curve's source).
+    private static MonitorSnapshot HiddenSensorCurveSnapshot(bool hiddenIsSource = false) => new(
+        "test",
+        new[]
+        {
+            new SensorReading("hwmon6/temp1", "Tctl", SensorKind.Temperature, "°C", 41),
+            new SensorReading("hwmon6/temp2", "Tccd1", SensorKind.Temperature, "°C", 39),
+        },
+        new[] { new FanReading("cpu", "CPU", 1500, 128, FanMode.Auto, true) },
+        new AppConfig
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "hwmon6/temp1", Name = "Tctl" },
+                new SensorConfig { SensorId = "hwmon6/temp2", Name = "Tccd1", Hidden = true },
+            },
+            Curves = new[]
+            {
+                new CurveConfig
+                {
+                    Id = "c1", Name = "K",
+                    SourceSensorIds = new[] { hiddenIsSource ? "hwmon6/temp2" : "hwmon6/temp1" },
+                    Points = new[] { new CurvePoint(30, 20), new CurvePoint(80, 100) },
+                },
+            },
+            Fans = new[] { new FanConfig { FanId = "cpu", Name = "CPU" } },
+        });
+
+    [Fact]
+    public void SensorChecks_ExcludeGloballyHiddenSensors()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(HiddenSensorCurveSnapshot());
+
+        CurveEditRow curve = Assert.Single(ctrl.Curves);
+        Assert.Equal("hwmon6/temp1", Assert.Single(curve.SensorChecks).Sensor.Id);
+        Assert.Equal("hwmon6/temp1",
+            Assert.Single(curve.DisplayedSensorGroups.SelectMany(g => g.Sensors)).Sensor.Id);
+    }
+
+    [Fact]
+    public void SensorChecks_KeepHiddenSensor_WhileCurveSource()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(HiddenSensorCurveSnapshot(hiddenIsSource: true));
+
+        CurveEditRow curve = Assert.Single(ctrl.Curves);
+        SensorCheck hidden = curve.SensorChecks.Single(c => c.Sensor.Id == "hwmon6/temp2");
+        Assert.True(hidden.Selected);
+
+        // Unchecking does NOT remove the row immediately (the write comes from this very checkbox) —
+        // the next rebuild (any visibility flip) filters it out.
+        hidden.Selected = false;
+        Assert.Contains(curve.SensorChecks, c => c.Sensor.Id == "hwmon6/temp2");
+
+        SensorOption tctl = ctrl.Sensors.First(s => s.Id == "hwmon6/temp1");
+        tctl.Visible = false;
+        tctl.Visible = true;
+        Assert.DoesNotContain(curve.SensorChecks, c => c.Sensor.Id == "hwmon6/temp2");
+    }
+
+    [Fact]
+    public void ToggleSensorVisible_UpdatesSensorChecks_Live()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(HiddenSensorCurveSnapshot());
+
+        CurveEditRow curve = Assert.Single(ctrl.Curves);
+        Assert.Single(curve.SensorChecks);
+
+        SensorOption tccd = ctrl.Sensors.First(s => s.Id == "hwmon6/temp2");
+        tccd.Visible = true; // eye toggle in the devices tab → immediately offered as source
+        Assert.Equal(2, curve.SensorChecks.Count);
+
+        tccd.Visible = false; // not a source → disappears again
+        Assert.Equal("hwmon6/temp1", Assert.Single(curve.SensorChecks).Sensor.Id);
+    }
+
     // --- Gruppierung im Kurven-Tab (Lüfter-Zuordnung + Quell-Sensoren), wie im Dashboard ---------
 
-    // Drei Lüfter: einer mit eigenem Gruppennamen, einer per Position, einer ohne (→ „Ungruppiert").
+    // Drei Lüfter: zwei mit Position, einer ohne (→ „Ungruppiert").
     private static MonitorSnapshot MixedFanSnapshot()
     {
         var config = new AppConfig
@@ -1577,7 +1773,7 @@ public sealed class CurveEditorControllerTests
             {
                 new FanConfig { FanId = "front", Name = "Front", Location = FanLocation.CaseFrontIntake },
                 new FanConfig { FanId = "loose", Name = "Loose" }, // Unspecified, keine Gruppe
-                new FanConfig { FanId = "named", Name = "Named", Location = FanLocation.CaseRearExhaust, Group = "Custom" },
+                new FanConfig { FanId = "named", Name = "Named", Location = FanLocation.CaseRearExhaust },
             },
         };
         return new MonitorSnapshot(
@@ -1593,14 +1789,14 @@ public sealed class CurveEditorControllerTests
     }
 
     [Fact]
-    public void SelectedCurveFanGroups_GroupsByPosition_CustomGroupWins_UngroupedLast()
+    public void SelectedCurveFanGroups_GroupsByPosition_UngroupedLast()
     {
         var ctrl = new CurveEditorController();
         ctrl.Initialize(MixedFanSnapshot());
         ctrl.AddCurveCommand.Execute(null); // SelectedCurve gesetzt → Checkboxen + Gruppen aufgebaut
 
-        // Eigener Gruppenname schlägt Position; reine Position bekommt den kurzen Namen; ohne beides „Ungruppiert" zuletzt.
-        Assert.Equal(new[] { "Custom", "Front · Einlass", "Ungruppiert" },
+        // Position bestimmt den kurzen Gruppennamen; ohne Position „Ungruppiert" zuletzt.
+        Assert.Equal(new[] { "Front · Einlass", "Hinten · Auslass", "Ungruppiert" },
             ctrl.SelectedCurveFanGroups.Select(g => g.Name).ToArray());
         Assert.All(ctrl.SelectedCurveFanGroups, g => Assert.Single(g.Fans));
     }
@@ -1615,7 +1811,7 @@ public sealed class CurveEditorControllerTests
         // „loose" (bisher Ungruppiert) eine Position geben → wandert live in die passende Positionsgruppe.
         ctrl.Fans.First(f => f.FanId == "loose").Location = FanLocationOption.For(FanLocation.CaseTopExhaust);
 
-        Assert.Equal(new[] { "Custom", "Front · Einlass", "Oben · Auslass" },
+        Assert.Equal(new[] { "Front · Einlass", "Hinten · Auslass", "Oben · Auslass" },
             ctrl.SelectedCurveFanGroups.Select(g => g.Name).ToArray());
         Assert.DoesNotContain(ctrl.SelectedCurveFanGroups, g => g.Name == "Ungruppiert");
     }
@@ -1644,5 +1840,35 @@ public sealed class CurveEditorControllerTests
         // hwmon6 → Gruppe „CPU"; hwmon7 ohne Gruppe → „Ungruppiert" zuletzt.
         Assert.Equal(new[] { "CPU", "Ungruppiert" },
             curve.DisplayedSensorGroups.Select(g => g.Name).ToArray());
+    }
+
+    [Fact]
+    public void CurveSourceSensors_MergeGroupsCaseInsensitively()
+    {
+        var config = new AppConfig
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "hwmon6/temp1", Name = "Tctl", Group = "CPU" },
+                new SensorConfig { SensorId = "hwmon7/temp1", Name = "Board", Group = "cpu" },
+            },
+            Curves = new[]
+            {
+                new CurveConfig
+                {
+                    Id = "c1", Name = "K", SourceSensorIds = new[] { "hwmon6/temp1" },
+                    Points = new[] { new CurvePoint(30, 20), new CurvePoint(80, 100) },
+                },
+            },
+        };
+
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(Snapshot(config));
+
+        CurveEditRow curve = Assert.Single(ctrl.Curves);
+        // Free-typed sensor groups can differ only in casing — they must land in ONE block.
+        SensorCheckGroup group = Assert.Single(curve.DisplayedSensorGroups);
+        Assert.Equal("CPU", group.Name);
+        Assert.Equal(2, group.Sensors.Count);
     }
 }

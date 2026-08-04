@@ -3,8 +3,10 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using LinFan.App.Controllers;
 using LinFan.App.Localization;
 using LinFan.App.Services;
@@ -45,6 +47,28 @@ public partial class MainWindow : Window
         // sind ohne Screens nutzbar (anders als die Off-Screen-Zentrierung in OnOpened).
         PositionChanged += (_, _) => CaptureNormalGeometry();
         SizeChanged += (_, _) => CaptureNormalGeometry();
+
+        // Tunnel so targets that mark the press handled (e.g. CurveChart's drag capture) cannot bypass
+        // the click-away focus release below.
+        AddHandler(PointerPressedEvent, OnGlobalPointerPressed, RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>
+    /// Click-away focus release: Avalonia only moves keyboard focus when a press lands on a focusable
+    /// control, so a click into empty space used to leave the focus (accent border, pending LostFocus
+    /// commits) on the last input forever. If the press target has no focusable ancestor, the window
+    /// takes focus itself — the previous control gets its LostFocus. Popup contents (dropdowns, flyouts,
+    /// context menus) live in their own visual roots and never route through this window handler.
+    /// </summary>
+    private void OnGlobalPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        for (Visual? v = e.Source as Visual; v is not null && !ReferenceEquals(v, this); v = v.GetVisualParent())
+        {
+            if (v is IInputElement { Focusable: true, IsEffectivelyEnabled: true })
+                return; // the press moves focus by itself (TextBox, Button, ListBoxItem, ...)
+        }
+        if (FocusManager?.GetFocusedElement() is { } focused && !ReferenceEquals(focused, this))
+            Focus();
     }
 
     /// <summary>Wendet die gespeicherte Geometrie an: Größe/Maximiert sofort, Position erst nach dem Anzeigen validiert.</summary>
@@ -237,6 +261,33 @@ public partial class MainWindow : Window
         }
     }
 
+    // --- Sensor group chip: explicit view->VM commit instead of a TwoWay LostFocus binding. ---
+    // Why: with UpdateSourceTrigger=LostFocus, the transient focus loss towards the suggestion popup
+    // committed the typed PREFIX (not the clicked suggestion); the resulting refresh of the shared
+    // suggestion list then rebuilt the open popup mid-click, cancelling the selection (todo: group
+    // select bug). Committing only while the dropdown is CLOSED lets the AutoCompleteBox finish the
+    // click first (its adapter writes the suggestion into Text), and DropDownClosed commits the final
+    // value; free-typed text commits via LostFocus once the popup is closed.
+
+    private static void CommitGroupChip(AutoCompleteBox box)
+    {
+        // Raw text only — normalization (trim, empty -> null) stays controller-side (SensorOption.ToConfig).
+        if (box.DataContext is SensorOption row)
+            row.Group = box.Text ?? "";
+    }
+
+    private void OnGroupChipDropDownClosed(object? sender, EventArgs e)
+    {
+        if (sender is AutoCompleteBox box)
+            CommitGroupChip(box);
+    }
+
+    private void OnGroupChipLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is AutoCompleteBox { IsDropDownOpen: false } box)
+            CommitGroupChip(box);
+    }
+
     // --- Sicherung: Export/Import über den StorageProvider (reine UI); die Logik liegt im BackupController. ---
 
     private static readonly FilePickerFileType JsonFileType = new("JSON") { Patterns = new[] { "*.json" } };
@@ -266,7 +317,7 @@ public partial class MainWindow : Window
         catch
         {
             // Defensive: ein Dialog-/Schreibfehler darf diesen async-void-Handler nicht in einen Crash kippen.
-            controller.Backup.Status = Localizer.Instance["Settings.ExportFailed"];
+            controller.Backup.ReportExportFailed();
         }
     }
 
@@ -292,7 +343,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            controller.Backup.Status = Localizer.Instance["Settings.ImportFailedParse"];
+            controller.Backup.ReportImportReadFailed();
         }
     }
 

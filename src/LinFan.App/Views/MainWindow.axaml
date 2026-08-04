@@ -11,6 +11,7 @@
         Width="1000" Height="720"
         MinWidth="760" MinHeight="520"
         Title="LinFan"
+        Focusable="True"
         Background="{DynamicResource BgWindow}">
 
     <Window.Styles>
@@ -144,62 +145,6 @@
                     <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
                 </StackPanel>
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLg}" Margin="0,4,0,0"
-                        IsVisible="{Binding Editor.HasUnsavedChanges}">
-                <TextBlock Text="{l:Tr MainWindow.UnsavedChanges}" Foreground="{DynamicResource WarningText}" FontSize="12"
-                           VerticalAlignment="Center" />
-                <Button Command="{Binding Editor.SaveCommand}"
-                        IsEnabled="{Binding Connected}" Padding="10,3" FontSize="12"
-                        ToolTip.Tip="{l:Tr MainWindow.ApplyChangesTooltip}">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                        <PathIcon Data="{StaticResource IconSave}" Width="13" Height="13" />
-                        <TextBlock Text="{l:Tr MainWindow.Apply}" />
-                    </StackPanel>
-                </Button>
-                <Button Padding="10,3" FontSize="12" Click="OnRevertChanges"
-                        ToolTip.Tip="{l:Tr MainWindow.RevertTooltip}">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                        <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
-                        <TextBlock Text="{l:Tr MainWindow.Revert}" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-            <Border IsVisible="{Binding !Connected}" Background="{DynamicResource DangerBg}" CornerRadius="{StaticResource RadiusMd}"
-                    Padding="12,8" Margin="0,8,0,0">
-                <TextBlock Foreground="{DynamicResource DangerText}" FontSize="12" TextWrapping="Wrap"
-                           Text="{l:Tr MainWindow.DaemonUnreachable}" />
-            </Border>
-
-            <Border IsVisible="{Binding Calibration, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
-                    Background="{DynamicResource InfoBg}" CornerRadius="{StaticResource RadiusMd}" Padding="12,8" Margin="0,8,0,0">
-                <Grid ColumnDefinitions="*,Auto">
-                    <ctrl:CalibrationCard Grid.Column="0" VerticalAlignment="Center"
-                                          Headline="{Binding Calibration.Headline}"
-                                          Detail="{Binding Calibration.Detail}"
-                                          Progress="{Binding Calibration.Progress}"
-                                          ShowProgress="{Binding Calibration.ShowProgress}" />
-                    <Button Grid.Column="1" Content="{l:Tr MainWindow.Close}" Command="{Binding CancelCalibrationCommand}"
-                            Margin="12,0,0,0" VerticalAlignment="Center" />
-                </Grid>
-            </Border>
-
-            <!-- Update-Hinweis: rein additiv, nur bei neuerer Release sichtbar; „Öffnen" führt zur Release-Seite,
-                 „Später" merkt sich die Version (eine neuere zeigt wieder). Opt-out in den Einstellungen. -->
-            <Border IsVisible="{Binding Update.UpdateAvailable}"
-                    Background="{DynamicResource InfoBg}" CornerRadius="{StaticResource RadiusMd}" Padding="12,8" Margin="0,8,0,0">
-                <Grid ColumnDefinitions="*,Auto,Auto">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" VerticalAlignment="Center">
-                        <TextBlock Text="{l:Tr MainWindow.UpdateAvailable}" Foreground="{DynamicResource TextPrimary}"
-                                   FontSize="12" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Update.LatestVersion}" Foreground="{DynamicResource TextPrimary}"
-                                   FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Content="{l:Tr MainWindow.UpdateOpen}" Command="{Binding Update.OpenReleaseCommand}"
-                            Padding="10,3" FontSize="12" VerticalAlignment="Center" />
-                    <Button Grid.Column="2" Content="{l:Tr MainWindow.UpdateDismiss}" Command="{Binding Update.DismissCommand}"
-                            Margin="8,0,0,0" Padding="10,3" FontSize="12" VerticalAlignment="Center" />
-                </Grid>
-            </Border>
         </StackPanel>
 
         <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
@@ -638,21 +583,21 @@
                                                                VerticalAlignment="Center" Margin="0,0,12,8" />
                                                     <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Aggregations}"
                                                               SelectedItem="{Binding SelectedAggregation}"
-                                                              HorizontalAlignment="Left" Width="220" Margin="0,0,0,8"
+                                                              HorizontalAlignment="Right" Width="220" Margin="0,0,0,8"
                                                               ToolTip.Tip="{l:Tr MainWindow.MixTooltip}" />
 
                                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:Tr MainWindow.Interpolation}" Foreground="{DynamicResource TextMuted}"
                                                                VerticalAlignment="Center" Margin="0,0,12,8" />
                                                     <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Interpolations}"
                                                               SelectedItem="{Binding SelectedInterpolation}"
-                                                              HorizontalAlignment="Left" Width="220" Margin="0,0,0,8"
+                                                              HorizontalAlignment="Right" Width="220" Margin="0,0,0,8"
                                                               ToolTip.Tip="{l:Tr MainWindow.InterpolationTooltip}" />
 
                                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{l:Tr MainWindow.Hysteresis}" Foreground="{DynamicResource TextMuted}"
                                                                VerticalAlignment="Center" Margin="0,0,12,0" />
                                                     <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Hysteresis}"
                                                                    Minimum="0" Maximum="20" Increment="0.5"
-                                                                   HorizontalAlignment="Left" Width="130"
+                                                                   HorizontalAlignment="Right" Width="130"
                                                                    ToolTip.Tip="{l:Tr MainWindow.HysteresisTooltip}" />
                                                 </Grid>
 
@@ -737,12 +682,6 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Speichern/Verwerfen liefert das globale „Ungespeichert"-Banner (auf allen Tabs);
-                                 hier nur noch die Statuszeile — zeigt Gespeichert/Fehler, gespeist vom selben
-                                 SaveCommand; ausgeblendet, wenn leer (kein Leerraum). -->
-                            <TextBlock Text="{Binding Editor.Status}" FontSize="12"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       IsVisible="{Binding Editor.Status, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}" />
                         </StackPanel>
                     </ScrollViewer>
                     </Grid>
@@ -853,7 +792,10 @@
                                                                    FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                                    ToolTip.Tip="{l:Tr MainWindow.HardwareAddressTooltip}" />
                                                         <Border Grid.Column="2" Classes="chip" ToolTip.Tip="{l:Tr MainWindow.GroupSensorTooltip}">
-                                                            <AutoCompleteBox Classes="ghost" Text="{Binding Group, UpdateSourceTrigger=LostFocus}"
+                                                            <!-- OneWay + explicit commit in code-behind (OnGroupChip*): a TwoWay LostFocus binding
+                                                                 committed the typed prefix when focus moved into the suggestion popup. -->
+                                                            <AutoCompleteBox Classes="ghost" Text="{Binding Group, Mode=OneWay}"
+                                                                             DropDownClosed="OnGroupChipDropDownClosed" LostFocus="OnGroupChipLostFocus"
                                                                              ItemsSource="{Binding AvailableGroups}" FilterMode="Contains"
                                                                              MinimumPrefixLength="0" PlaceholderText="{l:Tr MainWindow.AddGroup}">
                                                                 <AutoCompleteBox.Resources>
@@ -952,28 +894,15 @@
                                                         </Button>
                                                     </StackPanel>
 
-                                                    <!-- Sekundärzeile: HW-Adresse (Tooltip) · Gruppe · Position als kompakte Chips statt voll-breiter Zeilen. -->
-                                                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto,Auto"
+                                                    <!-- Sekundärzeile: HW-Adresse (Tooltip) · Position als kompakter Chip statt voll-breiter Zeilen.
+                                                         (Lüfter gruppieren sich über die Einbau-Position; das frühere manuelle Gruppenfeld ist entfallen.) -->
+                                                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto"
                                                           ColumnSpacing="{StaticResource SpacingSm}" Margin="0,4,0,0" VerticalAlignment="Center">
                                                         <TextBlock Grid.Column="0" Text="{Binding HardwareName}" Foreground="{DynamicResource TextFaintest}"
                                                                    FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                                    ToolTip.Tip="{l:Tr MainWindow.HardwareAddressTooltip}" />
-                                                        <Border Grid.Column="2" Classes="chip" ToolTip.Tip="{l:Tr MainWindow.GroupFanTooltip}">
-                                                            <AutoCompleteBox Classes="ghost" Text="{Binding Group, UpdateSourceTrigger=LostFocus}"
-                                                                             ItemsSource="{Binding AvailableGroups}" FilterMode="Contains"
-                                                                             MinimumPrefixLength="0" PlaceholderText="{l:Tr MainWindow.AddGroup}">
-                                                                <AutoCompleteBox.Resources>
-                                                                    <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
-                                                                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
-                                                                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
-                                                                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
-                                                                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
-                                                                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
-                                                                </AutoCompleteBox.Resources>
-                                                            </AutoCompleteBox>
-                                                        </Border>
                                                         <!-- Öffnet das Positions-Modal mit interaktiver Gehäuse-Vorschau; zeigt die aktuelle Wahl. -->
-                                                        <Button Grid.Column="3" Classes="chip" Click="OnPickLocation"
+                                                        <Button Grid.Column="2" Classes="chip" Click="OnPickLocation"
                                                                 ToolTip.Tip="{l:Tr MainWindow.PickLocationTooltip}">
                                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
                                                                 <TextBlock Text="{Binding Location.Display}" VerticalAlignment="Center"
@@ -1249,9 +1178,6 @@
                                                     </StackPanel>
                                                 </Button>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Backup.Status}" Foreground="{DynamicResource Accent}" FontSize="12"
-                                                       TextWrapping="Wrap"
-                                                       IsVisible="{Binding Backup.Status, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}" />
                                     </StackPanel>
                                     <!-- Gefahrenzone: Reset klar abgesetzt (destruktiv). -->
                                     <Border Background="{DynamicResource DangerBg}" CornerRadius="{StaticResource RadiusMd}" Padding="16">
@@ -1291,5 +1217,125 @@
                 </Grid>
             </TabItem>
         </TabControl>
+
+        <!-- Toast overlay: top-right, layout-neutral (spans both grid rows, so showing a toast never
+             shifts the tab content). The StackPanel has no background -> its empty area is not
+             hit-testable; only the toast cards themselves catch the pointer. -->
+        <StackPanel Grid.Row="0" Grid.RowSpan="2" ZIndex="100" Width="360"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Spacing="{StaticResource SpacingSm}">
+
+            <!-- Daemon unreachable (persistent state): X hides it until the next disconnect. -->
+            <Border Classes="toast danger" IsVisible="{Binding ShowDisconnectedToast}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1" Text="{l:Tr MainWindow.DaemonUnreachable}"
+                               Foreground="{DynamicResource DangerText}" FontSize="12" TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding HideDisconnectedToastCommand}"
+                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Unsaved changes (persistent state): actions apply/revert; X hides, the next edit re-shows. -->
+            <Border Classes="toast warning" IsVisible="{Binding Editor.ShowUnsavedToast}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingSm}">
+                        <TextBlock Text="{l:Tr MainWindow.UnsavedChanges}" Foreground="{DynamicResource WarningText}"
+                                   FontSize="12" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                            <Button Command="{Binding Editor.SaveCommand}"
+                                    IsEnabled="{Binding Connected}" Padding="10,3" FontSize="12"
+                                    ToolTip.Tip="{l:Tr MainWindow.ApplyChangesTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                    <PathIcon Data="{StaticResource IconSave}" Width="13" Height="13" />
+                                    <TextBlock Text="{l:Tr MainWindow.Apply}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="10,3" FontSize="12" Click="OnRevertChanges"
+                                    ToolTip.Tip="{l:Tr MainWindow.RevertTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
+                                    <TextBlock Text="{l:Tr MainWindow.Revert}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Editor.HideUnsavedToastCommand}"
+                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Calibration progress (live-bound card); X cancels/closes via the existing command. -->
+            <Border Classes="toast" IsVisible="{Binding Calibration, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
+                    <ctrl:CalibrationCard Grid.Column="1" VerticalAlignment="Center"
+                                          Headline="{Binding Calibration.Headline}"
+                                          Detail="{Binding Calibration.Detail}"
+                                          Progress="{Binding Calibration.Progress}"
+                                          ShowProgress="{Binding Calibration.ShowProgress}" />
+                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding CancelCalibrationCommand}"
+                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Update-Hinweis: rein additiv, nur bei neuerer Release sichtbar; „Öffnen" führt zur Release-Seite,
+                 das X merkt sich die Version wie zuvor „Später" (eine neuere zeigt wieder). Opt-out in den Einstellungen. -->
+            <Border Classes="toast" IsVisible="{Binding Update.UpdateAvailable}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingSm}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                            <TextBlock Text="{l:Tr MainWindow.UpdateAvailable}" Foreground="{DynamicResource TextPrimary}"
+                                       FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Update.LatestVersion}" Foreground="{DynamicResource TextPrimary}"
+                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Button Content="{l:Tr MainWindow.UpdateOpen}" Command="{Binding Update.OpenReleaseCommand}"
+                                Padding="10,3" FontSize="12" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Update.DismissCommand}"
+                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.UpdateDismiss}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Editor save/revert status (transient: successes auto-hide, errors stay + turn red). -->
+            <Border Classes="toast" Classes.danger="{Binding Editor.Status.IsError}"
+                    IsVisible="{Binding Editor.Status.Text, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Editor.Status.Text}" Foreground="{DynamicResource TextPrimary}"
+                               FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Editor.Status.DismissCommand}"
+                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Backup/import/reset status (transient, same semantics as the editor status toast). -->
+            <Border Classes="toast" Classes.danger="{Binding Backup.Status.IsError}"
+                    IsVisible="{Binding Backup.Status.Text, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Backup.Status.Text}" Foreground="{DynamicResource TextPrimary}"
+                               FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Backup.Status.DismissCommand}"
+                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
+                    </Button>
+                </Grid>
+            </Border>
+        </StackPanel>
     </Grid>
 </Window>

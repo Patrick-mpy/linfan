@@ -17,14 +17,9 @@ public sealed class DashboardCurveRowTests
     private static CurveEditRow Curve(bool enabled, params string[] sourceIds)
     {
         var sensors = new ObservableCollection<SensorOption>();
-        var visible = new ObservableCollection<SensorOption>();
         foreach (string id in sourceIds)
-        {
-            var opt = new SensorOption(id, id, visible: true, group: null, unit: "°C", availableGroups: new());
-            sensors.Add(opt);
-            visible.Add(opt);
-        }
-        return new CurveEditRow("c1", "Quiet", sourceIds, SensorAggregation.Max, 2m, sensors, visible)
+            sensors.Add(new SensorOption(id, id, visible: true, group: null, unit: "°C", availableGroups: new()));
+        return new CurveEditRow("c1", "Quiet", sourceIds, SensorAggregation.Max, 2m, sensors)
         {
             Enabled = enabled,
         };

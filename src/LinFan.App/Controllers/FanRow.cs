@@ -140,13 +140,13 @@ public partial class FanRow : ObservableObject
         CalibrationBadgeHint = calibration is { } cal ? CalibrationBadge.Hint(cal.StartPwm) : "";
     }
 
-    /// <summary>Setzt Position/Gruppe aus der Konfiguration (für Anzeige &amp; Gruppierung).</summary>
-    public void SetPlacement(FanLocation location, string? group)
+    /// <summary>Setzt die Position aus der Konfiguration (für Anzeige &amp; Gruppierung).</summary>
+    public void SetPlacement(FanLocation location)
     {
         Location = FanLocationOption.DisplayFor(location);
-        GroupKey = !string.IsNullOrWhiteSpace(group)
-            ? group.Trim()
-            : location != FanLocation.Unspecified ? FanLocationOption.GroupNameFor(location) : FanGroup.Ungrouped;
+        GroupKey = location != FanLocation.Unspecified
+            ? FanLocationOption.GroupNameFor(location)
+            : FanGroup.Ungrouped;
     }
 
     partial void OnIsManualChanged(bool value)

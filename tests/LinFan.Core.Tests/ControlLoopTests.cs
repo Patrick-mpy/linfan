@@ -415,6 +415,26 @@ public class ControlLoopTests
         Assert.Empty(hw.Writes);
     }
 
+    /// <summary>Zuordnung auf eine Kurve, die es (z. B. nach einem Profilwechsel) nicht mehr gibt.</summary>
+    private static AppConfig DanglingAssignment() => ConfigWith() with
+    {
+        Fans = new[] { new FanConfig { FanId = "f", Name = "f", AssignedCurveId = "gone" } },
+    };
+
+    [Fact]
+    public void Tick_DanglingCurveId_SetsModeAuto_NoPwmWrite()
+    {
+        // A dangling id must behave like "no curve" — a plain skip would freeze the fan at its
+        // last written PWM while it stays invisible (e.g. a hidden fan after onboarding re-run).
+        var hw = Hw(55);
+        var tick = new ControlLoop(hw, hw, dryRun: false).Tick(DanglingAssignment());
+
+        FanAction a = Assert.Single(tick.Actions);
+        Assert.Equal(FanActionKind.Skipped, a.Kind);
+        Assert.Equal(("f", FanMode.Auto), Assert.Single(hw.ModeWrites)); // active fallback, not frozen
+        Assert.Empty(hw.Writes);
+    }
+
     [Fact]
     public void Tick_UnassignedFan_DryRun_DoesNotTouchHardware()
     {

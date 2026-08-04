@@ -6,7 +6,10 @@ the git tag `vX.Y.Z` is the source of truth.
 
 Open items are tracked as GitHub issues.
 
-## [Unreleased]
+## [0.2.0] - 2026-08-04
+
+Curve and UI refinements — step interpolation, visibly smoother splines, toast notifications,
+and a sharper airflow analysis.
 
 ### Added
 

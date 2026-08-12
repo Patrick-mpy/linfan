@@ -37,11 +37,24 @@ public partial class FanAssignRow : ObservableObject
     // echte Änderung dort (Kalibrier-Ergebnis) zieht den Wert nach, ein unveränderter Snapshot lässt eine
     // gerade getippte, noch nicht gespeicherte Eingabe in Ruhe.
     private int _lastDaemonMinPwm;
+    // Hardware label as resolved by the daemon (from the live fan list). Shown when the fan carries no own
+    // name — and for exactly that reason must never be written back as one (see ToConfig).
+    private readonly string _hardwareLabel;
 
     public string FanId => _base.FanId;
 
     /// <summary>Hardware-Name (read-only, als Hinweis neben dem editierbaren Namen).</summary>
     public string HardwareName => _base.FanId;
+
+    /// <summary>
+    /// Placeholder of the name field: the hardware label as resolved by the daemon — exactly what is shown
+    /// everywhere while the fan has no own name. A placeholder rather than a value, so an untouched field
+    /// stays empty instead of being persisted as a user-defined name. Falls back to the generic hint when
+    /// there is no label.
+    /// </summary>
+    public string NamePlaceholder => string.IsNullOrWhiteSpace(_hardwareLabel)
+        ? Localizer.Instance["MainWindow.NameRequired"]
+        : _hardwareLabel;
 
     /// <summary>Ob der Lüfter steuerbar ist (nur dann ist Kalibrierung möglich). Laufzeit-Info aus dem Snapshot.</summary>
     public bool CanControl { get; }
@@ -169,9 +182,11 @@ public partial class FanAssignRow : ObservableObject
                         Func<string, byte, Task>? sendManual = null, Func<string, Task>? sendAuto = null,
                         Func<string, Task>? sendTachMapping = null, Func<Task>? cancelTachMapping = null,
                         Func<string, string?, Task>? sendSetTach = null,
-                        ObservableCollection<TachSensorOption>? availableTachSensors = null)
+                        ObservableCollection<TachSensorOption>? availableTachSensors = null,
+                        string? hardwareLabel = null)
     {
         _base = baseFan;
+        _hardwareLabel = hardwareLabel ?? "";
         _name = baseFan.Name;
         _selected = selected;
         AvailableCurves = availableCurves;
@@ -566,11 +581,11 @@ public partial class FanAssignRow : ObservableObject
 
     public FanConfig ToConfig() => _base with
     {
-        // Leerer/whitespace Name → bisherigen Anzeigenamen behalten (kein stiller Datenverlust);
-        // war auch der leer, bleibt die Hardware-/Id als letzter Rückfall.
-        Name = string.IsNullOrWhiteSpace(Name)
-            ? (string.IsNullOrWhiteSpace(_base.Name) ? _base.FanId : _base.Name)
-            : Name.Trim(),
+        // Empty/whitespace name → keep the previous display name (no silent data loss). If that was empty
+        // too, it stays empty: empty means "no own name", and the hardware label applies everywhere (that is
+        // how the daemon creates new fans). The last-resort fallback used to be the FanId, which turned the
+        // raw hardware path into a supposedly user-defined name.
+        Name = string.IsNullOrWhiteSpace(Name) ? _base.Name : Name.Trim(),
         AssignedCurveId = Selected?.Id,
         Location = Location.Value,
         Hidden = !Visible,

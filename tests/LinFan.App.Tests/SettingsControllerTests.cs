@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using LinFan.App.Controllers;
+using LinFan.App.Localization;
 using LinFan.App.Services;
 
 namespace LinFan.App.Tests;
@@ -98,5 +99,35 @@ public sealed class SettingsControllerTests
             new SettingsController(new UiSettingsStore(TempPath())).Dispose();
 
         Assert.Equal(before, LocalizerProbe.SubscriberCount());
+    }
+
+    /// <summary>
+    /// The theme labels live inside the option instances, not in the binding — without a rebuild the
+    /// dropdown would stay in the language the controller was created in. The selection has to survive that
+    /// rebuild (record value equality against the fresh list).
+    /// </summary>
+    [Fact]
+    public void ThemeOptions_AreRebuilt_OnLanguageChange_KeepingTheSelection()
+    {
+        string path = TempPath();
+        try
+        {
+            new UiSettingsStore(path).Save(new UiSettings { Theme = ThemeChoice.Dark });
+            using var controller = new SettingsController(new UiSettingsStore(path));
+
+            Localizer.Instance.SetLanguage(LanguageChoice.English);
+            Assert.Contains(controller.ThemeOptions, o => o.Display == "Dark");
+            Assert.Contains(controller.SelectedThemeOption, controller.ThemeOptions);
+
+            Localizer.Instance.SetLanguage(LanguageChoice.German);
+            Assert.Contains(controller.ThemeOptions, o => o.Display == "Dunkel");
+            Assert.Contains(controller.SelectedThemeOption, controller.ThemeOptions);
+            Assert.Equal(ThemeChoice.Dark, controller.SelectedThemeOption.Value);
+        }
+        finally
+        {
+            Localizer.Instance.SetLanguage(LanguageChoice.German); // restore the pinned test culture
+            File.Delete(path);
+        }
     }
 }

@@ -33,7 +33,12 @@ internal sealed class RunGate
     /// angegeben — <paramref name="canStart"/> zustimmt (z. B. Cooldown). Erfolg ⇒ <paramref name="token"/>
     /// ist das an das Host-Token gekoppelte Lauf-Token; Fehlschlag ⇒ <c>false</c> und <c>default</c>.
     /// </summary>
-    public bool TryBegin(out CancellationToken token, Func<bool>? canStart = null)
+    /// <param name="underLock">
+    /// On success, runs while still holding the lock and before the run becomes visible — for coordinator
+    /// state that must be read or set consistently with the run start (e.g. the remaining cooldown). Kept
+    /// separate from <paramref name="canStart"/> so the predicate stays a predicate.
+    /// </param>
+    public bool TryBegin(out CancellationToken token, Func<bool>? canStart = null, Action? underLock = null)
     {
         lock (_gate)
         {
@@ -42,6 +47,7 @@ internal sealed class RunGate
                 token = default;
                 return false;
             }
+            underLock?.Invoke();
             _cts = CancellationTokenSource.CreateLinkedTokenSource(_hostToken); // Shutdown bricht den Lauf ab
             token = _cts.Token;
             return true;

@@ -27,6 +27,10 @@ public partial class App : Application
             // bei jeder späteren Änderung im Header live nachziehen.
             ApplyCulture(controller.Settings.Language);
             ApplyTheme(controller.Settings.Theme);
+
+            // Must run before the first window: the class handler pulls the native title bar of every
+            // window opened afterwards onto the theme variant.
+            WindowFrameTheme.AttachAll();
             controller.Settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(SettingsController.Theme))
@@ -104,7 +108,7 @@ public partial class App : Application
 
             var tray = new TrayIcon
             {
-                Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://LinFan.App/Assets/tray.png"))),
+                Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://LinFan.App/Assets/icon.png"))),
                 ToolTipText = "LinFan",
                 Menu = menu,
             };

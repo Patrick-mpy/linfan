@@ -58,4 +58,26 @@ public sealed class LocalizerTests : IDisposable
         Assert.Equal("Ungrouped", Controllers.FanGroup.Ungrouped);
         Assert.Equal("Ungrouped", Controllers.SensorGroup.Ungrouped);
     }
+
+    [Fact]
+    public void ThemeOptions_FollowLanguage()
+    {
+        // Were hardcoded German ("Hell"/"Dunkel") before — they showed up in the English UI.
+        Localizer.Instance.SetLanguage(LanguageChoice.German);
+        Assert.Equal("Hell", Controllers.ThemeOption.For(ThemeChoice.Light).Display);
+        Assert.Equal("Dunkel", Controllers.ThemeOption.For(ThemeChoice.Dark).Display);
+
+        Localizer.Instance.SetLanguage(LanguageChoice.English);
+        Assert.Equal("Light", Controllers.ThemeOption.For(ThemeChoice.Light).Display);
+        Assert.Equal("Dark", Controllers.ThemeOption.For(ThemeChoice.Dark).Display);
+    }
+
+    [Fact]
+    public void ThemeOption_For_MatchesAFreshlyBuiltList_ByValueEquality()
+    {
+        // The ComboBox finds its selection in ItemsSource by record equality — that must hold for a
+        // list built after a language switch, otherwise the selection would silently clear.
+        Localizer.Instance.SetLanguage(LanguageChoice.English);
+        Assert.Contains(Controllers.ThemeOption.For(ThemeChoice.Dark), Controllers.ThemeOption.Build());
+    }
 }

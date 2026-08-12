@@ -2,6 +2,8 @@
 
 using System.Collections.ObjectModel;
 using LinFan.App.Controllers;
+using LinFan.App.Localization;
+using LinFan.App.Services;
 using LinFan.Core.Models;
 using LinFan.Core.Services;
 using Xunit;
@@ -304,6 +306,30 @@ public sealed class CurveEditRowTests
 
         Assert.Equal("1 Punkt", row.PointsLabel);
         Assert.Contains(nameof(CurveEditRow.PointsLabel), notified);
+    }
+
+    /// <summary>Were hardcoded German and showed up that way in the English UI too.</summary>
+    [Fact]
+    public void PointsLabel_AndSourceLabel_FollowLanguage()
+    {
+        CurveEditRow row = MakeRowWithSensors("s1", "s2");
+        row.AddPointRow(40, 30);
+        row.AddPointRow(60, 60);
+
+        try
+        {
+            Localizer.Instance.SetLanguage(LanguageChoice.English);
+            Assert.Equal("2 points", row.PointsLabel);
+            Assert.EndsWith("2 sensors", row.Label);
+
+            Localizer.Instance.SetLanguage(LanguageChoice.German);
+            Assert.Equal("2 Punkte", row.PointsLabel);
+            Assert.EndsWith("2 Sensoren", row.Label);
+        }
+        finally
+        {
+            Localizer.Instance.SetLanguage(LanguageChoice.German); // restore the pinned test culture
+        }
     }
 
     // --- IsActive: grün/grau-Badge (Quelle UND zugeordneter Lüfter) -----------------------------

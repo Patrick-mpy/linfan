@@ -159,7 +159,7 @@ internal static class ConfigMapper
     {
         var fans = current.Fans.ToList();
         int idx = fans.FindIndex(f => f.FanId == fanId);
-        FanConfig baseFan = idx >= 0 ? fans[idx] : new FanConfig { FanId = fanId, Name = fanId };
+        FanConfig baseFan = idx >= 0 ? fans[idx] : NewFan(fanId);
         FanConfig updated = cal.MinRpm > 0
             ? baseFan with { Calibration = cal, MinPwm = cal.StartPwm }
             : baseFan with { Calibration = cal };
@@ -178,12 +178,20 @@ internal static class ConfigMapper
         string? normalized = string.IsNullOrWhiteSpace(rpmSource) ? null : rpmSource.Trim();
         var fans = current.Fans.ToList();
         int idx = fans.FindIndex(f => f.FanId == fanId);
-        FanConfig baseFan = idx >= 0 ? fans[idx] : new FanConfig { FanId = fanId, Name = fanId };
+        FanConfig baseFan = idx >= 0 ? fans[idx] : NewFan(fanId);
         FanConfig updated = baseFan with { RpmSource = normalized };
         if (idx >= 0) fans[idx] = updated; else fans.Add(updated);
 
         return current with { Fans = fans };
     }
+
+    /// <summary>
+    /// New fan entry created by a daemon-side result (calibration / tach coupling) because the GUI has never
+    /// saved this fan. <b>Without</b> a name: <see cref="FanConfig.Name"/> is the user's <i>own</i> name, and
+    /// empty means "none" — then the hardware label applies everywhere. Putting the FanId here would count as
+    /// a user-defined name and leave the raw path ("/lpc/nct6797d/0/control/1") stuck as the display name.
+    /// </summary>
+    private static FanConfig NewFan(string fanId) => new() { FanId = fanId };
 
     private static IpcCurve ToIpcCurve(CurveConfig c)
     {

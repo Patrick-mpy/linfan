@@ -355,8 +355,10 @@ internal static class CliApp
             },
         };
 
+        // Ohne Namen anlegen: FanConfig.Name ist der EIGENE Name des Nutzers, leer heißt „keiner" — dann
+        // greift überall die Hardware-Bezeichnung. Sie hier einzutragen fröre sie als eigenen Namen ein.
         var fanConfigs = fans.DiscoverFans()
-            .Select(f => new FanConfig { FanId = f.Id.Value, Name = f.Name, AssignedCurveId = curve.Id })
+            .Select(f => new FanConfig { FanId = f.Id.Value, AssignedCurveId = curve.Id })
             .ToList();
 
         var config = new AppConfig
@@ -449,10 +451,11 @@ internal static class CliApp
         // Anlaufpunkt + Messreihe in die (oben geladene) Konfiguration übernehmen — über denselben
         // Fail-Safe-Pfad wie der Daemon: MinPwm wird nur bei echtem Anlaufpunkt (MinRpm > 0) gesetzt,
         // sonst würde StartPwm==255 („nicht angelaufen") den Lüfter dauerhaft auf Volllast zwingen.
-        // Ist der Lüfter noch nicht konfiguriert, vorher mit seinem erkannten Namen anlegen.
+        // Ist der Lüfter noch nicht konfiguriert, vorher anlegen — ohne Namen, wie ConfigMapper.NewFan:
+        // leer heißt „kein eigener Name", die Hardware-Bezeichnung gilt.
         AppConfig seeded = config.Fans.Any(f => f.FanId == id.Value)
             ? config
-            : config with { Fans = config.Fans.Append(new FanConfig { FanId = id.Value, Name = fan.Name }).ToList() };
+            : config with { Fans = config.Fans.Append(new FanConfig { FanId = id.Value }).ToList() };
         store.Save(ConfigMapper.ApplyCalibration(seeded, id.Value, result));
 
         Console.WriteLine(result.MinRpm > 0

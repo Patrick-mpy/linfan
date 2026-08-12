@@ -31,6 +31,7 @@ public partial class SettingsController : ObservableObject, IDisposable
 
         _sections = BuildSections();
         _selectedSectionItem = _sections[0];
+        _themeOptions = ThemeOption.Build();
 
         // Bei Sprachwechsel die Seitenmenü-Einträge neu aufbauen (Label/Gruppe lesen live aus dem Localizer;
         // die ListBox bindet frische Instanzen). Die Auswahl über die Sektion rekonstruieren (nicht die Instanz).
@@ -44,15 +45,21 @@ public partial class SettingsController : ObservableObject, IDisposable
         SettingsSection current = SelectedSection;
         Sections = BuildSections();
         SelectedSectionItem = Sections.FirstOrDefault(x => x.Section == current) ?? Sections[0];
+
+        // The theme labels are translated and live inside the option instances → rebuild them. List first
+        // (ItemsSource), then announce the selection: the getter rebuilds as well and, being a record, is
+        // value-equal to the matching list entry.
+        ThemeOptions = ThemeOption.Build();
+        OnPropertyChanged(nameof(SelectedThemeOption));
     }
 
     /// <summary>Löst das Localizer-Abo (siehe ctor). Vom <see cref="MainController"/> beim Shutdown aufgerufen.</summary>
     public void Dispose() => Localizer.Instance.PropertyChanged -= OnLanguageChanged;
 
-    /// <summary>Auswahlliste für den Header-Umschalter.</summary>
-    public IReadOnlyList<ThemeOption> ThemeOptions => ThemeOption.All;
+    /// <summary>Options for the header switch (translated ⇒ rebuilt on a language change).</summary>
+    [ObservableProperty] private IReadOnlyList<ThemeOption> _themeOptions;
 
-    /// <summary>Auswahlliste für den Sprach-Umschalter.</summary>
+    /// <summary>Options for the language switch (endonyms ⇒ constant across languages).</summary>
     public IReadOnlyList<LanguageOption> LanguageOptions => LanguageOption.All;
 
     /// <summary>Aktuell gewählter Theme-Modus (persistierte Quelle der Wahrheit).</summary>

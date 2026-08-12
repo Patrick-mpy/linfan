@@ -574,7 +574,7 @@ public class ConfigMapperTests
 
         Assert.Equal(2, result.Fans.Count);
         FanConfig added = result.Fans.Single(f => f.FanId == "new");
-        Assert.Equal("new", added.Name);              // Name = FanId beim Anlegen
+        Assert.Equal("", added.Name);                 // no pseudo name ⇒ the hardware label applies
         Assert.Equal((byte)64, added.MinPwm);
         Assert.Same(cal, added.Calibration);
         Assert.NotNull(result.Fans.Single(f => f.FanId == "other"));
@@ -667,7 +667,9 @@ public class ConfigMapperTests
         AppConfig result = ConfigMapper.ApplyTachometer(current, "new", "io/fan/9");
 
         FanConfig added = result.Fans.Single(f => f.FanId == "new");
-        Assert.Equal("new", added.Name);                // Name = FanId beim Anlegen
+        // No name: Name is the user's OWN name, empty ⇒ the hardware label applies. Putting the FanId here
+        // would leave the raw path stuck as the display name.
+        Assert.Equal("", added.Name);
         Assert.Equal("io/fan/9", added.RpmSource);
         Assert.Equal(2, result.Fans.Count);
     }

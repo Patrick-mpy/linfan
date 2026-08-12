@@ -191,7 +191,7 @@
     <value>Search…</value>
   </data>
   <data name="MainWindow.HideHidden" xml:space="preserve">
-    <value>Hide hidden</value>
+    <value>Hide here too</value>
   </data>
   <data name="MainWindow.HideHiddenSensorsTooltip" xml:space="preserve">
     <value>Hides hidden sensors from this list too (does not delete them).</value>
@@ -928,6 +928,15 @@
   <data name="CurveEditRow.ShowAll" xml:space="preserve">
     <value>Show all {0}</value>
   </data>
+  <data name="CurveEditRow.PointsOne" xml:space="preserve">
+    <value>1 point</value>
+  </data>
+  <data name="CurveEditRow.PointsMany" xml:space="preserve">
+    <value>{0} points</value>
+  </data>
+  <data name="CurveEditRow.SourceCount" xml:space="preserve">
+    <value>{0} sensors</value>
+  </data>
   <data name="CurveEditRow.ShowLess" xml:space="preserve">
     <value>Show less</value>
   </data>
@@ -999,6 +1008,9 @@
   </data>
   <data name="Ipc.Fail.NotControllable" xml:space="preserve">
     <value>Not controllable (requires root).</value>
+  </data>
+  <data name="Ipc.Fail.Busy" xml:space="preserve">
+    <value>Another fan action is still running — please try again.</value>
   </data>
   <data name="Ipc.Fail.NoTacho" xml:space="preserve">
     <value>No tacho signal — calibration not possible.</value>
@@ -1092,6 +1104,15 @@
   </data>
   <data name="Settings.AppearanceDesc" xml:space="preserve">
     <value>Choose the color scheme.</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>Dark</value>
   </data>
   <data name="Settings.LanguageDesc" xml:space="preserve">
     <value>Choose the display language.</value>

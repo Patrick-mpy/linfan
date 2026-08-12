@@ -22,6 +22,33 @@ public sealed class CalibrationStatusTests
         Assert.Equal("hwmon7/pwm1", Running(name: null).DisplayName);
     }
 
+    /// <summary>
+    /// The name comes from the <b>live fan list</b> (where the daemon has already resolved it: own name,
+    /// else hardware label) — not from the config. A fan that was never saved carries no name there, so the
+    /// message used to show the raw hardware id ("Calibrating /lpc/…/control/5").
+    /// </summary>
+    [Fact]
+    public void Convert_TakesFanName_FromLiveFanList_NotFromConfig()
+    {
+        var snapshot = new IpcSnapshot(
+            DaemonStatus.Active, DryRun: false, 40.0,
+            Array.Empty<IpcSensor>(),
+            new[] { new IpcFan("/lpc/nct6797d/0/control/5", "Nuvoton NCT6797D Fan #6", 1123, 0, "Manual", true) },
+            Config: new IpcConfig(
+                Array.Empty<IpcCurve>(),
+                // Config entry without an own name — exactly the case after calibration or coupling.
+                new[] { new IpcFanAssignment("/lpc/nct6797d/0/control/5", "", 0, 255, null) },
+                Array.Empty<IpcSensorName>(),
+                Array.Empty<IpcProfile>(),
+                ActiveProfileId: null),
+            Calibration: new IpcCalibration("/lpc/nct6797d/0/control/5", CalibrationPhase.Measuring,
+                                            0, 1123, Running: true, Done: false, StartPwm: null, FailReason: null));
+
+        MonitorSnapshot converted = IpcLiveMonitor.Convert(snapshot);
+
+        Assert.Equal("Nuvoton NCT6797D Fan #6", converted.Calibration!.DisplayName);
+    }
+
     [Fact]
     public void Running_Headline_NamesFan_DetailHasPhasePwmRpm_ProgressShown()
     {

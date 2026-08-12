@@ -189,13 +189,17 @@ public partial class CurveEditorController : ObservableObject
 
         foreach (FanReading f in snapshot.Fans)
         {
+            // The hardware label comes along for display only (it applies as long as the fan carries no own
+            // name — e.g. entries the daemon created via calibration or tach coupling). Do NOT write it into
+            // the FanConfig: empty means "no own name" there.
             FanConfig baseFan = snapshot.Config.Fans.FirstOrDefault(fc => fc.FanId == f.Id)
-                ?? new FanConfig { FanId = f.Id, Name = f.Name };
+                ?? new FanConfig { FanId = f.Id };
             var fan = new FanAssignRow(baseFan, selected: null, Curves, f.CanControl, _calibrate,
                                        sendIdentify: _identify,
                                        sendManual: _sendManual, sendAuto: _sendAuto,
                                        sendTachMapping: _startTachMapping, cancelTachMapping: _cancelTachMapping,
-                                       sendSetTach: _setFanTachometer, availableTachSensors: AvailableTachSensors);
+                                       sendSetTach: _setFanTachometer, availableTachSensors: AvailableTachSensors,
+                                       hardwareLabel: f.Name);
             // Zuordnungswechsel (Selected) muss das Aktiv-Badge der Kurven neu auswerten. Lebensdauer der
             // FanAssignRow == Lebensdauer des Controllers (Initialize ist einmalig) → kein Unsubscribe nötig.
             fan.PropertyChanged += OnFanRowChanged;

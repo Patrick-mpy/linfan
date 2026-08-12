@@ -30,9 +30,24 @@ SUDO=""
 echo "==> stop a possibly running service first (safe upgrade — ramps fans back to hardware auto)"
 $SUDO systemctl stop "$UNIT" 2>/dev/null || true
 
+# Same hazard for the GUI: it memory-maps its binaries from $PREFIX, so replacing them under a
+# running instance makes it segfault mid-flight (apport dialog). Close it; relaunched/announced
+# after the install. Matches both the self-contained apphost and a previous source install.
+GUI_MATCH="$PREFIX/[^ ]*LinFan\.App"
+GUI_WAS_RUNNING=
+if pgrep -f "$GUI_MATCH" >/dev/null; then
+  GUI_WAS_RUNNING=1
+  echo "==> close the running GUI (it must not run while its files are replaced)"
+  $SUDO pkill -f "$GUI_MATCH" || true
+  for _ in $(seq 1 25); do pgrep -f "$GUI_MATCH" >/dev/null || break; sleep 0.2; done
+  pgrep -f "$GUI_MATCH" >/dev/null && $SUDO pkill -9 -f "$GUI_MATCH" || true
+fi
+
 echo "==> install self-contained binaries to $PREFIX"
 $SUDO install -d "$PREFIX"
-$SUDO cp -rT "$BIN_DIR" "$PREFIX"
+# --remove-destination unlinks each target before writing (dpkg-style): a plain cp truncates the
+# old inode in place and corrupts the mapped image of anything still running from it.
+$SUDO cp -rT --remove-destination "$BIN_DIR" "$PREFIX"
 # cp folgt der umask (bei Root oft 0077) → die Binaries würden 0700 root-only, und die unprivilegierte
 # GUI scheiterte mit "Permission denied" beim App-Start. Explizit welt-les-/ausführbar machen (dpkg
 # macht das beim .deb automatisch; hier müssen wir es selbst tun).
@@ -45,6 +60,11 @@ $SUDO ln -sf "$PREFIX/linfan-gui" /usr/local/bin/linfan   # terminal command: ju
 echo "==> systemd unit (self-contained) + app-menu entry"
 $SUDO install -m0644 "$SCRIPT_DIR/linfan-daemon.service" "/etc/systemd/system/$UNIT"
 $SUDO install -m0644 "$SCRIPT_DIR/../linfan.desktop" /usr/share/applications/linfan.desktop
+$SUDO install -D -m0644 "$SCRIPT_DIR/../linfan.svg" /usr/share/icons/hicolor/scalable/apps/linfan.svg
+# Refresh the desktop caches, otherwise some environments keep showing the previous icon until re-login.
+# Best-effort: the tools are missing on minimal systems, and a stale cache is cosmetic.
+$SUDO gtk-update-icon-cache -qtf /usr/share/icons/hicolor 2>/dev/null || true
+$SUDO update-desktop-database /usr/share/applications 2>/dev/null || true
 $SUDO systemctl daemon-reload
 
 echo "==> configuration ($CONFIG_DIR)"
@@ -74,6 +94,17 @@ $SUDO systemctl enable "$UNIT"
 $SUDO systemctl restart "$UNIT"
 sleep 1
 $SUDO systemctl --no-pager --full status "$UNIT" || true
+
+if [ -n "$GUI_WAS_RUNNING" ]; then
+  # When the whole script runs as root (sudo ./linfan.run) the GUI must not be relaunched from
+  # here — it would run privileged and without the desktop session's display environment.
+  if [ "$(id -u)" -eq 0 ]; then
+    echo "NOTE: the GUI was closed for the upgrade — start it again via 'linfan' or the app menu."
+  else
+    echo "==> restart the GUI"
+    setsid "$PREFIX/linfan-gui" >/dev/null 2>&1 </dev/null &
+  fi
+fi
 
 cat <<EOF
 

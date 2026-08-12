@@ -74,6 +74,7 @@ internal static class IpcStatusText
         TachMappingFailReason.NoTemperatureReading => Localizer.Instance["Ipc.Fail.NoTemperatureReading"],
         TachMappingFailReason.Canceled => Localizer.Instance["Ipc.Fail.Canceled"],
         TachMappingFailReason.NotControllable => Localizer.Instance["Ipc.Fail.NotControllable"],
+        TachMappingFailReason.Busy => Localizer.Instance["Ipc.Fail.Busy"],
         _ => Localizer.Instance["Ipc.Fail.Unknown"],
     };
 

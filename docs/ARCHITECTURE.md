@@ -146,7 +146,11 @@ public interface IFanController
 - ❌ View → Model **directly** (always via the controller).
 - ❌ `LinFan.Core` → Avalonia / IPC / a concrete hardware implementation.
 - ❌ `LinFan.App` → `LinFan.Hardware.*` **directly** (only the daemon loads backends).
-- ❌ `#if <OS>` in `Core` or `App` (platform code exclusively in `Hardware.*`).
+- ❌ `#if <OS>` in `Core` or `App` — platform **hardware** access belongs exclusively in `Hardware.*`.
+  Pure platform *presentation or infrastructure* details with no domain meaning (window decoration, config
+  paths, the IPC transport) may live in `App`/`Core` when they are selected by a **runtime** check
+  (`OperatingSystem.IsWindows()` …), so the same binary stays correct everywhere. Moving them into
+  `Hardware.*` would be worse: it would force an `App` → `Hardware.*` reference, which is forbidden above.
 - ❌ Hardware/domain logic in view code-behind.
 - ❌ Blocking hardware/IPC calls on the UI thread.
 

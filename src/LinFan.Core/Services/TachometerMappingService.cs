@@ -69,8 +69,11 @@ public sealed class TachometerMappingService
         int blind = 0;
         try
         {
-            // Watchdog VOR jedem Eingriff: bei Übertemperatur gar nicht erst die anderen Lüfter drosseln.
-            blind = Guard(options.FailSafeTempC, blind);
+            // Watchdog BEFORE any intervention: on over-temperature, do not throttle the other fans at all.
+            // With a safety margin (StartMarginC): starting just below the limit would spend the whole
+            // measurement window without airflow on its way into the watchdog. The abort during the run
+            // keeps using the full limit — an already running attempt must not fail on the margin.
+            blind = Guard(Math.Max(0, options.FailSafeTempC - options.StartMarginC), blind);
             ct.ThrowIfCancellationRequested();
 
             _fans.SetMode(fanId, FanMode.Manual);
@@ -82,8 +85,9 @@ public sealed class TachometerMappingService
 
             // Baseline: Ziel niedrig, andere niedrig — engmaschig überwacht einpendeln, dann alle Drehzahlen lesen.
             // Dies ist der kühlungsärmste Zustand (alles nahe 0), daher slice-weiser Watchdog wie beim Identify-Hold.
+            // Coasting down needs more time than spinning up (see BaselineSettleTime), else the baseline is too high.
             _fans.SetPwm(fanId, 0);
-            blind = await SettleAsync(options.SettleTime, options.FailSafeTempC, blind, ct).ConfigureAwait(false);
+            blind = await SettleAsync(options.BaselineSettleTime, options.FailSafeTempC, blind, ct).ConfigureAwait(false);
             var baseline = rpmSensors.ToDictionary(id => id, ReadRpm);
 
             // Ziel hochtreiben (andere bleiben niedrig) — einpendeln, dann erneut lesen.

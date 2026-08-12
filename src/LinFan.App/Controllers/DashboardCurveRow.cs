@@ -3,6 +3,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LinFan.App.Localization;
 
 namespace LinFan.App.Controllers;
 
@@ -41,7 +42,7 @@ public sealed partial class DashboardCurveRow : ObservableObject
         {
             0 => "—",
             1 => curve.Sources[0].Name,
-            int n => $"{n} Sensoren",
+            int n => Localizer.Instance.Format("CurveEditRow.SourceCount", n),
         };
     }
 

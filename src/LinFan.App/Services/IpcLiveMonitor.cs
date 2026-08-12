@@ -93,8 +93,9 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
         SendAsync(new IpcCommand(IpcCommand.SetCurveEnabled, Target: curveId, Value: enabled ? 1 : 0));
 
     /// <summary>
-    /// Ersetzt die Daemon-Config vollständig (Import/Restore). Anders als <see cref="SendConfigAsync"/> wird die
-    /// Kalibrierung mitgesendet (<c>withCalibration: true</c>), damit ein Backup sie wiederherstellen kann.
+    /// Replaces the daemon config wholesale (import/restore). Unlike <see cref="SendConfigAsync"/> the
+    /// daemon-owned fields ride along (<c>withDaemonOwned: true</c>) — calibration and tachometer assignment
+    /// — so a backup can actually restore them.
     /// </summary>
     public async Task<bool> SendReplaceConfigAsync(AppConfig config)
     {
@@ -106,7 +107,7 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
 
         try
         {
-            await client.SendCommandAsync(new IpcCommand(IpcCommand.ReplaceConfig, ToIpcConfig(config, withCalibration: true)));
+            await client.SendCommandAsync(new IpcCommand(IpcCommand.ReplaceConfig, ToIpcConfig(config, withDaemonOwned: true)));
             return true;
         }
         catch
@@ -208,7 +209,8 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
             _latest = snapshot;
     }
 
-    private static MonitorSnapshot Convert(IpcSnapshot s)
+    /// <summary>IPC snapshot → GUI snapshot. <c>internal</c> so the name resolution can be tested.</summary>
+    internal static MonitorSnapshot Convert(IpcSnapshot s)
     {
         var sensors = s.Sensors
             .Select(x => new SensorReading(x.Id, x.Name, ParseKind(x.Kind), x.Unit, x.Value))
@@ -221,7 +223,11 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
         CalibrationStatus? cal = s.Calibration is { } c
             ? new CalibrationStatus(c.FanId, c.Phase, c.CurrentPwm, c.CurrentRpm, c.Running, c.Done, c.StartPwm,
                                     c.FailReason, c.OverTempC, c.OverLimitC,
-                                    FanName: s.Config?.Fans.FirstOrDefault(f => f.FanId == c.FanId)?.Name)
+                                    // From the live list, not from the config: the daemon has already resolved
+                                    // the display name there (own name, else hardware label). The config
+                                    // carries no name for a fan that was never saved — the message would
+                                    // otherwise fall back to the raw hardware id.
+                                    FanName: s.Fans.FirstOrDefault(f => f.Id == c.FanId)?.Name)
             : null;
         IdentifyStatus? ident = s.Identify is { } id
             ? new IdentifyStatus(id.FanId, id.Running, id.FailReason, id.OverTempC, id.OverLimitC)
@@ -272,11 +278,13 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
         };
     }
 
-    // withCalibration: normalerweise false — der Daemon ist Eigentümer der Kalibrierung, ein Merge (SaveConfig)
-    // soll sie nicht überschreiben. Beim vollständigen Ersetzen (ReplaceConfig/Import) wird sie mitgeschickt.
-    private static IpcConfig ToIpcConfig(AppConfig config, bool withCalibration = false) => new(
+    // withDaemonOwned: normally false — the daemon owns the calibration and the tachometer assignment, and a
+    // merge (SaveConfig) must not overwrite them. A full replace (ReplaceConfig/import) carries them along,
+    // otherwise restoring a backup would silently drop what the backup holds.
+    // internal so a test can cover the mapping — this is the seam where a missing field goes unnoticed.
+    internal static IpcConfig ToIpcConfig(AppConfig config, bool withDaemonOwned = false) => new(
         config.Curves.Select(ToIpcCurve).ToList(),
-        config.Fans.Select(f => ToIpcFan(f, withCalibration)).ToList(),
+        config.Fans.Select(f => ToIpcFan(f, withDaemonOwned)).ToList(),
         config.Sensors.Select(s => new IpcSensorName(s.SensorId, s.Name, s.Group, s.Hidden)).ToList(),
         config.Profiles.Select(p => new IpcProfile(
             p.Id, p.Name,
@@ -338,11 +346,12 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
             : null,
     };
 
-    private static IpcFanAssignment ToIpcFan(FanConfig f, bool withCalibration = false) => new(
+    private static IpcFanAssignment ToIpcFan(FanConfig f, bool withDaemonOwned = false) => new(
         f.FanId, f.Name, f.MinPwm, f.MaxPwm, f.AssignedCurveId, f.Location.ToString(), f.Hidden,
-        withCalibration && f.Calibration is { } cal
+        withDaemonOwned && f.Calibration is { } cal
             ? new IpcFanCalibration(cal.StartPwm, cal.MinRpm, cal.MaxRpm)
-            : null);
+            : null,
+        withDaemonOwned ? f.RpmSource : null);
 
     public async ValueTask DisposeAsync()
     {

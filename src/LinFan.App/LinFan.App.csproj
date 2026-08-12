@@ -8,8 +8,18 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Icon of the .exe itself — what Explorer and the Start-menu shortcut (packaging/windows) show.
+         Generated from the same geometry as Controls/BrandMark.cs and Assets/linfan-icon.svg. -->
+    <ApplicationIcon>Assets/linfan.ico</ApplicationIcon>
+  </PropertyGroup>
+
   <ItemGroup>
-    <AvaloniaResource Include="Assets/**" />
+    <!-- The .ico is linked into the executable by ApplicationIcon; embedding it a second time as an
+         Avalonia resource would only bloat the build (window/tray use icon.png). The SVGs are source
+         assets for the README and the Linux packages — Avalonia cannot render them, so nothing loads
+         them at runtime either. -->
+    <AvaloniaResource Include="Assets/**" Exclude="Assets/linfan.ico;Assets/*.svg" />
   </ItemGroup>
 
   <ItemGroup>

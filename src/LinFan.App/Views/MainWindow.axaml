@@ -11,6 +11,7 @@
         Width="1000" Height="720"
         MinWidth="760" MinHeight="520"
         Title="LinFan"
+        Icon="/Assets/icon.png"
         Focusable="True"
         Background="{DynamicResource BgWindow}">
 
@@ -141,7 +142,15 @@
         <StackPanel Grid.Row="0" Spacing="{StaticResource SpacingXxs}" Margin="0,0,0,16">
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Grid.Column="0" Spacing="{StaticResource SpacingXxs}">
-                    <TextBlock Text="LinFan" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                    <!-- Wordmark as in Assets/linfan-logo-horizontal.svg: the mark, "Lin" in the text colour,
+                         "Fan" in the accent. Sizes and spacing are the SVG's proportions at FontSize 28. -->
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" HorizontalAlignment="Left">
+                        <ctrl:BrandMark Height="25" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Lin" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                            <TextBlock Text="Fan" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource Accent}" />
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
                 </StackPanel>
             </Grid>
@@ -862,8 +871,10 @@
                                                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
                                                     <PathIcon Grid.Row="0" Grid.Column="0" Data="{StaticResource IconFan}" Width="16" Height="16"
                                                               Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                    <!-- Placeholder = hardware label: without an own name the user still sees what
+                                                         the fan is called everywhere, without that setting the value. -->
                                                     <TextBox Grid.Row="0" Grid.Column="1" Classes="ghost" Text="{Binding Name}"
-                                                             PlaceholderText="{l:Tr MainWindow.NameRequired}"
+                                                             PlaceholderText="{Binding NamePlaceholder}"
                                                              FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
                                                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SpacingXs}"
                                                                 VerticalAlignment="Center" Margin="10,0,0,0">

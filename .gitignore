@@ -427,7 +427,10 @@ test-results/
 
 # Mac bundle stuff
 *.dmg
-*.app
+# Deliberately no "*.app": with core.ignorecase=true (Windows/macOS checkouts) that pattern also
+# matches the src/LinFan.App/ directory, so every *new* file below it gets silently ignored —
+# already-tracked files stay visible, which makes the loss easy to miss. macOS .app bundles only
+# ever show up as build output here, and bin/obj are ignored anyway.
 
 # content below from: https://github.com/github/gitignore/blob/master/Global/macOS.gitignore
 # General

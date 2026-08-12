@@ -94,5 +94,11 @@ Installation & operation: [docs/INSTALL.md](INSTALL.md).
 5. Show the result to the user → rename, confirm, save.
 6. Then propose default curves (e.g. silent / balanced / performance).
 
+Every step is also available per fan afterwards, under Settings → Fans: calibration, identification
+(pulse the fan to see which one it is), and coupling a speed sensor — the last one drives the fan up
+while throttling the others and assigns the tachometer that responds.
+
+![Fan settings: one card per fan with its hardware path, live speed, position, PWM min/max sliders, and buttons for calibration, identification, and coupling a speed sensor](images/settings.jpg)
+
 > During calibration keep the **safety limit** active (on over-temperature immediately fall back to
 > 100 % or hardware auto mode). Fail-safe details: [docs/ARCHITECTURE.md](ARCHITECTURE.md) §7.

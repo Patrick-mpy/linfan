@@ -73,15 +73,40 @@ public sealed class FanAssignRowTests
         Assert.Equal("Test Fan", row.ToConfig().Name);
     }
 
+    /// <summary>
+    /// Empty means "no own name" — then the hardware label applies everywhere. This used to yield the FanId,
+    /// which turned the raw hardware path ("/lpc/nct6797d/0/control/1") into the display name.
+    /// </summary>
     [Fact]
-    public void ToConfig_EmptyName_AndEmptyBaseName_FallsBackToFanId()
+    public void ToConfig_EmptyName_AndEmptyBaseName_StaysEmpty()
     {
         var row = new FanAssignRow(
             new FanConfig { FanId = "hwmon1/pwm1", Name = "" },
             selected: null, availableCurves: new ObservableCollection<CurveEditRow>());
         row.Name = "   ";
 
-        Assert.Equal("hwmon1/pwm1", row.ToConfig().Name);
+        Assert.Equal("", row.ToConfig().Name);
+    }
+
+    /// <summary>
+    /// Without an own name the row shows the hardware label as a <b>placeholder</b>, not as a value.
+    /// Otherwise an untouched field would freeze it as a user-defined name on the next save, and the
+    /// daemon-side "no pseudo name" fix would come to nothing.
+    /// </summary>
+    [Fact]
+    public void HardwareLabel_IsPlaceholderOnly_AndNotPersisted()
+    {
+        var row = new FanAssignRow(
+            new FanConfig { FanId = "/lpc/nct6797d/0/control/1", Name = "" },
+            selected: null, availableCurves: new ObservableCollection<CurveEditRow>(),
+            hardwareLabel: "Nuvoton NCT6797D Fan #2");
+
+        Assert.Equal("Nuvoton NCT6797D Fan #2", row.NamePlaceholder);
+        Assert.Equal("", row.Name);
+        Assert.Equal("", row.ToConfig().Name);
+
+        row.Name = "CPU";
+        Assert.Equal("CPU", row.ToConfig().Name);   // a real own name is of course kept
     }
 
     [Fact]

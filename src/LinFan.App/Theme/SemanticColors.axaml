@@ -35,6 +35,8 @@
             <Color x:Key="AxisColor">#71717A</Color>
             <Color x:Key="HandleColor">#FAFAFA</Color>
             <Color x:Key="AccentColor">#38BDF8</Color>
+            <!-- One step darker than the accent — the blade shading of the brand mark (BrandMark). -->
+            <Color x:Key="AccentShadeColor">#0EA5E9</Color>
             <Color x:Key="ClampColor">#356C82</Color>
             <Color x:Key="LiveColor">#F59E0B</Color>
 
@@ -71,6 +73,8 @@
             <Color x:Key="AxisColor">#71717A</Color>
             <Color x:Key="HandleColor">#18181B</Color>
             <Color x:Key="AccentColor">#0284C7</Color>
+            <!-- One step darker than the accent — the blade shading of the brand mark (BrandMark). -->
+            <Color x:Key="AccentShadeColor">#0369A1</Color>
             <Color x:Key="ClampColor">#7DD3FC</Color>
             <Color x:Key="LiveColor">#D97706</Color>
 

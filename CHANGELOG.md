@@ -6,6 +6,47 @@ the git tag `vX.Y.Z` is the source of truth.
 
 Open items are tracked as GitHub issues.
 
+## [0.3.0] - 2026-08-12
+
+LinFan gets its own look — and the setup assistant no longer loses fans along the way.
+
+### Added
+
+- **LinFan logo and app icons**: the wordmark in the GUI header and on the assistant's welcome page,
+  plus a proper icon for the window and tray, for the executable in Explorer and the Start menu on
+  Windows, and for the application menu and dock on Linux (it used to borrow a generic system icon).
+  The installers and the `.deb` ship it.
+- **Windows: the native title bar follows the app theme** — no more light system bar above a dark window.
+
+### Fixed
+
+- **The setup assistant no longer loses the fan after a skipped one.** A coupling request that arrived
+  right after the previous run was silently discarded, so the GUI waited out its timeout and wrote the
+  fan off — skipping both its speed-sensor coupling and its calibration. Requests now wait out the cool
+  down instead of vanishing.
+- **Inert fans are no longer reported as having no tachometer.** The reference measurement waits longer
+  for the fan to coast down — coasting down takes far longer than spinning up, and a large CPU cooler
+  was still near full speed when measured. The log now also records what was measured, so a fan that
+  genuinely has no tachometer can be told apart from one that was measured too early.
+- **The speed-sensor coupling refuses to start when it is already hot.** It parks every fan near zero
+  for the measurement, so it now requires headroom below the fail-safe limit rather than starting just
+  under it.
+- **No more raw hardware paths as fan names.** Entries created by a calibration or a coupling kept the
+  device path (`/lpc/nct6797d/0/control/1`) as their display name. They now show the hardware label
+  until you pick a name of your own, and the calibration message names the fan instead of its id.
+- **Restoring a backup no longer drops the speed-sensor assignments.** The GUI never put them on the
+  wire, so a restore reset every fan to "no sensor" even though the backup file held them — and every
+  coupling you had run was lost with it. The calibration was already carried; both travel together now.
+- **The English interface was partly German**: the theme picker ("Hell"/"Dunkel") and the point and
+  sensor counts in the curve editor and dashboard now follow the display language and switch with it.
+- **Setup assistant, calibration step**: the content scrolls, so the progress card no longer pushes over
+  the buttons while a fan is being coupled or calibrated.
+
+### Changed
+
+- The device lists' filter reads **"Hide here too"** instead of "Hide hidden" — it hides entries you
+  already marked hidden from *this* list as well.
+
 ## [0.2.0] - 2026-08-04
 
 Curve and UI refinements — step interpolation, visibly smoother splines, toast notifications,

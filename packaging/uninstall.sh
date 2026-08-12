@@ -15,7 +15,8 @@ echo "==> stop & disable service"
 sudo systemctl disable --now "$UNIT" 2>/dev/null || true
 
 echo "==> remove files"
-sudo rm -f "/etc/systemd/system/$UNIT" /usr/share/applications/linfan.desktop /usr/local/bin/linfan
+sudo rm -f "/etc/systemd/system/$UNIT" /usr/share/applications/linfan.desktop /usr/local/bin/linfan \
+  /usr/share/icons/hicolor/scalable/apps/linfan.svg
 sudo rm -rf "$PREFIX"
 sudo systemctl daemon-reload
 

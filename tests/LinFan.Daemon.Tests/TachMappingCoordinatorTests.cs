@@ -30,11 +30,12 @@ public class TachMappingCoordinatorTests
         FakeHardware hw, CancellationToken token,
         Action<string, string>? onMatched = null,
         Action<string>? suspend = null, Action<string>? resume = null,
-        Func<double>? failSafe = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null) =>
+        Func<double>? failSafe = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null) =>
         new(hw, hw, NullLogger.Instance, suspend ?? (_ => { }), resume ?? (_ => { }),
             onMatched ?? ((_, __) => { }), token,
             mappingFactory: (s, f) => new TachometerMappingService(s, f, NoDelay),
-            failSafeTempC: failSafe, cooldown: cooldown, now: now);
+            failSafeTempC: failSafe, cooldown: cooldown, now: now, delay: delay ?? NoDelay);
 
     [Fact]
     public async Task Map_Matched_SetsStatus_AndPersistsOverride()
@@ -88,8 +89,29 @@ public class TachMappingCoordinatorTests
         Assert.Equal(TachMappingPhase.Failed, s!.Phase);
         Assert.Equal(TachMappingFailReason.OverTemperature, s.FailReason);
         Assert.Equal(95.0, s.OverTempC);
-        Assert.Equal(90.0, s.OverLimitC);
+        // Reported is the threshold that actually tripped: starting demands a margin below the fail-safe
+        // limit (90 − StartMarginC 10), because the long window without airflow follows right after.
+        Assert.Equal(80.0, s.OverLimitC);
         Assert.True(hw.RestoreCount >= 1);
+    }
+
+    /// <summary>
+    /// Below the fail-safe limit but inside the start margin: the run would spend its whole measurement
+    /// window (every fan near PWM 0) on its way into the watchdog — so do not start at all. The point is
+    /// that no fan may have been throttled in the process.
+    /// </summary>
+    [Fact]
+    public async Task Map_WithinStartMargin_RefusesToStart_WithoutThrottling()
+    {
+        var hw = Rig(temp: 85);   // < 90, but >= 90 − 10
+        using var cts = new CancellationTokenSource();
+        var co = New(hw, cts.Token, failSafe: () => 90);
+
+        co.Start(new FanId("f1"));
+        await co.StopAsync();
+
+        Assert.Equal(TachMappingFailReason.OverTemperature, co.Status!.FailReason);
+        Assert.Empty(hw.Writes);   // nothing throttled, nothing driven
     }
 
     [Fact]
@@ -126,30 +148,92 @@ public class TachMappingCoordinatorTests
         Assert.Null(co.Status);
     }
 
+    /// <summary>
+    /// A second run started right away is <b>delayed, not dropped</b>. A silent drop made the GUI wait out
+    /// its 60 s timeout: in the assistant every fan following a skipped one lost both its coupling AND its
+    /// calibration.
+    /// </summary>
     [Fact]
-    public async Task Map_Cooldown_RejectsImmediateSecondRun()
+    public async Task Map_Cooldown_DelaysSecondRun_InsteadOfDroppingIt()
     {
         var hw = Rig();
         var matched = new List<(string, string)>();
+        var waits = new List<TimeSpan>();
         var clock = new FakeClock();
         using var cts = new CancellationTokenSource();
         var co = New(hw, cts.Token, onMatched: (f, t) => matched.Add((f, t)),
-            cooldown: TimeSpan.FromSeconds(3), now: () => clock.Now);
+            cooldown: TimeSpan.FromSeconds(3), now: () => clock.Now,
+            delay: (d, _) => { waits.Add(d); return Task.CompletedTask; });
 
         co.Start(new FanId("f1"));
         await co.StopAsync();
         Assert.Single(matched);
+        Assert.Empty(waits);                          // first run: no cooldown open
 
-        // Sofort erneut → Cooldown aktiv → abgelehnt.
-        co.Start(new FanId("f1"));
-        await co.StopAsync();
-        Assert.Single(matched);
-
-        // Nach Ablauf des Cooldowns → wieder erlaubt.
-        clock.Advance(TimeSpan.FromSeconds(4));
+        // Immediately again → cooldown still open → the run waits it out and then goes ahead anyway.
         co.Start(new FanId("f1"));
         await co.StopAsync();
         Assert.Equal(2, matched.Count);
+        Assert.Equal(TimeSpan.FromSeconds(3), Assert.Single(waits));
+
+        // Once the cooldown has elapsed → straight away, no waiting.
+        clock.Advance(TimeSpan.FromSeconds(4));
+        co.Start(new FanId("f1"));
+        await co.StopAsync();
+        Assert.Equal(3, matched.Count);
+        Assert.Single(waits);
+    }
+
+    /// <summary>No hardware may be touched while the cooldown is being waited out (fail-safe).</summary>
+    [Fact]
+    public async Task Map_CooldownWait_HappensBeforeThrottling()
+    {
+        var hw = Rig();
+        var clock = new FakeClock();
+        int suspendedAtWait = -1;
+        using var cts = new CancellationTokenSource();
+        int suspended = 0;
+        var co = New(hw, cts.Token,
+            suspend: _ => Interlocked.Increment(ref suspended),
+            cooldown: TimeSpan.FromSeconds(3), now: () => clock.Now,
+            delay: (_, __) => { suspendedAtWait = Volatile.Read(ref suspended); return Task.CompletedTask; });
+
+        co.Start(new FanId("f1"));
+        await co.StopAsync();
+        int suspendedBeforeSecondRun = Volatile.Read(ref suspended);
+
+        co.Start(new FanId("f1"));   // second run → waits out the cooldown
+        await co.StopAsync();
+
+        // Waiting happens BEFORE throttling → no further fan is suspended during the wait, so cooling keeps
+        // running normally for its duration.
+        Assert.Equal(suspendedBeforeSecondRun, suspendedAtWait);
+    }
+
+    /// <summary>A cancel inside the cooldown window touches no hardware (nothing throttled ⇒ nothing to restore).</summary>
+    [Fact]
+    public async Task Map_CanceledDuringCooldown_DoesNotTouchHardware()
+    {
+        var hw = Rig();
+        var clock = new FakeClock();
+        using var cts = new CancellationTokenSource();
+        // The delay cancels, the way Task.Delay does on a cancelled token. The first run has no open cooldown
+        // yet and therefore never calls it.
+        var co = New(hw, cts.Token, cooldown: TimeSpan.FromSeconds(3), now: () => clock.Now,
+            delay: (_, __) => Task.FromCanceled(new CancellationToken(canceled: true)));
+
+        co.Start(new FanId("f1"));
+        await co.StopAsync();
+        int writesAfterFirst = hw.Writes.Count;
+        int restoresAfterFirst = hw.RestoreCount;
+
+        co.Start(new FanId("f1"));   // second run → cancelled while waiting out the cooldown
+        await co.StopAsync();
+
+        Assert.Equal(writesAfterFirst, hw.Writes.Count);        // no PWM write
+        Assert.Equal(restoresAfterFirst, hw.RestoreCount);      // no needless RestoreDefaults
+        Assert.Equal(TachMappingPhase.Failed, co.Status!.Phase);
+        Assert.Equal(TachMappingFailReason.Canceled, co.Status.FailReason);
     }
 
     private sealed class FakeClock

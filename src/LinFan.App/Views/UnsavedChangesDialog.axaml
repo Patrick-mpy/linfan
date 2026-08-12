@@ -3,6 +3,7 @@
         xmlns:l="clr-namespace:LinFan.App.Localization"
         x:Class="LinFan.App.Views.UnsavedChangesDialog"
         Title="{l:Tr UnsavedChanges.Title}"
+        Icon="/Assets/icon.png"
         Width="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" CanResize="False"
         Background="{DynamicResource BgWindow}">

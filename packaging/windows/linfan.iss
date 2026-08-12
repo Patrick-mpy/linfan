@@ -28,6 +28,9 @@ AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
+; Brand the installer itself and its "Apps & features" entry — otherwise both show the stock Inno icon.
+SetupIconFile=..\..\src\LinFan.App\Assets\linfan.ico
+UninstallDisplayIcon={app}\App\LinFan.App.exe
 OutputDir=..\..\artifacts
 OutputBaseFilename=LinFan-Setup-{#AppVersion}-win-x64
 ArchitecturesAllowed=x64

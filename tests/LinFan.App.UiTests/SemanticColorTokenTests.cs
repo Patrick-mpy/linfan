@@ -50,6 +50,7 @@ public class SemanticColorTokenTests
     [InlineData("AxisColor")]
     [InlineData("HandleColor")]
     [InlineData("AccentColor")]
+    [InlineData("AccentShadeColor")]
     [InlineData("ClampColor")]
     [InlineData("LiveColor")]
     public void Color_token_resolves_in_both_variants(string key)

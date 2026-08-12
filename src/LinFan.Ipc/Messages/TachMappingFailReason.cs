@@ -22,4 +22,10 @@ public enum TachMappingFailReason
 
     /// <summary>Sonstiger, nicht klassifizierter Fehler.</summary>
     Unknown,
+
+    /// <summary>
+    /// Another coupling run was still active, so this request was refused. Reported instead of staying
+    /// silent: the GUI would otherwise wait out its timeout and write the fan off as failed.
+    /// </summary>
+    Busy,
 }

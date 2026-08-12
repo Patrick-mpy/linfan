@@ -29,6 +29,8 @@ echo "==> assets (self-contained unit, GUI launcher, desktop entry, /usr/bin/lin
 install -m0755 "$SCRIPT_DIR/linfan-gui" "$PKG/opt/linfan/linfan-gui"
 install -D -m0644 "$SCRIPT_DIR/linfan-daemon.service" "$PKG/lib/systemd/system/linfan-daemon.service"
 install -D -m0644 "$REPO/packaging/linfan.desktop" "$PKG/usr/share/applications/linfan.desktop"
+install -D -m0644 "$REPO/src/LinFan.App/Assets/linfan-icon.svg" \
+  "$PKG/usr/share/icons/hicolor/scalable/apps/linfan.svg"
 install -d "$PKG/usr/bin"
 ln -sf /opt/linfan/linfan-gui "$PKG/usr/bin/linfan"
 

@@ -64,7 +64,9 @@ public partial class CurveEditRow : ObservableObject
     [ObservableProperty] private bool _showPoints;
 
     /// <summary>Zusammenfassung der eingeklappten Punkte-Sektion (Header-Beschriftung).</summary>
-    public string PointsLabel => Points.Count == 1 ? "1 Punkt" : $"{Points.Count} Punkte";
+    public string PointsLabel => Points.Count == 1
+        ? Localizer.Instance["CurveEditRow.PointsOne"]
+        : Localizer.Instance.Format("CurveEditRow.PointsMany", Points.Count);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Label))]
@@ -167,7 +169,7 @@ public partial class CurveEditRow : ObservableObject
             {
                 0 => Name,
                 1 => $"{Name} – {srcs[0].Name}",
-                _ => $"{Name} – {srcs.Count} Sensoren",
+                _ => $"{Name} – {Localizer.Instance.Format("CurveEditRow.SourceCount", srcs.Count)}",
             };
         }
     }

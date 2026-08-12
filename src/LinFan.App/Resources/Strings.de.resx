@@ -186,7 +186,7 @@
     <value>Suchen…</value>
   </data>
   <data name="MainWindow.HideHidden" xml:space="preserve">
-    <value>Versteckte aus</value>
+    <value>Auch hier ausblenden</value>
   </data>
   <data name="MainWindow.HideHiddenSensorsTooltip" xml:space="preserve">
     <value>Blendet ausgeblendete Sensoren auch aus dieser Liste aus (löscht sie nicht).</value>
@@ -923,6 +923,15 @@
   <data name="CurveEditRow.ShowAll" xml:space="preserve">
     <value>Alle {0} einblenden</value>
   </data>
+  <data name="CurveEditRow.PointsOne" xml:space="preserve">
+    <value>1 Punkt</value>
+  </data>
+  <data name="CurveEditRow.PointsMany" xml:space="preserve">
+    <value>{0} Punkte</value>
+  </data>
+  <data name="CurveEditRow.SourceCount" xml:space="preserve">
+    <value>{0} Sensoren</value>
+  </data>
   <data name="CurveEditRow.ShowLess" xml:space="preserve">
     <value>Weniger anzeigen</value>
   </data>
@@ -994,6 +1003,9 @@
   </data>
   <data name="Ipc.Fail.NotControllable" xml:space="preserve">
     <value>Nicht steuerbar (Root nötig).</value>
+  </data>
+  <data name="Ipc.Fail.Busy" xml:space="preserve">
+    <value>Eine andere Lüfter-Aktion läuft noch — bitte erneut versuchen.</value>
   </data>
   <data name="Ipc.Fail.NoTacho" xml:space="preserve">
     <value>Kein Tachosignal — Kalibrierung nicht möglich.</value>
@@ -1087,6 +1099,15 @@
   </data>
   <data name="Settings.AppearanceDesc" xml:space="preserve">
     <value>Farbschema wählen.</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>Hell</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>Dunkel</value>
   </data>
   <data name="Settings.LanguageDesc" xml:space="preserve">
     <value>Anzeigesprache wählen.</value>

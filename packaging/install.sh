@@ -38,10 +38,26 @@ dotnet publish -c Release "$REPO/src/LinFan.App"    -o "$BUILD/gui"
 echo "==> stop a possibly running service (safe upgrade path)"
 sudo systemctl stop "$UNIT" 2>/dev/null || true
 
+# Same hazard for the GUI: it memory-maps its assemblies from $PREFIX/gui, so replacing them under
+# a running instance makes it segfault mid-flight (apport dialog). Close it, relaunch after the
+# install. The pattern only matches processes running from $PREFIX — a dev GUI from a source tree
+# is left alone.
+GUI_MATCH="$PREFIX/[^ ]*LinFan\.App"
+GUI_WAS_RUNNING=
+if pgrep -f "$GUI_MATCH" >/dev/null; then
+  GUI_WAS_RUNNING=1
+  echo "==> close the running GUI (restarted after the install)"
+  pkill -f "$GUI_MATCH" || true
+  for _ in $(seq 1 25); do pgrep -f "$GUI_MATCH" >/dev/null || break; sleep 0.2; done
+  pgrep -f "$GUI_MATCH" >/dev/null && pkill -9 -f "$GUI_MATCH" || true
+fi
+
 echo "==> files to $PREFIX (sudo)"
 sudo install -d "$PREFIX" "$PREFIX/gui"
-sudo cp -rT "$BUILD/daemon" "$PREFIX"
-sudo cp -rT "$BUILD/gui"    "$PREFIX/gui"
+# --remove-destination unlinks each target before writing (dpkg-style): a plain cp truncates the
+# old inode in place and corrupts the mapped image of anything still running from it.
+sudo cp -rT --remove-destination "$BUILD/daemon" "$PREFIX"
+sudo cp -rT --remove-destination "$BUILD/gui"    "$PREFIX/gui"
 
 echo "==> GUI launcher $PREFIX/linfan-gui (pins $DOTNET)"
 sudo tee "$PREFIX/linfan-gui" >/dev/null <<EOF
@@ -55,6 +71,13 @@ sudo ln -sf "$PREFIX/linfan-gui" /usr/local/bin/linfan   # terminal command: jus
 echo "==> systemd unit + app-menu entry"
 sudo cp "$REPO/packaging/$UNIT"        /etc/systemd/system/
 sudo cp "$REPO/packaging/linfan.desktop" /usr/share/applications/
+# App icon for the launcher (Icon=linfan in the .desktop). Scalable, so every panel size is covered.
+sudo install -D -m0644 "$REPO/src/LinFan.App/Assets/linfan-icon.svg" \
+  /usr/share/icons/hicolor/scalable/apps/linfan.svg
+# Refresh the desktop caches, otherwise some environments keep showing the previous icon until re-login.
+# Best-effort: the tools are missing on minimal systems, and a stale cache is cosmetic.
+sudo gtk-update-icon-cache -qtf /usr/share/icons/hicolor 2>/dev/null || true
+sudo update-desktop-database /usr/share/applications 2>/dev/null || true
 sudo systemctl daemon-reload
 
 echo "==> configuration ($CONFIG_DIR)"
@@ -84,6 +107,15 @@ sudo systemctl enable "$UNIT"
 sudo systemctl restart "$UNIT"   # restart instead of --now: also loads the new build on upgrade
 sleep 1
 sudo systemctl --no-pager --full status "$UNIT" || true
+
+if [ -n "$GUI_WAS_RUNNING" ]; then
+  if [ "$(id -u)" -eq 0 ]; then
+    echo "NOTE: the GUI was closed for the upgrade — start it again via 'linfan' or the app menu."
+  else
+    echo "==> restart the GUI"
+    setsid "$PREFIX/linfan-gui" >/dev/null 2>&1 </dev/null &
+  fi
+fi
 
 cat <<EOF
 

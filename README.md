@@ -1,4 +1,4 @@
-# LinFan
+# <picture><source media="(prefers-color-scheme: dark)" srcset="src/LinFan.App/Assets/linfan-logo-horizontal-dark.svg"><img src="src/LinFan.App/Assets/linfan-logo-horizontal-dark.svg" alt="LinFan" height="56"></picture>
 
 Cross-platform fan control for **Linux, Windows, and macOS** — modern, minimal, open source.
 
@@ -8,6 +8,24 @@ LinFan reads temperature sensors and fans, calibrates them automatically on firs
 green, validated on real hardware (ThinkPad/AMD on Linux, NCT6797D on Windows). macOS support is best-effort and works on **Apple Silicon** (validated live on an M2 Pro): the IOKit/SMC backend reads temperatures and fan RPM without root and **controls fans** (SMC target-RPM, `F*Md`/`F*Tg`) when the daemon runs as root — read **and** control confirmed end-to-end via the GUI. See
 
 [Known issues](#known-issues) for the current gaps and the [CHANGELOG](CHANGELOG.md) for the release history.
+
+![LinFan dashboard: the active profile's curves with their live operating point, temperature history per sensor, and each fan's speed with a manual override slider](docs/images/overview.jpg)
+
+<details>
+<summary><b>More screenshots</b> — curve editor and settings</summary>
+
+<br>
+
+Curve editor: temperature → power as a draggable graph, with the source sensors, how they are mixed,
+interpolation mode, hysteresis, and which fans follow the curve.
+
+![Curve editor: a spline curve with five draggable points, the live operating point marked on it, the source sensor checkboxes with their current temperatures, and the list of fans assigned to this curve](docs/images/curves.jpg)
+
+Settings → Fans: per-fan PWM limits, calibration, identification, and the speed-sensor coupling.
+
+![Fan settings: one card per fan with its hardware path, live speed, position, PWM min/max sliders, and buttons for calibration, identification, and coupling a speed sensor](docs/images/settings.jpg)
+
+</details>
 
 ## Features
 
@@ -92,7 +110,7 @@ Layers, dependency rules, the IPC contract, and threading in detail: **[docs/ARC
 | Area              | Choice                                    |
 |-------------------|-------------------------------------------|
 | Language / runtime| C# / .NET 8 (LTS)                         |
-| GUI               | Avalonia UI 11 + FluentAvalonia           |
+| GUI               | Avalonia UI 12 (Fluent theme)             |
 | Controller        | CommunityToolkit.Mvvm                     |
 | Hardware Linux    | direct `sysfs`/`hwmon` access             |
 | Hardware Windows  | LibreHardwareMonitorLib (MPL-2.0)         |

@@ -39,6 +39,7 @@ internal sealed class TachMappingCoordinator
     private readonly Func<double>? _failSafeTempC;
     private readonly TimeSpan _cooldown;
     private readonly Func<DateTimeOffset> _now;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
     private readonly RunGate _run;
     private DateTimeOffset? _lastRunEndedAt; // Cooldown-Anker, unter der RunGate-Sperre geschützt
@@ -49,12 +50,14 @@ internal sealed class TachMappingCoordinator
     /// <param name="failSafeTempC">Liefert die aktuelle Temp-Obergrenze für den Watchdog; <c>null</c> ⇒ Vorgabe.</param>
     /// <param name="cooldown">Abklingzeit nach einem Lauf; <c>null</c> ⇒ <see cref="DefaultCooldown"/>.</param>
     /// <param name="now">Uhr (injizierbar für Tests); <c>null</c> ⇒ <see cref="DateTimeOffset.UtcNow"/>.</param>
+    /// <param name="delay">Wartefunktion für den Cooldown (injizierbar für Tests); <c>null</c> ⇒ <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
     public TachMappingCoordinator(
         ISensorBackend sensors, IFanController fans, ILogger log,
         Action<string> suspend, Action<string> resume, Action<string, string> onMatched,
         CancellationToken hostToken,
         Func<ISensorBackend, IFanController, TachometerMappingService>? mappingFactory = null,
-        Func<double>? failSafeTempC = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null)
+        Func<double>? failSafeTempC = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _sensors = sensors;
         _fans = fans;
@@ -67,6 +70,7 @@ internal sealed class TachMappingCoordinator
         _failSafeTempC = failSafeTempC;
         _cooldown = cooldown ?? DefaultCooldown;
         _now = now ?? (() => DateTimeOffset.UtcNow);
+        _delay = delay ?? Task.Delay;
     }
 
     /// <summary>Aktueller Kopplungs-Status (für den Snapshot); <c>null</c> = inaktiv/quittiert.</summary>
@@ -81,24 +85,40 @@ internal sealed class TachMappingCoordinator
         if (!controllable.Contains(target))
             return; // Ziel nicht steuerbar — der Aufrufer prüft das ebenfalls
 
-        if (!_run.TryBegin(out CancellationToken token, canStart: CooldownElapsed))
-            return; // läuft bereits ODER Cooldown noch aktiv
+        // The cooldown must NOT drop the request: the GUI cannot see a silent drop and waits out its 60 s
+        // timeout, writing the fan off as failed and skipping its calibration too. Wait out the remainder
+        // inside the run instead — read under the RunGate lock so it stays consistent with the run end
+        // (_lastRunEndedAt).
+        TimeSpan cooldownWait = TimeSpan.Zero;
+        if (!_run.TryBegin(out CancellationToken token, underLock: () => cooldownWait = RemainingCooldown()))
+        {
+            // Same reasoning: report a terminal status instead of staying silent, so the GUI fails fast
+            // rather than blocking on its timeout.
+            _status = Fail(target, TachMappingFailReason.Busy);
+            _log.LogWarning("Sensor-Kopplung abgelehnt: es läuft bereits eine ({Fan}).", target.Value);
+            return;
+        }
 
         _status = new IpcTachMapping(target.Value, TachMappingPhase.Running, Running: true);
-        _log.LogInformation("Sensor-Kopplung: {Fan} → antreiben, reagierenden Tacho suchen.", target.Value);
-        _run.Attach(RunAsync(target, controllable, token));
+        _log.LogInformation("Sensor-Kopplung: {Fan} → antreiben, reagierenden Tacho suchen{Wait}.", target.Value,
+            cooldownWait > TimeSpan.Zero ? $" (nach {cooldownWait.TotalSeconds:0.0}s Cooldown)" : "");
+        _run.Attach(RunAsync(target, controllable, cooldownWait, token));
     }
 
-    private bool CooldownElapsed()
+    /// <summary>
+    /// Cooldown left since the last run ended; <see cref="TimeSpan.Zero"/> once it has elapsed. Capped at the
+    /// cooldown itself: the wall clock is not monotonic, and a backwards step (NTP, suspend/resume) would
+    /// otherwise yield "cooldown + skew" and block calibration and identification through the RunGate too.
+    /// </summary>
+    private TimeSpan RemainingCooldown()
     {
-        if (_lastRunEndedAt is { } last && _now() - last < _cooldown)
-        {
-            _log.LogDebug("Sensor-Kopplung abgelehnt: Cooldown aktiv (noch {Remaining:0.0}s).",
-                (_cooldown - (_now() - last)).TotalSeconds);
-            return false;
-        }
-        return true;
+        if (_lastRunEndedAt is not { } last)
+            return TimeSpan.Zero;
+        TimeSpan elapsed = _now() - last;
+        return elapsed < _cooldown ? Min(_cooldown - elapsed, _cooldown) : TimeSpan.Zero;
     }
+
+    private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
 
     /// <summary>Bricht eine laufende Kopplung ab — oder quittiert (löscht) einen Abschluss-Status.</summary>
     public void Cancel() => _run.Cancel(whenIdle: () => _status = null);
@@ -106,21 +126,18 @@ internal sealed class TachMappingCoordinator
     /// <summary>Bricht ab und wartet auf das Ende (für den Daemon-Shutdown, vor dem finalen RestoreDefaults).</summary>
     public Task StopAsync() => _run.StopAsync();
 
-    private async Task RunAsync(FanId target, IReadOnlyList<FanId> fans, CancellationToken ct)
+    private async Task RunAsync(FanId target, IReadOnlyList<FanId> fans, TimeSpan cooldownWait, CancellationToken ct)
     {
-        foreach (FanId f in fans)
-            _suspend(f.Value); // alle steuerbaren Lüfter dem Tick-Loop entziehen, BEVOR der Service schreibt
-
         try
         {
-            var options = new TachMappingOptions
-            {
-                FailSafeTempC = _failSafeTempC?.Invoke() ?? CalibrationOptions.DefaultFailSafeTempC,
-            };
-            // Die suspendierte Menge als Drossel-Menge durchreichen → Drossel- und Suspend-Menge deckungsgleich.
-            TachMappingResult result = await _mappingFactory(_sensors, _fans)
-                .MapAsync(target, options, ct, fans)
-                .ConfigureAwait(false);
+            // Wait out the cooldown BEFORE throttling: no hardware has been touched yet and the control loop
+            // keeps regulating. Waiting after the suspend would stretch the window with reduced cooling
+            // (fail-safe). Deliberately OUTSIDE DriveAsync: everything that touches hardware sits behind an
+            // unconditional finally in there — out here there is nothing to restore yet.
+            if (cooldownWait > TimeSpan.Zero)
+                await _delay(cooldownWait, ct).ConfigureAwait(false);
+
+            TachMappingResult result = await DriveAsync(target, fans, ct).ConfigureAwait(false);
 
             switch (result.Outcome)
             {
@@ -134,8 +151,12 @@ internal sealed class TachMappingCoordinator
                 case TachMappingOutcome.NoResponse:
                     _status = new IpcTachMapping(target.Value, TachMappingPhase.NoResponse, Running: false,
                         RiseRpm: result.RiseRpm);
-                    _log.LogInformation("Sensor-Kopplung: {Fan} — kein reagierender Tacho (kein Drehzahlsignal).",
-                        target.Value);
+                    // Log the measured rises as well (like the ambiguous branch): without them there is no
+                    // telling whether the fan really has no tachometer or had merely not coasted down far
+                    // enough when measured (inert fan → baseline too high → rise ≈ 0).
+                    _log.LogInformation(
+                        "Sensor-Kopplung: {Fan} — kein reagierender Tacho (kein Drehzahlsignal); gemessen: {Rises}.",
+                        target.Value, DescribeContenders(result, top: 3));
                     break;
                 default: // Ambiguous (Matched ohne Sensor kann nicht auftreten)
                     _status = new IpcTachMapping(target.Value, TachMappingPhase.Ambiguous, Running: false,
@@ -174,18 +195,45 @@ internal sealed class TachMappingCoordinator
         }
         finally
         {
-            _fans.RestoreDefaults();          // sofort sicher: alle Lüfter auf Hardware-Auto (v. a. bei Übertemp)
-            foreach (FanId f in fans)
-                _resume(f.Value);             // an den Loop zurückgeben → Kurve/Manuell greift wieder
             _run.End(underLock: () => _lastRunEndedAt = _now()); // Cooldown-Fenster ab dem Lauf-Ende
         }
     }
 
-    /// <summary>Benennt die am stärksten reagierenden Sensoren (Top 2) für die „mehrdeutig"-Diagnose im Log.</summary>
-    private static string DescribeContenders(TachMappingResult result) =>
+    /// <summary>
+    /// Everything that touches hardware, behind an <b>unconditional</b> finally: throttle the other fans,
+    /// drive the target, then always hand every fan back to the loop on firmware auto — cancellation,
+    /// over-temperature and shutdown included. Kept separate from the cooldown wait on purpose, so the
+    /// restore can never end up behind a condition again.
+    /// </summary>
+    private async Task<TachMappingResult> DriveAsync(FanId target, IReadOnlyList<FanId> fans, CancellationToken ct)
+    {
+        foreach (FanId f in fans)
+            _suspend(f.Value); // take every controllable fan off the tick loop BEFORE the service writes
+
+        try
+        {
+            var options = new TachMappingOptions
+            {
+                FailSafeTempC = _failSafeTempC?.Invoke() ?? CalibrationOptions.DefaultFailSafeTempC,
+            };
+            // Pass the suspended set as the throttle set → throttled and suspended fans are the same set.
+            return await _mappingFactory(_sensors, _fans)
+                .MapAsync(target, options, ct, fans)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _fans.RestoreDefaults();   // immediately safe: every fan back on firmware auto (over-temp above all)
+            foreach (FanId f in fans)
+                _resume(f.Value);      // hand back to the loop → curve/manual control applies again
+        }
+    }
+
+    /// <summary>Names the strongest responding sensors for the log diagnosis (ambiguous / no signal).</summary>
+    private static string DescribeContenders(TachMappingResult result, int top = 2) =>
         result.Rises is { Count: > 0 } rises
-            ? string.Join(" ≈ ", rises.Take(2).Select(x => $"{x.Sensor.Value} +{x.Rise} RPM"))
-            : $"+{result.RiseRpm} RPM";
+            ? string.Join(" ≈ ", rises.Take(top).Select(x => $"{x.Sensor.Value} {x.Rise:+0;-0;0} RPM"))
+            : $"{result.RiseRpm:+0;-0;0} RPM";
 
     private static IpcTachMapping Fail(
         FanId target, TachMappingFailReason reason, double? overTempC = null, double? overLimitC = null) =>

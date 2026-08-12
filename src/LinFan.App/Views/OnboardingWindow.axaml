@@ -9,6 +9,7 @@
         x:Class="LinFan.App.Views.OnboardingWindow"
         x:DataType="c:OnboardingController"
         Title="{l:Tr Onboarding.WindowTitle}"
+        Icon="/Assets/icon.png"
         Width="560" Height="520"
         MinWidth="420" MinHeight="400"
         WindowStartupLocation="CenterOwner"
@@ -24,7 +25,11 @@
             <StackPanel Spacing="{StaticResource SpacingXl}"
                         IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                     ConverterParameter=Welcome}">
+                <!-- The mark only, not the wordmark: the title below already says "LinFan".
+                     Mark and title are centred; the body text stays left-aligned for readability. -->
+                <ctrl:BrandMark Height="56" HorizontalAlignment="Center" />
                 <TextBlock Text="{l:Tr Onboarding.WelcomeTitle}" FontSize="22" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" TextAlignment="Center"
                            Foreground="{DynamicResource TextPrimary}" />
                 <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="13"
                            Text="{l:Tr Onboarding.WelcomeIntro}" />
@@ -32,75 +37,79 @@
                            Text="{l:Tr Onboarding.WelcomeSkipHint}" />
             </StackPanel>
 
-            <!-- Schritt 1: Kalibrierung -->
-            <StackPanel Spacing="{StaticResource SpacingXl}"
-                        IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
-                                    ConverterParameter=Calibration}">
-                <TextBlock Text="{l:Tr Onboarding.CalibrationTitle}" FontSize="18" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextPrimary}" />
-                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="12"
-                           Text="{l:Tr Onboarding.CalibrationIntro}" />
+            <!-- Step 1: calibration. In a ScrollViewer like the devices/profile steps: the window is fixed
+                 (CanResize=False), and as soon as the progress card grows a headline plus a bar, the content
+                 outgrows its row — without a scroll area it would push over the footer. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
+                                      ConverterParameter=Calibration}">
+                <StackPanel Spacing="{StaticResource SpacingXl}">
+                    <TextBlock Text="{l:Tr Onboarding.CalibrationTitle}" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="12"
+                               Text="{l:Tr Onboarding.CalibrationIntro}" />
 
-                <!-- Lüfter-Liste -->
-                <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
-                    <StackPanel Spacing="{StaticResource SpacingXs}">
-                        <TextBlock Text="{l:Tr Onboarding.ControllableFansLabel}" Foreground="{DynamicResource TextFaint}" FontSize="11"
-                                   Margin="0,0,0,4" />
-                        <ItemsControl ItemsSource="{Binding ControllableFans}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="c:OnboardingFanRow">
-                                    <Grid ColumnDefinitions="16,*,Auto" Margin="0,2" ColumnSpacing="{StaticResource SpacingSm}">
-                                        <!-- Pro-Lüfter-Status: koppeln (Wind) bzw. kalibrieren (Fan) läuft, Häkchen fertig,
-                                             Alert für kein-Tacho (gedämpft) / uneindeutig (Warnung) / Fehler. Feste Spaltenbreite → kein Springen. -->
-                                        <Panel Grid.Column="0" VerticalAlignment="Center">
-                                            <PathIcon Data="{StaticResource IconWind}" Width="13" Height="13" Foreground="{DynamicResource Accent}"
-                                                      IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Coupling}" />
-                                            <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13" Foreground="{DynamicResource Accent}"
-                                                      IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Running}" />
-                                            <PathIcon Data="{StaticResource IconCheckCircle}" Width="13" Height="13" Foreground="{DynamicResource Success}"
-                                                      IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Done}" />
-                                            <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource TextFaint}"
-                                                      IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=NoTacho}" />
-                                            <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource WarningText}"
-                                                      IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Ambiguous}" />
-                                            <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource DangerAccent}"
-                                                      IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Failed}" />
-                                        </Panel>
-                                        <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
-                                                   FontSize="12" VerticalAlignment="Center" />
-                                        <!-- Pro-Lüfter-Ergebnis (koppeln…/kalibrieren…/kein Tacho/nicht eindeutig/fertig) — bleibt nach der Sequenz stehen. -->
-                                        <TextBlock Grid.Column="2" Text="{Binding CalibrationStateText}" Foreground="{DynamicResource TextFaint}"
-                                                   FontSize="11" VerticalAlignment="Center" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Text="{l:Tr Onboarding.NoControllableFans}"
-                                   IsVisible="{Binding !HasControllableFans}"
-                                   Foreground="{DynamicResource TextFaintest}" FontSize="12" />
+                    <!-- Lüfter-Liste -->
+                    <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                        <StackPanel Spacing="{StaticResource SpacingXs}">
+                            <TextBlock Text="{l:Tr Onboarding.ControllableFansLabel}" Foreground="{DynamicResource TextFaint}" FontSize="11"
+                                       Margin="0,0,0,4" />
+                            <ItemsControl ItemsSource="{Binding ControllableFans}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="c:OnboardingFanRow">
+                                        <Grid ColumnDefinitions="16,*,Auto" Margin="0,2" ColumnSpacing="{StaticResource SpacingSm}">
+                                            <!-- Pro-Lüfter-Status: koppeln (Wind) bzw. kalibrieren (Fan) läuft, Häkchen fertig,
+                                                 Alert für kein-Tacho (gedämpft) / uneindeutig (Warnung) / Fehler. Feste Spaltenbreite → kein Springen. -->
+                                            <Panel Grid.Column="0" VerticalAlignment="Center">
+                                                <PathIcon Data="{StaticResource IconWind}" Width="13" Height="13" Foreground="{DynamicResource Accent}"
+                                                          IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Coupling}" />
+                                                <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13" Foreground="{DynamicResource Accent}"
+                                                          IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Running}" />
+                                                <PathIcon Data="{StaticResource IconCheckCircle}" Width="13" Height="13" Foreground="{DynamicResource Success}"
+                                                          IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Done}" />
+                                                <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource TextFaint}"
+                                                          IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=NoTacho}" />
+                                                <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource WarningText}"
+                                                          IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Ambiguous}" />
+                                                <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource DangerAccent}"
+                                                          IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Failed}" />
+                                            </Panel>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
+                                                       FontSize="12" VerticalAlignment="Center" />
+                                            <!-- Pro-Lüfter-Ergebnis (koppeln…/kalibrieren…/kein Tacho/nicht eindeutig/fertig) — bleibt nach der Sequenz stehen. -->
+                                            <TextBlock Grid.Column="2" Text="{Binding CalibrationStateText}" Foreground="{DynamicResource TextFaint}"
+                                                       FontSize="11" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{l:Tr Onboarding.NoControllableFans}"
+                                       IsVisible="{Binding !HasControllableFans}"
+                                       Foreground="{DynamicResource TextFaintest}" FontSize="12" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Fortschritts-/Status-Anzeige. Sichtbar, sobald eine Meldung vorliegt: während der Sequenz zeigt
+                         CalibrationProgress den Live-Detailtext (immer gesetzt), danach das Ergebnis. Kopfzeile + Balken
+                         nur während der laufenden Kalibrierung. -->
+                    <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource InfoBg}" Padding="12"
+                            IsVisible="{Binding CalibrationProgress, Converter={x:Static acv:StringConverters.IsNotNullOrEmpty}}">
+                        <ctrl:CalibrationCard Headline="{Binding CalibrationHeadline}"
+                                              Detail="{Binding CalibrationProgress}"
+                                              Progress="{Binding CalibrationOverallProgress}"
+                                              ShowProgress="{Binding IsCalibrating}" />
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                        <Button Content="{l:Tr Onboarding.CalibrateButton}"
+                                Command="{Binding CalibrateAllCommand}"
+                                IsEnabled="{Binding !IsCalibrating}" />
+                        <Button Content="{l:Tr Onboarding.SkipCalibration}"
+                                Command="{Binding SkipCalibrationCommand}"
+                                IsEnabled="{Binding !IsCalibrating}" />
                     </StackPanel>
-                </Border>
-
-                <!-- Fortschritts-/Status-Anzeige. Sichtbar, sobald eine Meldung vorliegt: während der Sequenz zeigt
-                     CalibrationProgress den Live-Detailtext (immer gesetzt), danach das Ergebnis. Kopfzeile + Balken
-                     nur während der laufenden Kalibrierung. -->
-                <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource InfoBg}" Padding="12"
-                        IsVisible="{Binding CalibrationProgress, Converter={x:Static acv:StringConverters.IsNotNullOrEmpty}}">
-                    <ctrl:CalibrationCard Headline="{Binding CalibrationHeadline}"
-                                          Detail="{Binding CalibrationProgress}"
-                                          Progress="{Binding CalibrationOverallProgress}"
-                                          ShowProgress="{Binding IsCalibrating}" />
-                </Border>
-
-                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
-                    <Button Content="{l:Tr Onboarding.CalibrateButton}"
-                            Command="{Binding CalibrateAllCommand}"
-                            IsEnabled="{Binding !IsCalibrating}" />
-                    <Button Content="{l:Tr Onboarding.SkipCalibration}"
-                            Command="{Binding SkipCalibrationCommand}"
-                            IsEnabled="{Binding !IsCalibrating}" />
                 </StackPanel>
-            </StackPanel>
+            </ScrollViewer>
 
             <!-- Schritt 2: Geräte (Positionen + Sensor-Sichtbarkeit) -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"

@@ -14,10 +14,11 @@ namespace LinFan.App.Services;
 /// re-trigger it, so the DWM attribute is set directly.
 /// </para>
 /// <para>
-/// This is the one piece of platform code outside <c>LinFan.Hardware.*</c>: the rule there is about
-/// hardware access behind <c>ISensorBackend</c>/<c>IFanController</c>, while this is pure window
-/// decoration with no domain meaning. Guarded at runtime instead of by <c>#if</c>, so the same binary
-/// stays correct on Linux/macOS, where it simply does nothing.
+/// One of the few pieces of platform code outside <c>LinFan.Hardware.*</c> (see also
+/// <see cref="SingleInstanceGuard"/>): the rule there is about hardware access behind
+/// <c>ISensorBackend</c>/<c>IFanController</c>, while this is pure window decoration with no domain
+/// meaning. Guarded at runtime instead of by <c>#if</c>, so the same binary stays correct on
+/// Linux/macOS, where it simply does nothing.
 /// </para>
 /// </summary>
 public static class WindowFrameTheme

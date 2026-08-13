@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using LinFan.App.Controllers;
 using LinFan.App.Localization;
 using LinFan.App.Services;
@@ -63,6 +64,10 @@ public partial class App : Application
                     window.WindowState = WindowState.Minimized;
                 }
             }
+
+            // Further launches (desktop icon, start menu, autostart) do not start a second GUI — they
+            // reach this instance instead, which shows itself, including back out of the tray.
+            Program.Instance?.ListenForActivation(() => Dispatcher.UIThread.Post(() => ShowWindow(window)));
 
             // Einmaliger, additiver Update-Check (GitHub-Release) — nach dem Fenster-Setup, best-effort/still.
             controller.BeginUpdateCheck();

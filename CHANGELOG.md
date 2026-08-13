@@ -6,6 +6,20 @@ the git tag `vX.Y.Z` is the source of truth.
 
 Open items are tracked as GitHub issues.
 
+## [0.3.1] - 2026-08-13
+
+One window again — no matter how often you start LinFan.
+
+### Fixed
+
+- **LinFan opens only once.** Every launch used to start a GUI of its own: several windows on the same
+  daemon, each with its own tray icon, each saving settings and window geometry independently. A further
+  launch — desktop icon, start menu, autostart — now hands over to the instance that is already running
+  and brings its window to the front, out of the tray as well, instead of adding another one.
+- **Repository only:** line endings are now fixed to LF on every platform. A Windows checkout used to
+  hand out CRLF while the project's own formatter writes LF, so running it left Git reporting hundreds
+  of changed files that did not differ by a single byte. Nothing about the application changes.
+
 ## [0.3.0] - 2026-08-12
 
 LinFan gets its own look — and the setup assistant no longer loses fans along the way.

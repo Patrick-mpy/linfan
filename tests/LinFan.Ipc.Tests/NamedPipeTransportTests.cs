@@ -4,6 +4,7 @@ using LinFan.Ipc;
 using LinFan.Ipc.Messages;
 using LinFan.Ipc.Transport;
 using Xunit;
+using Xunit.Sdk;
 
 namespace LinFan.Ipc.Tests;
 
@@ -16,6 +17,12 @@ namespace LinFan.Ipc.Tests;
 /// </summary>
 public class NamedPipeTransportTests
 {
+    // Upper bound per test, not a performance statement: it is only there so a hung connect fails the
+    // run instead of hanging it. Generous on purpose — `dotnet test` runs the test projects of the
+    // solution in parallel, and under that load connect/accept plus the first snapshot occasionally
+    // needed more than the 15 s this used to allow, which failed the run without anything being wrong.
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
+
     private static string PipeName() => $"linfan-test-{Guid.NewGuid():N}";
 
     [Fact]
@@ -23,7 +30,7 @@ public class NamedPipeTransportTests
     {
         string name = PipeName();
         await using var server = new IpcServer(name, new NamedPipeServerTransport());
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(Timeout);
         await server.StartAsync(cts.Token);
 
         await using var client = new IpcClient(name, new NamedPipeClientTransport());
@@ -68,14 +75,14 @@ public class NamedPipeTransportTests
         var received = new TaskCompletionSource<IpcCommand>(TaskCreationOptions.RunContinuationsAsynchronously);
         server.CommandHandler = cmd => received.TrySetResult(cmd);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(Timeout);
         await server.StartAsync(cts.Token);
 
         await using var client = new IpcClient(name, new NamedPipeClientTransport());
         await client.ConnectAsync(cts.Token);
         await client.SendCommandAsync(new IpcCommand(IpcCommand.SetManualPwm, Target: "fan1", Value: 200), cts.Token);
 
-        IpcCommand command = await received.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        IpcCommand command = await received.Task.WaitAsync(Timeout);
         Assert.Equal("setManualPwm", command.Command);
         Assert.Equal("fan1", command.Target);
         Assert.Equal(200, command.Value);
@@ -93,7 +100,9 @@ public class NamedPipeTransportTests
     {
         string name = PipeName();
         await using var server = new IpcServer(name, new NamedPipeServerTransport());
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        int accepted = 0;
+        server.ClientsChanged += n => accepted = n;
+        using var cts = new CancellationTokenSource(Timeout);
         await server.StartAsync(cts.Token);
 
         // Zwei Clients gleichzeitig — pro Verbindung erzeugt der Transport eine eigene Pipe-Instanz.
@@ -117,11 +126,26 @@ public class NamedPipeTransportTests
 
         try
         {
+            int index = 0;
             foreach (IpcClient c in new[] { c1, c2 })
             {
+                index++;
                 await using IAsyncEnumerator<IpcSnapshot> e =
                     c.ReadSnapshotsAsync(cts.Token).GetAsyncEnumerator(cts.Token);
-                Assert.True(await e.MoveNextAsync());
+                try
+                {
+                    Assert.True(await e.MoveNextAsync());
+                }
+                catch (OperationCanceledException)
+                {
+                    // This test has been seen to hang exactly here when the whole solution's test
+                    // projects run in parallel (never when this project runs alone). A bare cancellation
+                    // says nothing about the cause, so name the client and how many connections the
+                    // server had actually accepted: that separates "the server never took the second
+                    // connection" from "it did, but the broadcast never reached it".
+                    throw new XunitException(
+                        $"Client {index} bekam keinen Snapshot; der Server hatte {accepted} Verbindung(en) angenommen.");
+                }
                 Assert.Equal(DaemonStatus.Active, e.Current.Status);
             }
         }

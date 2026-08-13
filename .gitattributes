@@ -1,5 +1,11 @@
+# LF in the working directory on every platform, matching .editorconfig (end_of_line = lf).
+# Without this a Windows checkout (core.autocrlf) writes CRLF, `dotnet format` writes the same files
+# back as LF, and Git then reports hundreds of "modified" files that do not differ in content at all.
+# text=auto keeps the detection: binaries (icons, screenshots) stay untouched.
+*               text=auto eol=lf
+
 # Shell scripts and Linux packaging assets run on Linux targets — force LF so a Windows checkout
-# (autocrlf) can never ship CRLF into a .deb/.run or break a shebang.
+# can never ship CRLF into a .deb/.run or break a shebang.
 *.sh            text eol=lf
 *.service       text eol=lf
 *.desktop       text eol=lf

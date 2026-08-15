@@ -5,7 +5,7 @@ using Avalonia;
 namespace LinFan.App.Services;
 
 /// <summary>
-/// Reine Geometrie-Helfer für das Wiederherstellen der Fensterposition — ohne Fenster/Avalonia-Laufzeit
+/// Reine Geometrie-Helfer für das Wiederherstellen der Fensterposition - ohne Fenster/Avalonia-Laufzeit
 /// testbar (<see cref="PixelRect"/> ist ein Werttyp). Verhindert, dass ein Fenster off-screen startet,
 /// wenn der gespeicherte Monitor weg ist (Notebook abgesteckt, Auflösung geändert).
 /// </summary>

@@ -66,7 +66,7 @@ public sealed class FanAssignRowTests
     [InlineData("\t")]
     public void ToConfig_EmptyName_FallsBackToPreviousDisplayName(string emptied)
     {
-        // baseFan.Name = "Test Fan" — der zuletzt geladene Anzeigename bleibt erhalten.
+        // baseFan.Name = "Test Fan" - der zuletzt geladene Anzeigename bleibt erhalten.
         var row = MakeRow();
         row.Name = emptied;
 
@@ -74,7 +74,7 @@ public sealed class FanAssignRowTests
     }
 
     /// <summary>
-    /// Empty means "no own name" — then the hardware label applies everywhere. This used to yield the FanId,
+    /// Empty means "no own name" - then the hardware label applies everywhere. This used to yield the FanId,
     /// which turned the raw hardware path ("/lpc/nct6797d/0/control/1") into the display name.
     /// </summary>
     [Fact]
@@ -157,7 +157,7 @@ public sealed class FanAssignRowTests
         row.MinPwm = 150; // > Max=100
 
         Assert.Equal(150, row.MaxPwm);
-        Assert.Contains("59 %", row.PwmAdjustHint); // 150/255 ≈ 59 % — der Hinweis spricht Prozent
+        Assert.Contains("59 %", row.PwmAdjustHint); // 150/255 ≈ 59 % - der Hinweis spricht Prozent
         Assert.Contains("angehoben", row.PwmAdjustHint);
     }
 
@@ -226,7 +226,7 @@ public sealed class FanAssignRowTests
     [Fact]
     public void UntouchedMinPwm_StaysExact_OnSave_EvenIfPercentRounds()
     {
-        // 100/255 ≈ 39 % — angezeigt wird 39 %, gespeichert bleibt aber exakt 100 (kein stiller Drift).
+        // 100/255 ≈ 39 % - angezeigt wird 39 %, gespeichert bleibt aber exakt 100 (kein stiller Drift).
         var row = MakeRow(minPwm: 100, maxPwm: 255);
 
         Assert.Equal(39, row.MinPercent);
@@ -440,7 +440,7 @@ public sealed class FanAssignRowTests
         row.ApplyCalibration(DoneStatus());
         Assert.Contains("96", row.CalibrationProgress);
 
-        // Zwischendurch Snapshots ohne Kalibrierung für diesen Lüfter — die finale Meldung bleibt.
+        // Zwischendurch Snapshots ohne Kalibrierung für diesen Lüfter - die finale Meldung bleibt.
         row.ApplyCalibration(null);
         Assert.Contains("96", row.CalibrationProgress);
         row.ApplyCalibration(Running("other/pwm2"));
@@ -553,7 +553,7 @@ public sealed class FanAssignRowTests
         Assert.False(row.IsIdentifying);
         Assert.Contains("Übertemperatur", row.IdentifyProgress);
 
-        // Zwischendurch fremde/leere Snapshots — die Abbruch-Meldung bleibt bis zum Ablauf.
+        // Zwischendurch fremde/leere Snapshots - die Abbruch-Meldung bleibt bis zum Ablauf.
         row.ApplyIdentify(null);
         Assert.Contains("Übertemperatur", row.IdentifyProgress);
 
@@ -655,7 +655,7 @@ public sealed class FanAssignRowTests
 
     private static ObservableCollection<TachSensorOption> TachOptions() => new()
     {
-        new TachSensorOption(null, "— (keiner) —"),
+        new TachSensorOption(null, "- (keiner) -"),
         new TachSensorOption("hwmon7/fan1", "Fan 1"),
         new TachSensorOption("hwmon7/fan2", "Fan 2"),
     };
@@ -796,7 +796,7 @@ public sealed class FanAssignRowTests
         row.ApplyTachMapping(new TachMappingStatus("hwmon7/pwm1", TachMappingPhase.NoResponse, Running: false));
         Assert.Contains("Drehzahlsignal", row.TachMappingProgress); // sofort sichtbar (gehalten)
 
-        // Zwischendurch fremde/leere Snapshots — die Ergebnis-Meldung bleibt bis zum Ablauf.
+        // Zwischendurch fremde/leere Snapshots - die Ergebnis-Meldung bleibt bis zum Ablauf.
         row.ApplyTachMapping(null);
         Assert.Contains("Drehzahlsignal", row.TachMappingProgress);
 
@@ -863,7 +863,7 @@ public sealed class FanAssignRowTests
         ObservableCollection<TachSensorOption> tachs = TachOptions();
         FanAssignRow row = TachRow(canControl: true, tachs: tachs); // rpmSource null
 
-        Assert.Same(tachs[0], row.SelectedTach); // „— (keiner) —"
+        Assert.Same(tachs[0], row.SelectedTach); // „- (keiner) -"
     }
 
     [Fact]
@@ -887,7 +887,7 @@ public sealed class FanAssignRowTests
         // Mit vorhandener Zuordnung starten, damit der Wechsel auf „keiner" eine echte Änderung ist.
         FanAssignRow row = TachRow(canControl: true, sets: sets, tachs: tachs, rpmSource: "hwmon7/fan1");
 
-        row.SelectedTach = tachs[0]; // „— (keiner) —" → null
+        row.SelectedTach = tachs[0]; // „- (keiner) -" → null
 
         Assert.Single(sets);
         Assert.Equal(("hwmon7/pwm1", (string?)null), sets[0]);

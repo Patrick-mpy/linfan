@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using LinFan.App.Controllers;
 using LinFan.App.Services;
 using LinFan.Core.Models;
+using LinFan.Core.Services;
 using LinFan.Ipc.Messages;
 using Xunit;
 
@@ -159,7 +160,7 @@ public sealed class CurveEditorControllerTests
         Assert.Equal(("c1", false), Assert.Single(toggles)); // Live-Command gesendet …
         Assert.False(ctrl.HasUnsavedChanges);                // … aber kein „Nicht gespeichert"-Banner
 
-        // „Verwerfen" stellt aus der Baseline wieder her — der live persistierte Toggle bleibt erhalten.
+        // „Verwerfen" stellt aus der Baseline wieder her - der live persistierte Toggle bleibt erhalten.
         ctrl.RevertCommand.Execute(null);
         Assert.False(Assert.Single(ctrl.Curves).Enabled);
     }
@@ -231,7 +232,7 @@ public sealed class CurveEditorControllerTests
 
         CurveEditRow curve = Assert.Single(ctrl.Curves);
         // The hidden source stays offered and checked (mirror of the fan list): hidden is display-only,
-        // so an active source must remain visible/removable — never silently dropped on save.
+        // so an active source must remain visible/removable - never silently dropped on save.
         SensorCheck hidden = curve.SensorChecks.Single(c => c.Sensor.Id == "hwmon6/temp1");
         Assert.True(hidden.Selected);
         Assert.Contains(curve.SensorChecks, c => c.Sensor.Id == "hwmon7/temp1");
@@ -272,17 +273,27 @@ public sealed class CurveEditorControllerTests
         ctrl.Initialize(Snapshot(config));
 
         Assert.Equal("p-silent", ctrl.SelectedProfile!.Id);
+        Assert.Equal("p-silent", ctrl.ActiveProfile!.Id);
         Assert.Equal("quiet", Assert.Single(ctrl.Fans).Selected!.Id);
 
-        ctrl.SelectedProfile = ctrl.Profiles.First(p => p.Id == "p-perf"); // umschalten
-        Assert.Equal("loud", Assert.Single(ctrl.Fans).Selected!.Id);       // Zuordnung übernommen
-        Assert.Contains("p-perf", activated);                              // live aktiviert
+        ctrl.SelectedProfile = ctrl.Profiles.First(p => p.Id == "p-perf"); // nur ansehen/bearbeiten
+        Assert.Equal("loud", Assert.Single(ctrl.Fans).Selected!.Id);       // Zuordnungen des Profils geladen
+        Assert.Empty(activated);                                           // aber NICHT live umgeschaltet
+        Assert.Equal("p-silent", ctrl.ActiveProfile!.Id);
+
+        // Übernehmen, dann ausdrücklich aktivieren - der Schalter ist gesperrt, solange etwas offen ist.
+        await ctrl.SaveCommand.ExecuteAsync(null);
+        Assert.Equal("p-silent", sink.Saved[^1].ActiveProfileId);          // gespeichert wird das laufende Profil
+        Assert.Equal(2, sink.Saved[^1].Profiles.Count);
+
+        Assert.True(ctrl.CanActivateSelectedProfile);
+        ctrl.SelectedProfileActive = true;
+        Assert.Equal("p-perf", Assert.Single(activated));
+        // Den Wechsel persistiert der Daemon selbst - er darf den „Nicht gespeichert"-Hinweis nicht zünden.
+        Assert.False(ctrl.HasUnsavedChanges);
 
         await ctrl.SaveCommand.ExecuteAsync(null);
-
-        AppConfig sent = Assert.Single(sink.Saved);
-        Assert.Equal("p-perf", sent.ActiveProfileId);
-        Assert.Equal(2, sent.Profiles.Count);
+        Assert.Equal("p-perf", sink.Saved[^1].ActiveProfileId);
     }
 
     [Fact]
@@ -479,7 +490,7 @@ public sealed class CurveEditorControllerTests
 
         ctrl.Curves[0].Name = "Geändert";   // Editor-Änderung
 
-        Assert.True(ctrl.HasUnsavedChanges); // sofort dirty — ohne auf den nächsten Tick zu warten
+        Assert.True(ctrl.HasUnsavedChanges); // sofort dirty - ohne auf den nächsten Tick zu warten
     }
 
     [Fact]
@@ -496,7 +507,7 @@ public sealed class CurveEditorControllerTests
     }
 
     // Regression zum Dirty-Funnel: Live-Werte UND Kalibrier-/Identify-Status sind reine Anzeige und stehen
-    // bewusst NICHT in der Whitelist der On*RowChanged-/ConfigChanged-Handler — ein Tick darf den Editor NIE
+    // bewusst NICHT in der Whitelist der On*RowChanged-/ConfigChanged-Handler - ein Tick darf den Editor NIE
     // als „ungespeichert" markieren (sonst kehrte die Pro-Tick-Serialisierung zurück).
     [Fact]
     public void UpdateLive_WithChangedLiveValuesAndStatus_DoesNotMarkDirty()
@@ -507,7 +518,7 @@ public sealed class CurveEditorControllerTests
         Assert.False(ctrl.HasUnsavedChanges);
 
         // Ein Tick mit ABWEICHENDEN Live-Werten (andere Temperaturen + Drehzahl) plus laufendem Kalibrier-
-        // und Identify-Status — gleiche Config.
+        // und Identify-Status - gleiche Config.
         var live = new MonitorSnapshot(
             "test",
             new[]
@@ -546,7 +557,7 @@ public sealed class CurveEditorControllerTests
     }
 
     // ---------------------------------------------------------------------------
-    // Dirty-Erkennung je Edit-Pfad — edit-getrieben (nicht pro Tick): sofort dirty, OHNE UpdateLive.
+    // Dirty-Erkennung je Edit-Pfad - edit-getrieben (nicht pro Tick): sofort dirty, OHNE UpdateLive.
     // Ein vergessener Pfad ⇒ HasUnsavedChanges bliebe falsch (das Risiko dieses Umbaus).
     // ---------------------------------------------------------------------------
 
@@ -634,7 +645,7 @@ public sealed class CurveEditorControllerTests
     // Coalescing des Dirty-Vergleichs (Review-Effizienz): Ein Punkt-Drag darf nicht pro Maus-Sample die ganze
     // Config serialisieren. Aus dem sauberen Zustand greift dirty weiterhin sofort (oben getestet); im bereits
     // dirty-Zustand wird die einzige Rück-Transition (Edit exakt zurück auf die Baseline) erst am nächsten
-    // Live-Tick nachgezogen — Bedeutung/Speicherzeitpunkt bleiben gleich, nur der Vergleich läuft nicht je Sample.
+    // Live-Tick nachgezogen - Bedeutung/Speicherzeitpunkt bleiben gleich, nur der Vergleich läuft nicht je Sample.
     [Fact]
     public void PointDragBackToBaseline_StaysDirtyUntilTickReconciles()
     {
@@ -781,19 +792,21 @@ public sealed class CurveEditorControllerTests
     }
 
     [Fact]
-    public async Task Edit_SwitchActiveProfile_MarksDirty()
+    public async Task Edit_InNonActiveProfile_KeepsTheRunningCurvesUntouched()
     {
         var sink = new SaveSink();
         var ctrl = new CurveEditorController(sink.SaveAsync);
         ctrl.Initialize(Snapshot(CurveAndFanConfig()));
-        ProfileRow first = ctrl.SelectedProfile!;
-        ctrl.AddProfileCommand.Execute(null);      // zweites Profil (aktiv) → Editor dirty
-        await ctrl.SaveCommand.ExecuteAsync(null);  // Baseline = zwei Profile, das zweite aktiv
-        Assert.False(ctrl.HasUnsavedChanges);
+        ctrl.AddProfileCommand.Execute(null);       // zweites Profil, ausgewählt aber nicht aktiv
+        ctrl.Curves.Single().Name = "Nur im Entwurf";
 
-        ctrl.SelectedProfile = first;               // zurück auf das erste → ActiveProfileId ändert sich
+        await ctrl.SaveCommand.ExecuteAsync(null);
 
-        Assert.True(ctrl.HasUnsavedChanges);
+        AppConfig sent = Assert.Single(sink.Saved);
+        Assert.Equal("p1", sent.ActiveProfileId);                       // das laufende Profil bleibt
+        Assert.Equal("Quiet", Assert.Single(sent.Curves).Name);         // und regelt weiter mit seiner Kurve
+        Profile draft = sent.Profiles.Single(p => p.Id != "p1");
+        Assert.Equal("Nur im Entwurf", Assert.Single(draft.Curves).Name); // die Bearbeitung landet im Entwurf
     }
 
     // ---------------------------------------------------------------------------
@@ -867,6 +880,28 @@ public sealed class CurveEditorControllerTests
         Assert.Empty(ctrl.Curves);            // gelöscht
         Assert.Empty(sink.Saved);             // aber NICHT auto-gespeichert (fremde Änderung läge sonst mit drin)
         Assert.True(ctrl.HasUnsavedChanges);  // bleibt offen
+    }
+
+    /// <summary>
+    /// Der Sperr-Hinweis nennt nur den Grund, den der Schalter nicht selbst zeigt: offene Änderungen.
+    /// Beim laufenden Profil ist er gesperrt, WEIL es aktiv ist - dort bliebe der Hinweis irreführend.
+    /// </summary>
+    [Fact]
+    public void ShowActivationBlockedHint_OnlyForAnotherProfile_WhileDirty()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(Snapshot(TwoProfileConfig()));
+
+        Assert.False(ctrl.HasUnsavedChanges);
+        Assert.False(ctrl.ShowActivationBlockedHint);
+
+        ctrl.Fans.Single().Name = "geändert"; // dirty, aber das gezeigte Profil ist das laufende
+        Assert.True(ctrl.HasUnsavedChanges);
+        Assert.False(ctrl.ShowActivationBlockedHint);
+
+        ctrl.SelectedProfile = ctrl.Profiles.Single(p => p.Id == "p2"); // gezeigt ≠ laufend → Grund anzeigen
+        Assert.False(ctrl.CanActivateSelectedProfile);
+        Assert.True(ctrl.ShowActivationBlockedHint);
     }
 
     [Fact]
@@ -967,7 +1002,7 @@ public sealed class CurveEditorControllerTests
     }
 
     // ---------------------------------------------------------------------------
-    // Kalibrier-Ergebnis (MinPwm) aus dem Geräte-Tab — der Daemon ändert die Config hier ohne
+    // Kalibrier-Ergebnis (MinPwm) aus dem Geräte-Tab - der Daemon ändert die Config hier ohne
     // Zutun des Editors. Regression: die einmalig befüllte Zeile blieb auf dem alten Anlaufpunkt
     // und das nächste Speichern schrieb das Ergebnis wieder weg.
     // ---------------------------------------------------------------------------
@@ -993,7 +1028,7 @@ public sealed class CurveEditorControllerTests
         Assert.Equal(96, Assert.Single(sink.Saved).Fans.Single(f => f.FanId == "hwmon7/pwm1").MinPwm);
     }
 
-    // „Verwerfen" darf das übernommene Kalibrier-Ergebnis nicht auf den Vor-Kalibrier-Wert zurückdrehen —
+    // „Verwerfen" darf das übernommene Kalibrier-Ergebnis nicht auf den Vor-Kalibrier-Wert zurückdrehen -
     // die Baseline muss mitgezogen worden sein.
     [Fact]
     public void Revert_AfterCalibration_KeepsCalibratedMinPwm()
@@ -1140,6 +1175,81 @@ public sealed class CurveEditorControllerTests
         Assert.Empty(ctrl.AirflowSuggestions);
     }
 
+    // ---------------------------------------------------------------------------
+    // Airflow-Ergebnis („schon durchgeführt")
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Bereits getunter Stand, wie ihn Onboarding oder ein früheres „Übernehmen" hinterlässt.</summary>
+    private static MonitorSnapshot TunedAirflowSnapshot()
+    {
+        MonitorSnapshot fresh = AirflowSnapshot();
+        return fresh with { Config = AirflowTuneService.Apply(fresh.Config, AirflowTuneService.Analyze(fresh.Config)) };
+    }
+
+    [Fact]
+    public void AirflowStatus_WithoutTuning_StaysEmpty()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(AirflowSnapshot());
+
+        Assert.False(ctrl.HasAirflowStatus);
+        Assert.Empty(ctrl.AirflowStatus);
+        Assert.Equal("", ctrl.AirflowStatusPressureText);
+    }
+
+    // Der Kernfall: eine gespeicherte, bereits getunte Config zeigt das Ergebnis ohne neue Analyse.
+    [Fact]
+    public void AirflowStatus_FromStoredConfig_ListsFansAndPressure()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(TunedAirflowSnapshot());
+
+        Assert.True(ctrl.HasAirflowStatus);
+        Assert.Equal(3, ctrl.AirflowStatus.Count);
+        Assert.Contains("ausgeglichen", ctrl.AirflowStatusPressureText); // 1 Einlass : 1 Auslass
+        AirflowStatusRow cpu = ctrl.AirflowStatus.First(r => r.Fan.FanId == "cpu");
+        Assert.Equal("airflow-cpu", cpu.Curve.Id);
+        Assert.Equal("CPU", cpu.Fan.DisplayName);
+    }
+
+    [Fact]
+    public void AirflowStatus_AfterApply_FollowsTheEditor()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(AirflowSnapshot());
+
+        ctrl.AnalyzeAirflowCommand.Execute(null);
+        ctrl.ApplyAirflowCommand.Execute(null);
+
+        Assert.True(ctrl.HasAirflowStatus);
+        Assert.Equal(3, ctrl.AirflowStatus.Count);
+    }
+
+    [Fact]
+    public void AirflowStatus_ReassignedFan_DropsOut()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(TunedAirflowSnapshot());
+
+        ctrl.Fans.First(f => f.FanId == "cpu").Selected = null; // zurück auf Hardware-Auto
+
+        Assert.Equal(2, ctrl.AirflowStatus.Count);
+        Assert.DoesNotContain(ctrl.AirflowStatus, r => r.Fan.FanId == "cpu");
+    }
+
+    // Ausgeblendete Lüfter sind für die Analyse „nicht vorhanden" - im Ergebnis ebenso wenig.
+    [Fact]
+    public void AirflowStatus_HiddenFan_IsExcluded()
+    {
+        var ctrl = new CurveEditorController();
+        ctrl.Initialize(TunedAirflowSnapshot());
+
+        ctrl.Fans.First(f => f.FanId == "front").Visible = false;
+
+        Assert.DoesNotContain(ctrl.AirflowStatus, r => r.Fan.FanId == "front");
+        Assert.Contains("Unterdruck", ctrl.AirflowStatusPressureText); // ohne Einlass-Lüfter kippt die Bilanz
+    }
+
     // Regression: nach Ablauf einer Auto-Hide-Statusmeldung darf der nächste Status nicht auf einem
     // bereits entsorgten CancellationTokenSource Cancel() aufrufen (ObjectDisposedException beim Speichern).
     [Fact]
@@ -1190,47 +1300,6 @@ public sealed class CurveEditorControllerTests
 
         Assert.Contains("Gespeichert", ctrl.Status.Text);
         Assert.False(ctrl.Status.IsError);
-    }
-
-    [Fact]
-    public void UnsavedToast_HiddenByX_ReappearsOnNextEdit()
-    {
-        var ctrl = new CurveEditorController(new SaveSink().SaveAsync);
-        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
-        Assert.False(ctrl.ShowUnsavedToast);
-
-        CurveEditRow curve = Assert.Single(ctrl.Curves);
-        curve.Name = "Geändert";
-        Assert.True(ctrl.HasUnsavedChanges);
-        Assert.True(ctrl.ShowUnsavedToast);
-
-        ctrl.HideUnsavedToastCommand.Execute(null);
-        Assert.True(ctrl.HasUnsavedChanges); // hiding the toast leaves the dirty state untouched
-        Assert.False(ctrl.ShowUnsavedToast);
-
-        curve.Name = "Nochmal geändert"; // the next edit re-shows the toast
-        Assert.True(ctrl.ShowUnsavedToast);
-    }
-
-    [Fact]
-    public void UnsavedToast_HiddenFlagResets_OnCleanTransition()
-    {
-        var ctrl = new CurveEditorController(new SaveSink().SaveAsync);
-        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
-
-        CurveEditRow curve = Assert.Single(ctrl.Curves);
-        curve.Name = "Geändert";
-        ctrl.HideUnsavedToastCommand.Execute(null);
-
-        ctrl.RevertCommand.Execute(null); // back to baseline -> clean resets the hidden flag
-
-        Assert.False(ctrl.HasUnsavedChanges);
-        Assert.False(ctrl.ShowUnsavedToast);
-
-        // Revert rebuilds the curve rows -> re-fetch before editing again.
-        CurveEditRow reloaded = Assert.Single(ctrl.Curves);
-        reloaded.Name = "Neu geändert";
-        Assert.True(ctrl.ShowUnsavedToast);
     }
 
     // --- Verwerfen (Revert) + Aktiv-Badge ------------------------------------------------------
@@ -1322,7 +1391,7 @@ public sealed class CurveEditorControllerTests
     // --- Profil/Kurve anlegen + duplizieren + Namensfeld -----------------------------------------
 
     [Fact]
-    public void AddProfile_IsEmpty_OneDefaultCurve_NoAssignments_OpensNaming()
+    public void AddProfile_IsEmpty_OneDefaultCurve_NoAssignments_OpensProfileEditor()
     {
         var ctrl = new CurveEditorController();
         ctrl.Initialize(Snapshot(CurveAndFanConfig()));
@@ -1332,7 +1401,8 @@ public sealed class CurveEditorControllerTests
         ctrl.AddProfileCommand.Execute(null);
 
         Assert.Equal(profilesBefore + 1, ctrl.Profiles.Count);
-        Assert.True(ctrl.IsNamingProfile);              // Namensfeld eingeblendet
+        Assert.Equal(CurveTabPane.Profile, ctrl.Pane);  // Profil-Editor offen (dort steht das Namensfeld)
+        Assert.False(ctrl.SelectedProfileIsActive);     // ein neues Profil regelt nicht von selbst
         CurveEditRow curve = Assert.Single(ctrl.Curves); // genau eine Default-Kurve
         Assert.Equal("Neue Kurve", curve.Name);
         Assert.Equal(5, curve.Points.Count);            // Standard-Stützpunkte
@@ -1340,7 +1410,7 @@ public sealed class CurveEditorControllerTests
     }
 
     [Fact]
-    public void DuplicateProfile_CopiesCurrentState_WithKopieName_OpensNaming()
+    public void DuplicateProfile_CopiesCurrentState_WithKopieName_OpensProfileEditor()
     {
         var ctrl = new CurveEditorController();
         ctrl.Initialize(Snapshot(CurveAndFanConfig()));
@@ -1350,7 +1420,8 @@ public sealed class CurveEditorControllerTests
 
         ctrl.DuplicateProfileCommand.Execute(null);
 
-        Assert.True(ctrl.IsNamingProfile);
+        Assert.Equal(CurveTabPane.Profile, ctrl.Pane);
+        Assert.False(ctrl.SelectedProfileIsActive);     // die Kopie übernimmt nicht die Regelung
         Assert.Equal($"{activeName} (Kopie)", ctrl.SelectedProfile!.Name);
         Assert.Single(ctrl.Curves);                     // Kopie = aktueller Stand
         Assert.NotNull(ctrl.Fans.Single().Selected);    // Zuordnung mitkopiert
@@ -1408,7 +1479,7 @@ public sealed class CurveEditorControllerTests
                 new SensorConfig { SensorId = "hwmon8/temp1", Name = "C", Group = "  " }, // leer → kein Vorschlag
             },
         };
-        // Dedicated snapshot with three temperature readings — Snapshot() only yields two sensor rows.
+        // Dedicated snapshot with three temperature readings - Snapshot() only yields two sensor rows.
         var snap = new MonitorSnapshot(
             "test",
             new[]
@@ -1470,20 +1541,54 @@ public sealed class CurveEditorControllerTests
     }
 
     [Fact]
-    public void ProfileNaming_ClosesOnFinish_AndOnRealProfileSwitch()
+    public async Task SelectingProfile_DoesNotActivate_AndLeavesEditorClean()
     {
-        var ctrl = new CurveEditorController();
+        var sink = new SaveSink();
+        var activated = new List<string>();
+        var ctrl = new CurveEditorController(sink.SaveAsync, id => { activated.Add(id); return Task.CompletedTask; });
         ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+        ctrl.AddProfileCommand.Execute(null);          // zweites Profil, ausgewählt aber nicht aktiv
+        ProfileRow added = ctrl.Profiles.Last();
+        await ctrl.SaveCommand.ExecuteAsync(null);     // Ausgangslage: gespeichert
+        activated.Clear();
 
-        ctrl.RenameProfileCommand.Execute(null);
-        Assert.True(ctrl.IsNamingProfile);
-        ctrl.FinishNamingProfileCommand.Execute(null);
-        Assert.False(ctrl.IsNamingProfile);
+        ctrl.SelectedProfile = ctrl.Profiles.First();  // hin …
+        ctrl.SelectedProfile = added;                  // … und zurück
 
-        ctrl.AddProfileCommand.Execute(null);   // öffnet das Namensfeld
-        Assert.True(ctrl.IsNamingProfile);
-        ctrl.SelectedProfile = ctrl.Profiles.First(); // echter Wechsel → schließt es
-        Assert.False(ctrl.IsNamingProfile);
+        Assert.Empty(activated);                       // die Auswahl allein schaltet nichts um
+        Assert.False(ctrl.HasUnsavedChanges);          // und ändert die Konfiguration nicht
+        Assert.Equal("p1", ctrl.ActiveProfile!.Id);
+    }
+
+    [Fact]
+    public void ActivateProfile_IsBlockedWhileUnsaved_AndDoesNotDirtyOnceApplied()
+    {
+        var activated = new List<string>();
+        var ctrl = new CurveEditorController(activateProfile: id => { activated.Add(id); return Task.CompletedTask; });
+        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+        ctrl.AddProfileCommand.Execute(null);          // neues Profil = ungespeicherte Änderung
+
+        Assert.True(ctrl.HasUnsavedChanges);
+        Assert.False(ctrl.CanActivateSelectedProfile); // gesperrt, bis übernommen wurde
+        ctrl.SelectedProfileActive = true;
+        Assert.Empty(activated);                       // der abgelehnte Schalter schickt nichts
+    }
+
+    [Fact]
+    public void DeletingActiveProfile_HandsTheFansToTheNextOne()
+    {
+        var activated = new List<string>();
+        var ctrl = new CurveEditorController(activateProfile: id => { activated.Add(id); return Task.CompletedTask; });
+        ctrl.Initialize(Snapshot(CurveAndFanConfig()));
+        ctrl.AddProfileCommand.Execute(null);
+        ProfileRow added = ctrl.Profiles.Last();
+        ctrl.SelectedProfile = ctrl.Profiles.First(p => p.Id == "p1"); // das aktive auswählen
+        activated.Clear();
+
+        ctrl.DeleteProfileCommand.Execute(null);
+
+        Assert.Same(added, ctrl.ActiveProfile);        // das verbliebene Profil regelt jetzt
+        Assert.Equal(added.Id, Assert.Single(activated));
     }
 
     // --- Geräte-Tab-Filter (Suche + „Versteckte ausblenden") -----------------------------------
@@ -1656,7 +1761,7 @@ public sealed class CurveEditorControllerTests
         FanCurveCheck front = ctrl.SelectedCurveFans.Single(c => c.Fan.FanId == "front");
         Assert.True(front.Assigned);
 
-        // Abwahl entfernt die Zeile bewusst NICHT sofort (kommt aus der Checkbox dieser Liste) —
+        // Abwahl entfernt die Zeile bewusst NICHT sofort (kommt aus der Checkbox dieser Liste) -
         // erst der nächste Listen-Aufbau (z. B. Kurvenwechsel) filtert sie heraus.
         front.Assigned = false;
         Assert.Contains(ctrl.SelectedCurveFans, c => c.Fan.FanId == "front");
@@ -1733,7 +1838,7 @@ public sealed class CurveEditorControllerTests
         SensorCheck hidden = curve.SensorChecks.Single(c => c.Sensor.Id == "hwmon6/temp2");
         Assert.True(hidden.Selected);
 
-        // Unchecking does NOT remove the row immediately (the write comes from this very checkbox) —
+        // Unchecking does NOT remove the row immediately (the write comes from this very checkbox) -
         // the next rebuild (any visibility flip) filters it out.
         hidden.Selected = false;
         Assert.Contains(curve.SensorChecks, c => c.Sensor.Id == "hwmon6/temp2");
@@ -1866,7 +1971,7 @@ public sealed class CurveEditorControllerTests
         ctrl.Initialize(Snapshot(config));
 
         CurveEditRow curve = Assert.Single(ctrl.Curves);
-        // Free-typed sensor groups can differ only in casing — they must land in ONE block.
+        // Free-typed sensor groups can differ only in casing - they must land in ONE block.
         SensorCheckGroup group = Assert.Single(curve.DisplayedSensorGroups);
         Assert.Equal("CPU", group.Name);
         Assert.Equal(2, group.Sensors.Count);

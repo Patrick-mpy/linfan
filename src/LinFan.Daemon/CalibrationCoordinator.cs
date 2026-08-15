@@ -14,7 +14,7 @@ namespace LinFan.Daemon;
 /// Fortschritt für den Snapshot und übergibt das Ergebnis an den Daemon (Persistenz im Tick-Loop).
 /// <para>
 /// Fail-Safe: Das Kalibrier-Token ist an das Daemon-Shutdown-Token gekoppelt; <see cref="StopAsync"/>
-/// bricht ab und wartet, bevor der Daemon sein abschließendes RestoreDefaults ausführt — so kann die
+/// bricht ab und wartet, bevor der Daemon sein abschließendes RestoreDefaults ausführt - so kann die
 /// Rampe nach dem RestoreDefaults nicht weiterlaufen. Suspend/Resume sind symmetrisch im
 /// <c>RunAsync</c>-finally, sodass kein Lüfter suspendiert hängen bleibt.
 /// </para>
@@ -89,7 +89,7 @@ internal sealed class CalibrationCoordinator
         _run.Attach(RunAsync(fanId, token));
     }
 
-    /// <summary>Bricht eine laufende Kalibrierung ab — oder quittiert (löscht) einen Abschluss-Status.</summary>
+    /// <summary>Bricht eine laufende Kalibrierung ab - oder quittiert (löscht) einen Abschluss-Status.</summary>
     public void Cancel() => _run.Cancel(whenIdle: () => _status = null);
 
     /// <summary>Bricht eine laufende Kalibrierung ab und wartet auf ihr Ende (für den Daemon-Shutdown).</summary>
@@ -121,7 +121,7 @@ internal sealed class CalibrationCoordinator
             _status = new IpcCalibration(fanId.Value, CalibrationPhase.Done, result.StartPwm, result.MaxRpm,
                 Running: false, Done: true, result.StartPwm, FailReason: null);
             _onResult(fanId.Value, result);
-            _log.LogInformation("Kalibrierung fertig: {Fan} · Anlauf pwm={Pwm} · {Min}–{Max} RPM",
+            _log.LogInformation("Kalibrierung fertig: {Fan} · Anlauf pwm={Pwm} · {Min}-{Max} RPM",
                 fanId.Value, result.StartPwm, result.MinRpm, result.MaxRpm);
         }
         catch (OperationCanceledException)
@@ -139,20 +139,20 @@ internal sealed class CalibrationCoordinator
             // „Nicht steuerbar" ist ein Normalzustand (read-only / ohne Rechte), kein Fehler →
             // saubere Info ohne Exception-Trace statt warn + Cross-Build-Stacktrace.
             _status = Fail(fanId, CalibrationFailReason.NotControllable);
-            _log.LogInformation("Kalibrierung nicht möglich: {Fan} — {Reason}", fanId.Value, ex.Message);
+            _log.LogInformation("Kalibrierung nicht möglich: {Fan} - {Reason}", fanId.Value, ex.Message);
         }
         catch (NoTachometerException ex)
         {
             // „Kein Tacho" ist ein Normalzustand (read-only ohne Drehzahl-Feedback), kein Fehler →
             // saubere Info ohne Exception-Trace statt warn + Cross-Build-Stacktrace.
             _status = Fail(fanId, CalibrationFailReason.NoTacho);
-            _log.LogInformation("Kalibrierung nicht möglich: {Fan} — {Reason}", fanId.Value, ex.Message);
+            _log.LogInformation("Kalibrierung nicht möglich: {Fan} - {Reason}", fanId.Value, ex.Message);
         }
         catch (NoTemperatureReadingException ex)
         {
-            // Fail-Safe-Abbruch (kein Watchdog möglich) — bekannte Ursache, daher Warnung ohne Trace.
+            // Fail-Safe-Abbruch (kein Watchdog möglich) - bekannte Ursache, daher Warnung ohne Trace.
             _status = Fail(fanId, CalibrationFailReason.NoTemperatureReading);
-            _log.LogWarning("Kalibrierung abgebrochen (kein Watchdog): {Fan} — {Reason}", fanId.Value, ex.Message);
+            _log.LogWarning("Kalibrierung abgebrochen (kein Watchdog): {Fan} - {Reason}", fanId.Value, ex.Message);
         }
         catch (Exception ex)
         {

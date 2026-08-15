@@ -10,7 +10,7 @@ namespace LinFan.App.UiTests;
 
 /// <summary>
 /// Tier-3-Smoke-Tests: Steuerbefehle, die die GUI an den Daemon sendet, werden über einen Fake-
-/// <c>ICommandSink</c> beobachtet — Manual-PWM/Auto im Dashboard und das Speichern. Plus die
+/// <c>ICommandSink</c> beobachtet - Manual-PWM/Auto im Dashboard und das Speichern. Plus die
 /// Sensor-Sichtbarkeit im Geräte-Tab (editor-lokal, ohne Sink).
 /// </summary>
 public class Tier3SmokeTests
@@ -86,9 +86,10 @@ public class Tier3SmokeTests
     {
         var (ctrl, fake, window) = Show(UiTestHelpers.SampleSnapshot());
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        ctrl.Editor.HasUnsavedChanges = true; // Speichern/Verwerfen liefert das globale „Übernehmen"-Banner
+        ctrl.Editor.HasUnsavedChanges = true; // blendet „Übernehmen" neben der Profil-Auswahl ein
 
-        Button apply = window.Find<Button>().Single(b => UiTestHelpers.ButtonLabel(b) == "Übernehmen");
+        // Über den Namen gesucht: der Knopf trägt nur sein Symbol, keine Beschriftung.
+        Button apply = window.Find<Button>().Single(b => b.Name == "HeaderSaveButton");
         Assert.Empty(fake.ConfigCalls);
 
         apply.Command!.Execute(null); // → Editor.SaveCommand → SendConfigAsync

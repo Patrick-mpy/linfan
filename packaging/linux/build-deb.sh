@@ -22,7 +22,7 @@ dotnet publish "$REPO/src/LinFan.Daemon" -c Release -r linux-x64 --self-containe
   -p:Version="$VERSION" -p:PublishSingleFile=true -o "$PKG/opt/linfan"
 dotnet publish "$REPO/src/LinFan.App" -c Release -r linux-x64 --self-contained \
   -p:Version="$VERSION" -p:PublishSingleFile=true -o "$PKG/opt/linfan"
-# Native Debug-Symbole (falls vorhanden) raus — halten das Paket schlank.
+# Native Debug-Symbole (falls vorhanden) raus - halten das Paket schlank.
 find "$PKG/opt/linfan" -name '*.pdb' -delete
 
 echo "==> assets (self-contained unit, GUI launcher, desktop entry, /usr/bin/linfan)"

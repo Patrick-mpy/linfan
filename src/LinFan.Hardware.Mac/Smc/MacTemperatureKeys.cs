@@ -7,7 +7,7 @@ namespace LinFan.Hardware.Mac.Smc;
 /// <b>Positivliste</b> statt einer Heuristik: Auf Apple Silicon ist der <c>flt</c>-Typ massiv überladen
 /// (Watt, Volt, Prozente, Drehzahlen), eine Typ-/Bereichs-Heuristik lieferte auf echter Hardware ~500
 /// Rausch-Kanäle. Quelle der Key-Bedeutungen sind die über Jahre in verbreiteten Open-Source-Tools
-/// (smcFanControl, iStats, exelban/stats, Macs Fan Control) dokumentierten Listen — nur Keys mit dort
+/// (smcFanControl, iStats, exelban/stats, Macs Fan Control) dokumentierten Listen - nur Keys mit dort
 /// gesicherter Bedeutung sind aufgenommen. Nur Keys, die zur Laufzeit <b>existieren und einen plausiblen
 /// Wert liefern</b>, werden zu Sensoren (siehe <see cref="MacSmcBackend"/>).
 /// <para>
@@ -20,7 +20,7 @@ namespace LinFan.Hardware.Mac.Smc;
 /// <b>Apple Silicon braucht per-Familie-Tabellen</b> (<see cref="SelectAppleSiliconCluster"/>): dieselben
 /// Keys bedeuten je nach Chip-Familie etwas anderes (<c>Tp09</c> = M1 E-Core 1, aber M2 P-Core 3;
 /// <c>Tp0P</c> = M1 P-Core 6, aber Intel Netzteil-Proximity). Die Familie wird über die Präsenz ihrer
-/// Keys erkannt — Chip-Familien schließen sich auf einer Maschine gegenseitig aus. M4-spezifische
+/// Keys erkannt - Chip-Familien schließen sich auf einer Maschine gegenseitig aus. M4-spezifische
 /// Core-Keys fehlen bewusst (in den Referenz-Tools nicht eindeutig genug dokumentiert); dort greifen
 /// die plattformübergreifenden Keys der flachen Liste.
 /// </para>
@@ -83,11 +83,11 @@ internal static class MacTemperatureKeys
     /// <summary>
     /// Mindestzahl vorhandener Keys, damit eine Apple-Silicon-Familie als erkannt gilt. Verhindert,
     /// dass ein einzelner mehrdeutiger Key eine Familie auslöst (Intel-Macs haben <c>Tp0P</c> =
-    /// Netzteil — ein Treffer in der M1-Tabelle, aber kein M1).
+    /// Netzteil - ein Treffer in der M1-Tabelle, aber kein M1).
     /// </summary>
     private const int MinFamilyHits = 3;
 
-    /// <summary>M1 / M1 Pro / M1 Max / M1 Ultra — Cluster-Reihenfolge: E-Cores → P-Cores → GPU.</summary>
+    /// <summary>M1 / M1 Pro / M1 Max / M1 Ultra - Cluster-Reihenfolge: E-Cores → P-Cores → GPU.</summary>
     private static readonly (string Key, string Name)[] M1 =
     {
         ("Tp09", "CPU Efficiency Core 1"),
@@ -106,7 +106,7 @@ internal static class MacTemperatureKeys
         ("Tg0T", "GPU 4"),
     };
 
-    /// <summary>M2 / M2 Pro / M2 Max / M2 Ultra — Cluster-Reihenfolge: E-Cores → P-Cores → GPU.</summary>
+    /// <summary>M2 / M2 Pro / M2 Max / M2 Ultra - Cluster-Reihenfolge: E-Cores → P-Cores → GPU.</summary>
     private static readonly (string Key, string Name)[] M2 =
     {
         ("Tp1h", "CPU Efficiency Core 1"),
@@ -125,7 +125,7 @@ internal static class MacTemperatureKeys
         ("Tg0j", "GPU 2"),
     };
 
-    /// <summary>M3 / M3 Pro / M3 Max — Cluster-Reihenfolge: E-Cores → P-Cores → GPU.</summary>
+    /// <summary>M3 / M3 Pro / M3 Max - Cluster-Reihenfolge: E-Cores → P-Cores → GPU.</summary>
     private static readonly (string Key, string Name)[] M3 =
     {
         ("Te05", "CPU Efficiency Core 1"),
@@ -159,7 +159,7 @@ internal static class MacTemperatureKeys
     /// <summary>
     /// Wählt die Apple-Silicon-Familie mit den meisten vorhandenen Keys und liefert deren kuratierte
     /// Cluster-Tabelle (E-Cores → P-Cores → GPU, Reihenfolge = Anzeigereihenfolge). Unterhalb von
-    /// <see cref="MinFamilyHits"/> Treffern gilt keine Familie als erkannt und das Ergebnis ist leer —
+    /// <see cref="MinFamilyHits"/> Treffern gilt keine Familie als erkannt und das Ergebnis ist leer -
     /// lieber kein Sensor als ein falsch beschrifteter. Die Zählung nutzt nur die <b>Präsenz</b> der
     /// Keys (<paramref name="keyExists"/>), nicht ihre Werte.
     /// </summary>

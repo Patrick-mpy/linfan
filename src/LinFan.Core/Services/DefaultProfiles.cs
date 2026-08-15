@@ -6,7 +6,7 @@ namespace LinFan.Core.Services;
 
 /// <summary>
 /// Erzeugt die drei vordefinierten Onboarding-Profile (silent / balanced / performance) als reine,
-/// seiteneffektfreie Factory-Methode. Keine externen Abhängigkeiten — jederzeit unit-testbar.
+/// seiteneffektfreie Factory-Methode. Keine externen Abhängigkeiten - jederzeit unit-testbar.
 /// </summary>
 public static class DefaultProfiles
 {
@@ -19,7 +19,7 @@ public static class DefaultProfiles
     /// <param name="primarySensorId">
     /// Id des Haupttemperatursensors, der alle Kurven speist. Darf nicht <c>null</c> oder leer sein.
     /// </param>
-    /// <param name="silentName">Anzeigename für Profil + Kurve „silent" — die GUI reicht hier die
+    /// <param name="silentName">Anzeigename für Profil + Kurve „silent" - die GUI reicht hier die
     /// lokalisierte Fassung durch; Core bleibt sprachneutral (englischer Default).</param>
     /// <param name="balancedName">Anzeigename für „balanced" (siehe <paramref name="silentName"/>).</param>
     /// <param name="performanceName">Anzeigename für „performance" (siehe <paramref name="silentName"/>).</param>

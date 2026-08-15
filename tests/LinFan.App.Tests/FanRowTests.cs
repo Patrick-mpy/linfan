@@ -9,7 +9,7 @@ namespace LinFan.App.Tests;
 /// <summary>
 /// Sichert das optimistische Modus-Umschalten (Auto↔Manual) in <see cref="FanRow"/>: nach einem
 /// Nutzer-Toggle darf ein veralteter Snapshot (noch alte <c>ManualOverride</c>-Bestätigung) den
-/// Schalter nicht zurückspringen lassen — bleibt die Bestätigung dauerhaft aus, wird die Realität
+/// Schalter nicht zurückspringen lassen - bleibt die Bestätigung dauerhaft aus, wird die Realität
 /// wieder akzeptiert.
 /// </summary>
 public sealed class FanRowTests
@@ -47,7 +47,7 @@ public sealed class FanRowTests
         row.IsManual = true; // Nutzer schaltet auf Manual (optimistisch)
         row.Update(Reading(manualOverride: false)); // noch unterwegs befindlicher Snapshot, alte Bestätigung
 
-        Assert.True(row.IsManual); // Schalter bleibt — kein Zurückspringen
+        Assert.True(row.IsManual); // Schalter bleibt - kein Zurückspringen
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class FanRowTests
         }
 
         row.Update(Reading(manualOverride: false)); // Schwelle überschritten
-        Assert.False(row.IsManual); // Realität akzeptiert — Fehlschlag wird sichtbar
+        Assert.False(row.IsManual); // Realität akzeptiert - Fehlschlag wird sichtbar
     }
 
     // --- „Bereits kalibriert"-Badge (Dashboard) -------------------------------------------------

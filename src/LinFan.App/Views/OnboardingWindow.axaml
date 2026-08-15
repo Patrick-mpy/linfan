@@ -39,7 +39,7 @@
 
             <!-- Step 1: calibration. In a ScrollViewer like the devices/profile steps: the window is fixed
                  (CanResize=False), and as soon as the progress card grows a headline plus a bar, the content
-                 outgrows its row — without a scroll area it would push over the footer. -->
+                 outgrows its row - without a scroll area it would push over the footer. -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                       ConverterParameter=Calibration}">
@@ -76,7 +76,7 @@
                                             </Panel>
                                             <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
                                                        FontSize="12" VerticalAlignment="Center" />
-                                            <!-- Pro-Lüfter-Ergebnis (koppeln…/kalibrieren…/kein Tacho/nicht eindeutig/fertig) — bleibt nach der Sequenz stehen. -->
+                                            <!-- Pro-Lüfter-Ergebnis (koppeln…/kalibrieren…/kein Tacho/nicht eindeutig/fertig) - bleibt nach der Sequenz stehen. -->
                                             <TextBlock Grid.Column="2" Text="{Binding CalibrationStateText}" Foreground="{DynamicResource TextFaint}"
                                                        FontSize="11" VerticalAlignment="Center" />
                                         </Grid>
@@ -133,7 +133,7 @@
                                                 <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
                                                            FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                            Margin="0,0,8,0" />
-                                                <!-- Identifizieren: kurz auf 100 %, andere gedrosselt — nur für steuerbare Lüfter. -->
+                                                <!-- Identifizieren: kurz auf 100 %, andere gedrosselt - nur für steuerbare Lüfter. -->
                                                 <Button Grid.Column="1" Command="{Binding IdentifyCommand}" IsVisible="{Binding CanControl}"
                                                         Margin="0,0,8,0"
                                                         ToolTip.Tip="{l:Tr Onboarding.IdentifyTooltip}">
@@ -283,7 +283,7 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Schritt 4: Fertig (nur über ein erfolgreiches Finish erreichbar — Quittungsseite) -->
+            <!-- Schritt 4: Fertig (nur über ein erfolgreiches Finish erreichbar - Quittungsseite) -->
             <StackPanel Spacing="{StaticResource SpacingXl}"
                         IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                     ConverterParameter=Done}">
@@ -319,7 +319,7 @@
         <!-- Navigations-Leiste -->
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,20,0,0">
 
-            <!-- Überspringen (global — nicht auf Done, dort ist die Config bereits gespeichert) -->
+            <!-- Überspringen (global - nicht auf Done, dort ist die Config bereits gespeichert) -->
             <Button Grid.Column="0" Content="{l:Tr Onboarding.SkipWizard}"
                     Command="{Binding SkipCommand}"
                     Foreground="{DynamicResource TextFaint}"
@@ -331,7 +331,7 @@
                        FontSize="11" VerticalAlignment="Center" Margin="8,0" TextWrapping="Wrap"
                        IsVisible="{Binding StatusMessage, Converter={x:Static acv:StringConverters.IsNotNullOrEmpty}}" />
 
-            <!-- Zurück (alle Schritte außer Welcome und Done — auf Done ist bereits gespeichert) -->
+            <!-- Zurück (alle Schritte außer Welcome und Done - auf Done ist bereits gespeichert) -->
             <Button Grid.Column="2" Content="{l:Tr Onboarding.Back}"
                     Command="{Binding BackCommand}"
                     Margin="0,0,8,0"
@@ -339,21 +339,21 @@
                                 ConverterParameter='Calibration,Devices,ChooseProfile'}" />
 
             <!-- Weiter (Welcome + Calibration + Devices) -->
-            <Button Grid.Column="3" Content="{l:Tr Onboarding.Next}"
+            <Button Grid.Column="3" Classes="primary" Content="{l:Tr Onboarding.Next}"
                     Command="{Binding NextCommand}"
                     Margin="0,0,8,0"
                     IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                 ConverterParameter='Welcome,Calibration,Devices'}" />
 
-            <!-- Fertigstellen (nur ChooseProfile — speichert und wechselt zur Done-Seite) -->
-            <Button Grid.Column="4" Content="{l:Tr Onboarding.Finish}"
+            <!-- Fertigstellen (nur ChooseProfile - speichert und wechselt zur Done-Seite) -->
+            <Button Grid.Column="4" Classes="primary" Content="{l:Tr Onboarding.Finish}"
                     Command="{Binding FinishCommand}"
                     IsEnabled="{Binding CanFinish}"
                     IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                 ConverterParameter=ChooseProfile}" />
 
-            <!-- Schließen (nur Done — Config ist gespeichert) -->
-            <Button Grid.Column="5" Content="{l:Tr Onboarding.Close}"
+            <!-- Schließen (nur Done - Config ist gespeichert) -->
+            <Button Grid.Column="5" Classes="primary" Content="{l:Tr Onboarding.Close}"
                     Command="{Binding CloseCommand}"
                     IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
                                 ConverterParameter=Done}" />

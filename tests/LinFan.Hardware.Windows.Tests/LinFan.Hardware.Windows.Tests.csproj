@@ -22,7 +22,7 @@
 
   <!--
     Das Backend selbst plus das geteilte Conformance-Kit (abstrakte Suite + Fault-/Referenz-Fixtures).
-    Bewusst NICHT LinFan.Core.Tests referenzieren — die Suite lebt eigenständig im Kit.
+    Bewusst NICHT LinFan.Core.Tests referenzieren - die Suite lebt eigenständig im Kit.
     Die Tests injizieren ein Fake-LHM in den internen Inject-Ctor und laufen daher auf JEDEM OS
     (kein Kernel-Treiber, keine Admin-Rechte).
   -->

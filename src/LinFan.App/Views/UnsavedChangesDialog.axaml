@@ -14,8 +14,8 @@
                    TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource SpacingMd}">
             <Button Content="{l:Tr UnsavedChanges.Cancel}" Click="OnCancel" />
-            <Button Content="{l:Tr UnsavedChanges.Discard}" Click="OnDiscard" />
-            <Button Content="{l:Tr UnsavedChanges.Save}" Click="OnSave" />
+            <Button Classes="danger" Content="{l:Tr UnsavedChanges.Discard}" Click="OnDiscard" />
+            <Button Classes="primary" Content="{l:Tr UnsavedChanges.Save}" Click="OnSave" />
         </StackPanel>
     </StackPanel>
 </Window>

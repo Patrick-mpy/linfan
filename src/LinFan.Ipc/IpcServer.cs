@@ -12,7 +12,7 @@ namespace LinFan.Ipc;
 /// IPC-Server (läuft im privilegierten Daemon). Hört über einen <see cref="IIpcServerTransport"/> am
 /// Endpunkt, pusht <see cref="IpcSnapshot"/>s (NDJSON, eine Zeile pro Tick) an alle verbundenen
 /// Clients und leitet eingehende <see cref="IpcCommand"/>s an <see cref="CommandHandler"/> weiter.
-/// Die Protokoll-Schicht ist transport-neutral — Unix-Socket vs. Named Pipe entscheidet der Transport.
+/// Die Protokoll-Schicht ist transport-neutral - Unix-Socket vs. Named Pipe entscheidet der Transport.
 /// </summary>
 public sealed class IpcServer : IIpcServer
 {
@@ -27,7 +27,7 @@ public sealed class IpcServer : IIpcServer
     /// <summary>
     /// Wartezeit, bevor eine fehlgeschlagene Verbindungsannahme wiederholt wird. Ohne sie würde ein
     /// <b>dauerhafter</b> Accept-Fehler (z. B. fehlendes Recht, eine weitere Pipe-Instanz anzulegen) die
-    /// Schleife frei drehen lassen — im privilegierten Daemon eine Dauerlast, die nichts erreicht.
+    /// Schleife frei drehen lassen - im privilegierten Daemon eine Dauerlast, die nichts erreicht.
     /// </summary>
     private static readonly TimeSpan AcceptRetryDelay = TimeSpan.FromMilliseconds(500);
 
@@ -93,7 +93,7 @@ public sealed class IpcServer : IIpcServer
             }
             catch (Exception ex)
             {
-                _log.LogDebug(ex, "IPC: Broadcast an einen Client fehlgeschlagen — Client entfernt.");
+                _log.LogDebug(ex, "IPC: Broadcast an einen Client fehlgeschlagen - Client entfernt.");
                 Remove(client);
             }
         }
@@ -117,11 +117,11 @@ public sealed class IpcServer : IIpcServer
             catch (Exception ex)
             {
                 // Warnung statt Debug: schlägt die Annahme dauerhaft fehl, nimmt der Daemon keine GUI mehr
-                // an — das darf nicht nur im Debug-Log stehen.
+                // an - das darf nicht nur im Debug-Log stehen.
                 if (!failureLogged)
                 {
                     failureLogged = true;
-                    _log.LogWarning(ex, "IPC: Verbindungsannahme fehlgeschlagen — Wiederholung alle {Ms} ms.",
+                    _log.LogWarning(ex, "IPC: Verbindungsannahme fehlgeschlagen - Wiederholung alle {Ms} ms.",
                         _acceptRetryDelay.TotalMilliseconds);
                 }
 
@@ -163,7 +163,7 @@ public sealed class IpcServer : IIpcServer
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)
                 {
-                    _log.LogDebug(ex, "IPC: Lesefehler auf der Client-Verbindung — Verbindung wird geschlossen.");
+                    _log.LogDebug(ex, "IPC: Lesefehler auf der Client-Verbindung - Verbindung wird geschlossen.");
                     break;
                 }
 
@@ -181,7 +181,7 @@ public sealed class IpcServer : IIpcServer
                     else if (line.Length >= _maxCommandBytes)
                     {
                         _log.LogWarning(
-                            "IPC: Kommando überschreitet {Max} Bytes ohne Zeilenende — Verbindung getrennt (möglicher DoS).",
+                            "IPC: Kommando überschreitet {Max} Bytes ohne Zeilenende - Verbindung getrennt (möglicher DoS).",
                             _maxCommandBytes);
                         return; // finally entfernt den Client
                     }
@@ -225,7 +225,7 @@ public sealed class IpcServer : IIpcServer
         }
         catch (Exception ex)
         {
-            // Der Handler (Daemon) darf die Client-Leseschleife nie reißen — ein einzelnes fehlerhaftes
+            // Der Handler (Daemon) darf die Client-Leseschleife nie reißen - ein einzelnes fehlerhaftes
             // Kommando brächte sonst den ganzen Reader (und damit diese GUI-Verbindung) zu Fall.
             _log.LogWarning(ex, "IPC: Verarbeitung des Kommandos {Command} fehlgeschlagen.", command.Command);
         }

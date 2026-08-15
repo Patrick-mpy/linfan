@@ -8,7 +8,7 @@ namespace LinFan.App.Tests;
 
 /// <summary>
 /// Sichert den <see cref="SettingsController"/>: er lädt die persistierten Werte, schreibt Änderungen zurück
-/// und erhält dabei die separat gespeicherte Fenster-Geometrie (Load-modify-write — Regression gegen das
+/// und erhält dabei die separat gespeicherte Fenster-Geometrie (Load-modify-write - Regression gegen das
 /// versehentliche Überschreiben der einen <c>ui.json</c> durch den jeweils anderen Schreibpfad).
 /// </summary>
 public sealed class SettingsControllerTests
@@ -102,7 +102,7 @@ public sealed class SettingsControllerTests
     }
 
     /// <summary>
-    /// The theme labels live inside the option instances, not in the binding — without a rebuild the
+    /// The theme labels live inside the option instances, not in the binding - without a rebuild the
     /// dropdown would stay in the language the controller was created in. The selection has to survive that
     /// rebuild (record value equality against the fresh list).
     /// </summary>

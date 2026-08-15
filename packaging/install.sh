@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # Installs LinFan as a system service (daemon, root) + GUI launcher.
-# Call without sudo — the script publishes as you and only elevates the necessary steps with sudo:
+# Call without sudo - the script publishes as you and only elevates the necessary steps with sudo:
 #
 #   ./packaging/install.sh
 #
-# Prerequisites: .NET SDK (apt, NOT snap — snap breaks the GUI/Skia) and systemd.
+# Prerequisites: .NET SDK (apt, NOT snap - snap breaks the GUI/Skia) and systemd.
 # ThinkPad: load thinkpad_acpi with fan_control=1, otherwise the daemon cannot write PWM (see README).
 set -euo pipefail
 
@@ -14,10 +14,10 @@ PREFIX=/opt/linfan
 CONFIG_DIR=/etc/linfan
 UNIT=linfan-daemon.service
 
-# Release tarball (self-contained bin/, no src/): install from the binaries — no .NET SDK needed.
+# Release tarball (self-contained bin/, no src/): install from the binaries - no .NET SDK needed.
 # A source checkout has src/ but no bin/, so it falls through to the build-from-source path below.
 if [ -d "$REPO/bin" ] && [ ! -d "$REPO/src" ]; then
-  echo "==> self-contained binaries detected — installing without building (no SDK needed)"
+  echo "==> self-contained binaries detected - installing without building (no SDK needed)"
   exec bash "$REPO/packaging/linux/install-bin.sh"
 fi
 
@@ -40,7 +40,7 @@ sudo systemctl stop "$UNIT" 2>/dev/null || true
 
 # Same hazard for the GUI: it memory-maps its assemblies from $PREFIX/gui, so replacing them under
 # a running instance makes it segfault mid-flight (apport dialog). Close it, relaunch after the
-# install. The pattern only matches processes running from $PREFIX — a dev GUI from a source tree
+# install. The pattern only matches processes running from $PREFIX - a dev GUI from a source tree
 # is left alone.
 GUI_MATCH="$PREFIX/[^ ]*LinFan\.App"
 GUI_WAS_RUNNING=
@@ -110,7 +110,7 @@ sudo systemctl --no-pager --full status "$UNIT" || true
 
 if [ -n "$GUI_WAS_RUNNING" ]; then
   if [ "$(id -u)" -eq 0 ]; then
-    echo "NOTE: the GUI was closed for the upgrade — start it again via 'linfan' or the app menu."
+    echo "NOTE: the GUI was closed for the upgrade - start it again via 'linfan' or the app menu."
   else
     echo "==> restart the GUI"
     setsid "$PREFIX/linfan-gui" >/dev/null 2>&1 </dev/null &
@@ -130,7 +130,7 @@ EOF
 
 if [ -n "$NEED_RELOGIN" ]; then
   cat <<EOF
-NOTE: $RUN_USER was added to the 'linfan' group — log out and back in (or run 'newgrp linfan')
+NOTE: $RUN_USER was added to the 'linfan' group - log out and back in (or run 'newgrp linfan')
       for the GUI to reach the daemon socket.
 EOF
 fi

@@ -11,6 +11,6 @@ public sealed record SensorConfig
     /// <summary>Free-form group for organizing (dashboard blocks and curve sensor pickers), or <c>null</c>.</summary>
     public string? Group { get; init; }
 
-    /// <summary>Hidden app-wide except in the settings' device lists (display/selection only — the sensor keeps being measured).</summary>
+    /// <summary>Hidden app-wide except in the settings' device lists (display/selection only - the sensor keeps being measured).</summary>
     public bool Hidden { get; init; }
 }

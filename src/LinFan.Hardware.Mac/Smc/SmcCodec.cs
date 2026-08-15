@@ -6,7 +6,7 @@ namespace LinFan.Hardware.Mac.Smc;
 
 /// <summary>
 /// Interpretiert SMC-Rohwerte (<see cref="SmcValue"/>) als <see cref="double"/> und kodiert Zielwerte
-/// zurück in den nativen Datentyp eines Keys. Rein und ohne I/O — die ausführbare Referenz für die
+/// zurück in den nativen Datentyp eines Keys. Rein und ohne I/O - die ausführbare Referenz für die
 /// (empirisch auf echter Hardware verifizierten) SMC-Datentypen; Unit-Tests decken jeden Typ ab.
 /// <para>
 /// Endianness: <c>flt</c> ist <b>little-endian</b> IEEE-754 (auf Apple-Silicon-Hardware bestätigt: die
@@ -18,7 +18,7 @@ internal static class SmcCodec
 {
     /// <summary>
     /// Dekodiert einen Rohwert. Unbekannte oder zu kurze Typen liefern <see cref="double.NaN"/>
-    /// („kein Wert") statt zu werfen — der Lese-Pfad ist vertraglich wurf-frei.
+    /// („kein Wert") statt zu werfen - der Lese-Pfad ist vertraglich wurf-frei.
     /// </summary>
     public static double Decode(SmcValue value)
     {
@@ -45,7 +45,7 @@ internal static class SmcCodec
     /// <summary>
     /// Kodiert einen Zielwert in die rohen Bytes des angegebenen SMC-Datentyps (für den Steuer-Pfad, z. B.
     /// Ziel-Drehzahl <c>F0Tg</c> oder Modus <c>F0Md</c>). Liefert <c>null</c> für Typen, die LinFan nicht
-    /// zu schreiben braucht — der Aufrufer überspringt den Write dann sicher (Fail-Safe), statt zu raten.
+    /// zu schreiben braucht - der Aufrufer überspringt den Write dann sicher (Fail-Safe), statt zu raten.
     /// </summary>
     public static byte[]? Encode(string type, double value) => Normalize(type) switch
     {
@@ -62,7 +62,7 @@ internal static class SmcCodec
     /// <summary>Normalisiert den 4-Zeichen-Typcode (trimmt das SMC-typische nachlaufende Leerzeichen, z. B. <c>"flt "</c> → <c>"flt"</c>).</summary>
     private static string Normalize(string type) => type.TrimEnd();
 
-    /// <summary>Liefert die ersten <paramref name="n"/> Bytes in little-endian-Reihenfolge (für <c>flt</c> auf big-endian-Hosts — pragmatisch, LinFan läuft nur little-endian).</summary>
+    /// <summary>Liefert die ersten <paramref name="n"/> Bytes in little-endian-Reihenfolge (für <c>flt</c> auf big-endian-Hosts - pragmatisch, LinFan läuft nur little-endian).</summary>
     private static byte[] LittleEndian(byte[] src, int n)
     {
         var b = new byte[n];

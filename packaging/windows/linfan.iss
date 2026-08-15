@@ -1,4 +1,4 @@
-; Inno Setup script for LinFan (Windows) — produces a one-click installer from the
+; Inno Setup script for LinFan (Windows) - produces a one-click installer from the
 ; cross-published, self-contained win-x64 build.
 ;
 ; COMPILE on Windows with Inno Setup 6 (https://jrsoftware.org/isdl.php):
@@ -28,7 +28,7 @@ AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-; Brand the installer itself and its "Apps & features" entry — otherwise both show the stock Inno icon.
+; Brand the installer itself and its "Apps & features" entry - otherwise both show the stock Inno icon.
 SetupIconFile=..\..\src\LinFan.App\Assets\linfan.ico
 UninstallDisplayIcon={app}\App\LinFan.App.exe
 OutputDir=..\..\artifacts
@@ -41,9 +41,16 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayName={#AppName} Fan Control
-; The service scripts run hidden, so their console hints never reach the user — the re-login needed
+; The service scripts run hidden, so their console hints never reach the user - the re-login needed
 ; for the "LinFan Users" group membership is shown on this page instead.
 InfoAfterFile=PostInstall.txt
+; A running GUI holds App\*, so the Restart Manager has to close it before the files are replaced. Since
+; 0.3.2 it closes on that request; "force" covers the upgrade FROM an older GUI, which only hid itself
+; into the tray and left setup asking the user to close it by hand.
+CloseApplications=force
+; Never let the Restart Manager restart what it closed: it would relaunch the GUI with SETUP's elevated
+; token. The GUI must stay unprivileged - hence the runasoriginaluser launch on the finish page.
+RestartApplications=no
 
 [Tasks]
 ; Checked by default: the GUI starts hidden in the tray (--minimized), so the login stays quiet.
@@ -61,14 +68,14 @@ Name: "{group}\LinFan"; Filename: "{app}\App\LinFan.App.exe"; WorkingDir: "{app}
 Name: "{group}\Uninstall LinFan"; Filename: "{uninstallexe}"
 
 [Registry]
-; Machine-wide autostart (HKLM Run) — the installer runs elevated, so a HKCU entry would land in the
+; Machine-wide autostart (HKLM Run) - the installer runs elevated, so a HKCU entry would land in the
 ; ADMIN's hive, not the installing user's. The uninstaller removes the value (uninsdeletevalue).
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: """{app}\App\LinFan.App.exe"" --minimized"; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 ; Register + start the service (files are already in {app} -> -InstallerManaged).
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Install-LinFan.ps1"" -InstallDir ""{app}"" -InstallerManaged -ReloginMarker ""{tmp}\relogin-required.flag"""; StatusMsg: "Registering and starting the LinFan service …"; Flags: runhidden waituntilterminated
-; Finish page "Launch LinFan": runasoriginaluser is essential — without it the GUI would inherit the
+; Finish page "Launch LinFan": runasoriginaluser is essential - without it the GUI would inherit the
 ; installer's elevation, and the GUI must run unprivileged (the service does the privileged work).
 Filename: "{app}\App\LinFan.App.exe"; WorkingDir: "{app}\App"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
@@ -88,7 +95,7 @@ begin
 end;
 
 // First install: the service script just added the GUI user to "LinFan Users", and Windows only
-// applies group membership at sign-in — until then the pipe stays unreachable for the GUI. The
+// applies group membership at sign-in - until then the pipe stays unreachable for the GUI. The
 // script signals that via the marker file; offering Inno's restart prompt here also suppresses the
 // "Launch LinFan" postinstall checkbox (it could not connect with the pre-add token anyway).
 // Upgrades (user already a member -> no marker) keep the launch checkbox and skip the prompt.

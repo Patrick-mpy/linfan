@@ -10,13 +10,13 @@ namespace LinFan.App.Services;
 
 /// <summary>
 /// Keeps the GUI to one instance per user. The first process owns a local activation endpoint; every
-/// later launch connects to it — that connection brings the running window back to the front — and then
+/// later launch connects to it - that connection brings the running window back to the front - and then
 /// exits without ever building a UI.
 /// <para>
 /// The endpoint is a Unix domain socket (Linux/macOS) or a named pipe (Windows), the same split as in
 /// <c>IpcTransportFactory</c>, but deliberately <b>not</b> its transports: those serve the daemon and are
 /// built to <i>take</i> ownership (the socket server deletes a stale socket file before binding, the pipe
-/// server allows many instances). Here the opposite is needed — creating the endpoint has to fail while
+/// server allows many instances). Here the opposite is needed - creating the endpoint has to fail while
 /// another instance holds it, because that failure is the detection.
 /// </para>
 /// <para>
@@ -25,7 +25,7 @@ namespace LinFan.App.Services;
 /// </para>
 /// <para>
 /// Fail-open by design: if the endpoint can neither be taken nor reached, the app starts normally with an
-/// inert guard. Not being able to enforce a single window is a nuisance, never a reason to refuse startup —
+/// inert guard. Not being able to enforce a single window is a nuisance, never a reason to refuse startup -
 /// the GUI is unprivileged and the daemon remains the only writer to the hardware.
 /// </para>
 /// </summary>
@@ -54,7 +54,7 @@ internal sealed class SingleInstanceGuard : IDisposable
 
     /// <summary>Per-user endpoint: a socket path on Linux/macOS, a pipe name on Windows.</summary>
     public static string DefaultEndpoint() =>
-        // Named pipes live in a machine-wide namespace, so the account has to be part of the name —
+        // Named pipes live in a machine-wide namespace, so the account has to be part of the name -
         // otherwise a second user's GUI would collide with the first one's endpoint instead of getting
         // its own instance. On Unix the path carries that separation on its own.
         OperatingSystem.IsWindows()
@@ -68,11 +68,11 @@ internal sealed class SingleInstanceGuard : IDisposable
     /// Derives the Unix socket path from the environment: the per-user runtime dir when the session has
     /// one (tmpfs, cleared at logout), otherwise the per-user base dir the config lives in. Deliberately
     /// not <c>$TMPDIR</c> first, whose value differs between terminals and contexts on macOS (see
-    /// <c>IpcEndpoint</c>) — both processes have to derive the same path.
+    /// <c>IpcEndpoint</c>) - both processes have to derive the same path.
     /// <para>
     /// Without a home directory <paramref name="appData"/> comes back empty (containers, service
     /// accounts). Combining that would produce a <b>relative</b> path, so every working directory would
-    /// get a "single" instance of its own — hence the last resort in the temp dir, with the uid in the
+    /// get a "single" instance of its own - hence the last resort in the temp dir, with the uid in the
     /// name because that directory is shared.
     /// </para>
     /// </summary>
@@ -84,7 +84,7 @@ internal sealed class SingleInstanceGuard : IDisposable
     /// <summary>
     /// Tries to become the one GUI instance. Returns the guard when this process owns the endpoint (the
     /// caller keeps it alive for the whole run), or <c>null</c> when a running instance was found and
-    /// activated — then this process must exit silently.
+    /// activated - then this process must exit silently.
     /// </summary>
     public static SingleInstanceGuard? AcquireOrActivate(string endpoint)
     {
@@ -143,7 +143,7 @@ internal sealed class SingleInstanceGuard : IDisposable
             {
                 // A launch that vanished before its connection was accepted (killed mid-handshake) leaves
                 // the pipe instance in a broken state; disconnecting puts it back into listening. Keep
-                // watching — otherwise every later launch would open a window of its own. If that does not
+                // watching - otherwise every later launch would open a window of its own. If that does not
                 // recover, stop: a background thread spinning on a broken endpoint is worse than a second
                 // window.
                 try { _pipe?.Disconnect(); } catch { /* egal */ }
@@ -153,7 +153,7 @@ internal sealed class SingleInstanceGuard : IDisposable
             }
             catch
             {
-                break; // disposed, cancelled or endpoint broken — stop watching, never crash the GUI
+                break; // disposed, cancelled or endpoint broken - stop watching, never crash the GUI
             }
 
             failures = 0;
@@ -162,7 +162,7 @@ internal sealed class SingleInstanceGuard : IDisposable
 
         // Left the loop for anything other than shutdown: give the endpoint back instead of holding it
         // unattended. Otherwise the next launch would connect to a claim nobody answers and exit without
-        // showing anything at all — while releasing it only brings the second window back, which is the
+        // showing anything at all - while releasing it only brings the second window back, which is the
         // nuisance this class prefers over an unreachable GUI.
         if (!_cts.IsCancellationRequested)
             ReleaseEndpoint();
@@ -183,7 +183,7 @@ internal sealed class SingleInstanceGuard : IDisposable
         }
         catch (IOException)
         {
-            // The other process is already gone — it got what it came for either way.
+            // The other process is already gone - it got what it came for either way.
         }
         finally
         {
@@ -193,11 +193,11 @@ internal sealed class SingleInstanceGuard : IDisposable
 
     private static SingleInstanceGuard Inert() => new();
 
-    // --- Unix (Linux/macOS): the socket file is the lock — bind() fails while it exists --------------
+    // --- Unix (Linux/macOS): the socket file is the lock - bind() fails while it exists --------------
 
     /// <summary>
     /// The Unix half of <see cref="AcquireOrActivate"/>. Internal so the tests can drive it on Windows as
-    /// well, where AF_UNIX exists since Windows 10 — the mirror image of <c>NamedPipeTransportTests</c>,
+    /// well, where AF_UNIX exists since Windows 10 - the mirror image of <c>NamedPipeTransportTests</c>,
     /// which checks the pipe transport on Linux. Otherwise the branch of the platform that has priority
     /// would only ever run in CI.
     /// </summary>
@@ -255,7 +255,7 @@ internal sealed class SingleInstanceGuard : IDisposable
 
     /// <summary>
     /// Restricts the socket to its owner (0600) so no other local account can pop up this user's window.
-    /// bind() creates the file under the umask first, so this closes a very short window — the runtime dir
+    /// bind() creates the file under the umask first, so this closes a very short window - the runtime dir
     /// it lives in is user-only anyway. Best effort: on failure the socket keeps the umask permissions.
     /// </summary>
     private static void RestrictToOwner(string path)
@@ -281,7 +281,7 @@ internal sealed class SingleInstanceGuard : IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // "All pipe instances are busy" — the name is taken, so a GUI should be running.
+            // "All pipe instances are busy" - the name is taken, so a GUI should be running.
             return TrySignalWindows(endpoint) ? null : Inert();
         }
     }
@@ -292,7 +292,7 @@ internal sealed class SingleInstanceGuard : IDisposable
         try
         {
             // The running process may only pull its window up front if a process that currently holds the
-            // foreground right hands it over — a freshly launched one does. Without this Windows just
+            // foreground right hands it over - a freshly launched one does. Without this Windows just
             // flashes the taskbar button. Granted before connecting, because the connect is what triggers
             // the activation over there.
             try { AllowSetForegroundWindow(AsfwAny); } catch (EntryPointNotFoundException) { /* egal */ }
@@ -305,12 +305,12 @@ internal sealed class SingleInstanceGuard : IDisposable
         }
         catch
         {
-            return false; // nobody listening, or the owner is hung — start normally instead
+            return false; // nobody listening, or the owner is hung - start normally instead
         }
     }
 
     /// <summary>
-    /// Blocks until the owner confirms the connection — see <see cref="AcceptPipeAsync"/>. Closing the
+    /// Blocks until the owner confirms the connection - see <see cref="AcceptPipeAsync"/>. Closing the
     /// pipe any earlier can drop the activation, and this process exits right afterwards. Bounded, so a
     /// hung owner costs a moment instead of a start that never happens.
     /// </summary>
@@ -318,7 +318,7 @@ internal sealed class SingleInstanceGuard : IDisposable
     {
         using var timeout = new CancellationTokenSource(ConnectTimeoutMs);
         try { client.ReadAsync(new byte[1], timeout.Token).AsTask().GetAwaiter().GetResult(); }
-        catch { /* egal — the connection alone was the request */ }
+        catch { /* egal - the connection alone was the request */ }
     }
 
     [SupportedOSPlatform("windows")]
@@ -329,7 +329,7 @@ internal sealed class SingleInstanceGuard : IDisposable
         return identity.User?.Value ?? identity.Name.Replace('\\', '-');
     }
 
-    /// <summary>ASFW_ANY — every process may take the foreground; this one is about to exit anyway.</summary>
+    /// <summary>ASFW_ANY - every process may take the foreground; this one is about to exit anyway.</summary>
     private const uint AsfwAny = unchecked((uint)-1);
 
     [DllImport("user32.dll")]

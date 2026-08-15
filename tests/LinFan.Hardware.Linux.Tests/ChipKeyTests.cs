@@ -8,9 +8,9 @@ using ChipDir = LinFan.Hardware.Linux.LinuxHwmonBackend.ChipDir;
 namespace LinFan.Hardware.Linux.Tests;
 
 /// <summary>
-/// Reine Tests der Chip-Schlüssel-Bestimmung (<see cref="LinuxHwmonBackend.ResolveChipKeys"/>) — die
+/// Reine Tests der Chip-Schlüssel-Bestimmung (<see cref="LinuxHwmonBackend.ResolveChipKeys"/>) - die
 /// Logik hinter den stabilen <c>chip/channel</c>-Ids. Ohne Hardware, deterministisch. (Die Logik selbst
-/// ist plattformneutral; das Attribut spiegelt nur den Linux-Typ, auf dem sie sitzt — CA1416.)
+/// ist plattformneutral; das Attribut spiegelt nur den Linux-Typ, auf dem sie sitzt - CA1416.)
 /// </summary>
 [SupportedOSPlatform("linux")]
 public class ChipKeyTests
@@ -57,7 +57,7 @@ public class ChipKeyTests
             Dir("hwmon4", "nvme", bus: null),
         });
 
-        // Ohne Bus-Adresse bleibt nur der (instabile) hwmon-Name als letzter Ausweg — aber eindeutig.
+        // Ohne Bus-Adresse bleibt nur der (instabile) hwmon-Name als letzter Ausweg - aber eindeutig.
         Assert.Equal("hwmon2", keys["hwmon2"]);
         Assert.Equal("hwmon4", keys["hwmon4"]);
         Assert.NotEqual(keys["hwmon2"], keys["hwmon4"]);

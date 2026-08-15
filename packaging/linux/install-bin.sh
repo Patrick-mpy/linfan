@@ -5,7 +5,7 @@
 #   - the .run installer   (makeself runs this after extracting bin/ + packaging/).
 # For a source checkout use packaging/install.sh (it builds and installs the framework-dependent build).
 #
-# Call without sudo — the script elevates the privileged steps itself (or runs as-is when already root):
+# Call without sudo - the script elevates the privileged steps itself (or runs as-is when already root):
 #   ./packaging/linux/install-bin.sh
 #
 # Linux/ThinkPad prerequisite: load thinkpad_acpi with fan_control=1, else the daemon runs read-only.
@@ -27,7 +27,7 @@ UNIT=linfan-daemon.service
 SUDO=""
 [ "$(id -u)" -ne 0 ] && SUDO="sudo"
 
-echo "==> stop a possibly running service first (safe upgrade — ramps fans back to hardware auto)"
+echo "==> stop a possibly running service first (safe upgrade - ramps fans back to hardware auto)"
 $SUDO systemctl stop "$UNIT" 2>/dev/null || true
 
 # Same hazard for the GUI: it memory-maps its binaries from $PREFIX, so replacing them under a
@@ -97,9 +97,9 @@ $SUDO systemctl --no-pager --full status "$UNIT" || true
 
 if [ -n "$GUI_WAS_RUNNING" ]; then
   # When the whole script runs as root (sudo ./linfan.run) the GUI must not be relaunched from
-  # here — it would run privileged and without the desktop session's display environment.
+  # here - it would run privileged and without the desktop session's display environment.
   if [ "$(id -u)" -eq 0 ]; then
-    echo "NOTE: the GUI was closed for the upgrade — start it again via 'linfan' or the app menu."
+    echo "NOTE: the GUI was closed for the upgrade - start it again via 'linfan' or the app menu."
   else
     echo "==> restart the GUI"
     setsid "$PREFIX/linfan-gui" >/dev/null 2>&1 </dev/null &
@@ -116,5 +116,5 @@ Done.
 EOF
 
 if [ -n "$NEED_RELOGIN" ]; then
-  echo "NOTE: $RUN_USER was added to the 'linfan' group — log out/in (or 'newgrp linfan') so the GUI can reach the socket without sudo."
+  echo "NOTE: $RUN_USER was added to the 'linfan' group - log out/in (or 'newgrp linfan') so the GUI can reach the socket without sudo."
 fi

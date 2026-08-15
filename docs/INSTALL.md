@@ -1,12 +1,12 @@
-# LinFan — Installation & Operation
+# LinFan - Installation & Operation
 
-Build, run locally, and install as a service — Linux and Windows. Overview and architecture:
+Build, run locally, and install as a service - Linux, Windows, and macOS. Overview and architecture:
 [README.md](../README.md) · [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Prerequisites
 
 - **.NET 8 SDK** to build (the target framework is `net8.0`, LTS). Thanks to `RollForward=Major`
-  (`Directory.Build.props`), the daemon **and** GUI also run on a newer major runtime — a **.NET 10 SDK
+  (`Directory.Build.props`), the daemon **and** GUI also run on a newer major runtime - a **.NET 10 SDK
   from the Microsoft apt feed** builds and starts everything; a dedicated net8 runtime is not required.
 - Do **not** use the **snap** SDK for the GUI: it bakes the old `core20` glibc loader into every apphost,
   which makes SkiaSharp (Avalonia) fail against the system `libfontconfig` (`GLIBC … not found`). The
@@ -32,7 +32,7 @@ sudo dotnet run --project src/LinFan.Daemon -- auto <fanId>       # back to hard
 dotnet run --project src/LinFan.Daemon -- monitor-ipc  # live snapshots from the daemon (Ctrl+C)
 dotnet run --project src/LinFan.Daemon -- reload       # make the daemon re-read the config
 
-# GUI (no root) — connects to the running daemon ('run'); otherwise shows it as unreachable:
+# GUI (no root) - connects to the running daemon ('run'); otherwise shows it as unreachable:
 dotnet run --project src/LinFan.App
 ```
 
@@ -51,7 +51,7 @@ lock writes by default:
   cat /sys/module/thinkpad_acpi/parameters/fan_control
   ```
 
-**Start the daemon as root** — build as your user first, then run the DLL with `sudo` (not
+**Start the daemon as root** - build as your user first, then run the DLL with `sudo` (not
 `sudo dotnet run`, which creates root-owned `obj/bin`). Pass `HOME` along, otherwise root looks for the
 config under `/root/.config`:
 
@@ -72,7 +72,7 @@ Instead of starting the daemon by hand, a script installs it as a **systemd serv
 boot) and adds a **GUI entry** to the app menu:
 
 ```bash
-./packaging/install.sh        # call without sudo — it elevates the necessary steps itself
+./packaging/install.sh        # call without sudo - it elevates the necessary steps itself
 ```
 
 The script publishes the daemon + GUI to `/opt/linfan`, installs the unit, enables it (`enable --now`),
@@ -92,7 +92,7 @@ sudo systemctl stop linfan-daemon       # stop
   automatically (`LINFAN_SOCKET` → `$XDG_RUNTIME_DIR/linfan.sock` → `/run/linfan/linfan.sock`), so it
   finds the root daemon without any configuration.
 - **Access control:** the root daemon restricts the socket to the **`linfan` group** (mode `0660`), so
-  only its members — not every local account — can send control commands. `install.sh` creates the group
+  only its members - not every local account - can send control commands. `install.sh` creates the group
   and adds you automatically; **log out and back in** (or `newgrp linfan`) for it to take effect. To grant
   another user later: `sudo usermod -aG linfan <user>`. If the group is missing the socket stays
   root-only and the GUI reports the daemon as unreachable.
@@ -102,7 +102,7 @@ sudo systemctl stop linfan-daemon       # stop
 
 ## Install as a service (Windows)
 
-The daemon runs as a **Windows service (LocalSystem)** — writing PWM via LibreHardwareMonitor/WinRing0
+The daemon runs as a **Windows service (LocalSystem)** - writing PWM via LibreHardwareMonitor/WinRing0
 requires admin. **Nothing is built** on the target PC: the `win-x64` build is self-contained (runtime
 included, no .NET SDK needed). Build from the Linux/dev machine (cross-publish):
 
@@ -120,16 +120,62 @@ Copy the `artifacts/LinFan-win-x64` folder to the Windows PC, then install from 
 ```
 
 Alternatively, a **one-click installer** from `packaging/windows/linfan.iss` (Inno Setup 6, compiled on
-Windows) — it bundles the build and calls the same scripts. Details: `packaging/windows/README.md`.
+Windows) - it bundles the build and calls the same scripts. Details: `packaging/windows/README.md`.
 
+- Both scripts **close a running GUI** from the install directory first - it holds `App\*.dll`, which
+  Windows would not let them overwrite or delete. Unsaved editor changes are lost; start the GUI again
+  from the Start menu afterwards.
 - **Log out and back in once after the first install.** Access to the pipe is restricted to the local
-  group `LinFan Users`, which the installer creates and adds you to — and Windows only applies group
+  group `LinFan Users`, which the installer creates and adds you to - and Windows only applies group
   membership at sign-in. Until then the GUI reports the service as unreachable although it is running
   (same situation as the `linfan` group on Linux).
-- Start the **GUI** as a **normal user** (Start menu → "LinFan"), **not** as admin — it connects to the
+- Start the **GUI** as a **normal user** (Start menu → "LinFan"), **not** as admin - it connects to the
   service over the named pipe `\\.\pipe\linfan`.
 - **Machine-wide config** under `%ProgramData%\linfan\config.json`, so the SYSTEM service and the user
   GUI see the same file (daemon = sole writer).
+
+### "Windows protected your PC" (SmartScreen)
+
+The Windows binaries are **not code-signed yet**, so SmartScreen shows a blue dialog on the first run of
+a download and the UAC prompt says *Unknown publisher*. That is a statement about the missing signature,
+not about the file - an unsigned installer has no reputation to look up, and every new release starts
+from zero.
+
+To continue: **More info → Run anyway**. Nothing is silently blocked; the dialog only hides the button
+behind that link.
+
+Verify the download first - the release page carries a `SHA256SUMS.txt` next to the assets:
+
+```powershell
+Get-FileHash .\LinFan-Setup-0.3.1-win-x64.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
+```
+
+```bash
+sha256sum -c SHA256SUMS.txt --ignore-missing   # Linux/macOS, or Git Bash on Windows
+```
+
+A matching hash proves the download arrived intact - it rules out a corrupted transfer or a tampered
+mirror, but not a compromised release page itself. Only a signature would additionally prove **who**
+built the file; that is planned (SignPath for open-source projects).
+
+## Run on macOS (no service yet)
+
+There is no `launchd` daemon yet - the daemon is started by hand:
+
+```bash
+dotnet run --project src/LinFan.Daemon -- monitor   # read-only, no root, no daemon needed
+
+# Full control: daemon as root in one terminal, GUI (as your user) in another.
+sudo dotnet run --project src/LinFan.Daemon -- run   # binds /Library/Application Support/linfan/linfan.sock
+dotnet run --project src/LinFan.App                  # GUI connects over IPC
+```
+
+Reading needs no root; **fan control needs `sudo`** (SMC writes are privileged). The root daemon makes the
+socket reachable only for the invoking user (via `SUDO_UID`, mode `0600`). Do **not** `sudo` the GUI.
+
+`sudo dotnet run` leaves `obj/bin` owned by root here just as it does on Linux - build as your user
+first and run the built DLL with `sudo` instead (see the note under
+[Enabling PWM writes](#enabling-pwm-writes-linux-root--possibly-a-driver-flag)).
 
 ## Packaging
 

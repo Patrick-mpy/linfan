@@ -18,7 +18,7 @@ internal static class FilteredListView
         return fields.Any(f => f is not null && f.Contains(q, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>Bringt eine Ziel-Collection auf den Inhalt von <paramref name="source"/> — nur bei Abweichung
+    /// <summary>Bringt eine Ziel-Collection auf den Inhalt von <paramref name="source"/> - nur bei Abweichung
     /// (kein unnötiges Auffrischen gebundener Listen). In-place Clear+Add genügt für die kleinen Geräte-Listen.</summary>
     public static void Sync<T>(ObservableCollection<T> target, IEnumerable<T> source)
     {

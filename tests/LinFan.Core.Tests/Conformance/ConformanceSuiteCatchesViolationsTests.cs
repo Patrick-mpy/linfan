@@ -31,7 +31,7 @@ public sealed class ConformanceSuiteCatchesViolationsTests
     [Fact]
     public void Inv1_Fails_For_DiscoveryStateRestore_Backend()
     {
-        // Das gefährliche Backend setzt nach RestoreDefaults wieder pwm=1/Manual — INV-1 MUSS das reißen.
+        // Das gefährliche Backend setzt nach RestoreDefaults wieder pwm=1/Manual - INV-1 MUSS das reißen.
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => new DiscoveryStateProbe().RunInv1());
     }
 
@@ -80,7 +80,7 @@ public sealed class ConformanceSuiteCatchesViolationsTests
     public void Inv9_Fails_For_RacyBackend()
     {
         // Das racy Backend (ungeschützter geteilter Zustand zwischen ReadValue und Fan-Writes) MUSS unter dem
-        // nebenläufigen Hammer reißen — INV-9 prüft `Assert.Empty(failures)`, genau diese Assertion würde hier
+        // nebenläufigen Hammer reißen - INV-9 prüft `Assert.Empty(failures)`, genau diese Assertion würde hier
         // also fehlschlagen. Eine Data-Race ist aber nicht in JEDEM Lauf sichtbar (Scheduling-Glück), darum den
         // Hammer bis zu mehrmals wiederholen: schon EIN reißender Lauf beweist, dass die Suite ein racy Backend
         // fängt. Reißt KEINER von vielen Läufen, ist das ein echter Befund (Race nicht auslösbar) → Test rot.
@@ -93,7 +93,7 @@ public sealed class ConformanceSuiteCatchesViolationsTests
                 return; // Race ausgelöst → INV-9 (Assert.Empty) reißt für dieses Backend. Beweis erbracht.
         }
 
-        Assert.Fail($"Die Race im RacyFanController wurde in {maxAttempts} Hammer-Läufen nie ausgelöst — " +
+        Assert.Fail($"Die Race im RacyFanController wurde in {maxAttempts} Hammer-Läufen nie ausgelöst - " +
                     "INV-9 könnte ein nicht thread-sicheres Backend übersehen.");
     }
 }

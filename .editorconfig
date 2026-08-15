@@ -1,4 +1,4 @@
-# LinFan — Code-Konventionen (von `dotnet format` erzwungen)
+# LinFan - Code-Konventionen (von `dotnet format` erzwungen)
 # Top-level config:
 root = true
 

@@ -7,7 +7,7 @@ namespace LinFan.Ipc.Transport;
 /// <summary>
 /// Client-Transport über eine Windows-Named-Pipe; der Endpunkt ist der reine Pipe-Name (Server ist
 /// stets der lokale Rechner <c>"."</c>). Schlägt nach einem kurzen Timeout fehl, wenn kein Daemon
-/// lauscht — so kann die Kandidaten-/Reconnect-Logik greifen, statt unbegrenzt zu blockieren (Parität
+/// lauscht - so kann die Kandidaten-/Reconnect-Logik greifen, statt unbegrenzt zu blockieren (Parität
 /// zum Unix-Transport, der bei fehlendem Socket sofort wirft).
 /// </summary>
 internal sealed class NamedPipeClientTransport : IIpcClientTransport

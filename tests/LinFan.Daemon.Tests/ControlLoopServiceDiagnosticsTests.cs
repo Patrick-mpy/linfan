@@ -7,7 +7,7 @@ namespace LinFan.Daemon.Tests;
 
 /// <summary>
 /// Tests für die Diagnose unbekannter Kurven-Quellen (<see cref="ControlLoopService.UnknownSourceIds"/>):
-/// findet config-referenzierte Sensor-IDs, die das Backend nach hwmon-Neunummerierung nicht (mehr) kennt —
+/// findet config-referenzierte Sensor-IDs, die das Backend nach hwmon-Neunummerierung nicht (mehr) kennt -
 /// Grundlage der einmaligen Daemon-Warnung.
 /// </summary>
 public class ControlLoopServiceDiagnosticsTests

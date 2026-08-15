@@ -8,7 +8,7 @@ namespace LinFan.Core.Services;
 /// <summary>
 /// Fasst die Live-Werte mehrerer Quell-Sensoren einer Kurve zu einem einzelnen Eingangswert zusammen.
 /// Nicht lesbare Sensoren (<see cref="double.NaN"/>, z. B. EIO) werden ignoriert; sind alle Quellen
-/// unlesbar (oder die Liste leer), ist das Ergebnis <see cref="double.NaN"/> — der Aufrufer behandelt
+/// unlesbar (oder die Liste leer), ist das Ergebnis <see cref="double.NaN"/> - der Aufrufer behandelt
 /// das wie „kein Wert" (kein PWM-Schreiben ohne gültige Temperatur).
 /// </summary>
 public static class SensorAggregator
@@ -23,9 +23,9 @@ public static class SensorAggregator
     }
 
     /// <summary>
-    /// Heißeste lesbare Temperatur über ALLE Temperatur-Sensoren des Backends — oder <see cref="double.NaN"/>,
+    /// Heißeste lesbare Temperatur über ALLE Temperatur-Sensoren des Backends - oder <see cref="double.NaN"/>,
     /// wenn keine lesbar ist. <b>Wirft nie</b> (Fail-Safe-Watchdog): eine werfende Discovery ODER ein einzelner
-    /// werfender Sensor (EIO o. Ä.) darf den Watchdog-Tick nicht abreißen — Discovery-Fehler ⇒ NaN, ein
+    /// werfender Sensor (EIO o. Ä.) darf den Watchdog-Tick nicht abreißen - Discovery-Fehler ⇒ NaN, ein
     /// kaputter Kanal wird übersprungen. Von Regel-Loop UND Kalibrier-Watchdog genutzt (eine Quelle statt
     /// Duplikaten). NaN führt beim Aufrufer über die Blind-Tick-Logik in den sicheren Zustand.
     /// </summary>
@@ -52,11 +52,11 @@ public static class SensorAggregator
     /// <summary>
     /// Liest einen Quell-Sensor defensiv: Die IDs stammen aus der gespeicherten Config und können auf einen
     /// Sensor zeigen, den das Backend gerade <b>nicht</b> kennt (z. B. weil sich die hwmon-Nummerierung seit
-    /// dem Speichern geändert hat) — laut Vertrag darf <see cref="ISensorBackend.ReadValue"/> dafür werfen.
+    /// dem Speichern geändert hat) - laut Vertrag darf <see cref="ISensorBackend.ReadValue"/> dafür werfen.
     /// <b>Jede</b> Backend-Exception (nicht nur <see cref="KeyNotFoundException"/>: auch <c>IOException</c>/EIO,
     /// unerwartete Fehler) zählt hier wie „nicht lesbar" → <see cref="double.NaN"/>, statt den ganzen Regel-Tick
-    /// abzureißen (Fail-Safe: eine einzelne fehlende/kaputte Quelle darf nicht die Regelung ALLER Lüfter — und
-    /// damit den Übertemp-Watchdog — stoppen).
+    /// abzureißen (Fail-Safe: eine einzelne fehlende/kaputte Quelle darf nicht die Regelung ALLER Lüfter - und
+    /// damit den Übertemp-Watchdog - stoppen).
     /// </summary>
     private static double ReadOrNaN(ISensorBackend backend, string id)
     {

@@ -6,6 +6,7 @@ using System.Text.Json;
 using CommunityToolkit.Mvvm.Input;
 using LinFan.App.Localization;
 using LinFan.Core.Models;
+using LinFan.Core.Services;
 
 namespace LinFan.App.Controllers;
 
@@ -18,15 +19,14 @@ public partial class CurveEditorController
     ///
     /// Coalescing des teuren Vergleichs: Ein Kurven-Punkt-Drag feuert hier pro Maus-Sample (Temp UND Prozent),
     /// ein voller <c>Serialize(BuildConfig())</c> je Sample war der Review-Hotpath. Aus dem <b>sauberen</b>
-    /// Zustand heraus MUSS jede Bearbeitung sofort geprüft werden (clean→dirty muss synchron greifen — daran
-    /// hängen die Edit-Tests und das Banner). Ist der Editor bereits <b>dirty</b>, bleibt er dirty, solange
+    /// Zustand heraus MUSS jede Bearbeitung sofort geprüft werden (clean→dirty muss synchron greifen - daran
+    /// hängen die Edit-Tests und die Knöpfe in der Kopfzeile). Ist der Editor bereits <b>dirty</b>, bleibt er dirty, solange
     /// weiter editiert wird; die einzige Rück-Transition (Edit exakt zurück auf die Baseline) wird nur
-    /// vorgemerkt und beim nächsten Live-Tick (<see cref="UpdateLive"/>, ~1 s) nachgezogen — also nicht pro
+    /// vorgemerkt und beim nächsten Live-Tick (<see cref="UpdateLive"/>, ~1 s) nachgezogen - also nicht pro
     /// Sample serialisiert. Bedeutung und Zeitpunkt des Speicherns bleiben unverändert.
     /// </summary>
     private void MarkDirty()
     {
-        UnsavedToastHidden = false; // any new edit re-shows a previously dismissed unsaved toast
         if (HasUnsavedChanges && _savedConfigJson is not null)
         {
             _dirtyCheckDeferred = true;
@@ -47,7 +47,7 @@ public partial class CurveEditorController
     private static string Serialize(AppConfig config) => JsonSerializer.Serialize(config);
 
     /// <summary>
-    /// Zieht die vom Daemon geänderten PWM-Grenzen (Kalibrier-Ergebnis) in der gespeicherten Baseline nach —
+    /// Zieht die vom Daemon geänderten PWM-Grenzen (Kalibrier-Ergebnis) in der gespeicherten Baseline nach -
     /// analog zu <c>RebaselineCurveEnabled</c>: eine Kalibrierung ist kein Nutzer-Edit und darf weder den
     /// „Nicht gespeichert"-Banner zünden noch von „Verwerfen" auf den Vor-Kalibrier-Wert zurückgenommen werden.
     /// </summary>
@@ -133,20 +133,11 @@ public partial class CurveEditorController
     /// <summary>Nur etwas zu verwerfen, solange ungespeicherte Änderungen vorliegen.</summary>
     private bool CanRevert() => HasUnsavedChanges;
 
-    partial void OnHasUnsavedChangesChanged(bool value)
-    {
-        RevertCommand.NotifyCanExecuteChanged();
-        if (!value)
-            UnsavedToastHidden = false; // clean again -> the next dirty transition shows the toast fresh
-    }
-
-    /// <summary>Hides the unsaved-changes toast until the next edit (the dirty state itself is untouched).</summary>
-    [RelayCommand]
-    private void HideUnsavedToast() => UnsavedToastHidden = true;
+    partial void OnHasUnsavedChangesChanged(bool value) => RevertCommand.NotifyCanExecuteChanged();
 
     /// <summary>
     /// Verwirft alle Änderungen seit dem letzten Speichern/Laden und stellt den Editor vollständig aus der
-    /// Baseline (<see cref="_savedConfigJson"/>) wieder her — der Gegenpart zu <see cref="SaveCommand"/>.
+    /// Baseline (<see cref="_savedConfigJson"/>) wieder her - der Gegenpart zu <see cref="SaveCommand"/>.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanRevert))]
     private void Revert()
@@ -169,6 +160,9 @@ public partial class CurveEditorController
 
         ProfileRow? active = Profiles.FirstOrDefault(p => p.Id == baseline.ActiveProfileId)
                              ?? Profiles.FirstOrDefault();
+        _applyingActiveProfile = true;
+        ActiveProfile = active;
+        _applyingActiveProfile = false;
         _applyingProfile = true;
         SelectedProfile = active;
         _applyingProfile = false;
@@ -189,7 +183,7 @@ public partial class CurveEditorController
     [RelayCommand]
     private async Task Save()
     {
-        // Vor dem ersten Snapshot sind Kurven/Lüfter leer — nicht speichern, sonst Datenverlust.
+        // Vor dem ersten Snapshot sind Kurven/Lüfter leer - nicht speichern, sonst Datenverlust.
         if (!_initialized)
         {
             SetStatus(Localizer.Instance["CurveEditorCtrl.NotConnected"], isError: true);
@@ -201,11 +195,12 @@ public partial class CurveEditorController
             return;
         }
 
-        // Das aktive Profil spiegelt den aktuellen Editor-Stand (Kurven + Zuordnungen) — für spätere Profilwechsel.
-        if (SelectedProfile is { } active)
+        // Das im Editor gezeigte Profil übernimmt den aktuellen Stand (Kurven + Zuordnungen) - es ist nicht
+        // zwingend das aktive; welche Kurven laufen, entscheidet weiterhin ActiveProfile (siehe BuildConfig).
+        if (SelectedProfile is { } edited)
         {
-            active.Curves = CurrentCurveConfigs();
-            active.Assignments = CurrentAssignments();
+            edited.Curves = CurrentCurveConfigs();
+            edited.Assignments = CurrentAssignments();
         }
 
         AppConfig config = BuildConfig();
@@ -223,25 +218,60 @@ public partial class CurveEditorController
     }
 
     /// <summary>
-    /// Baut die vollständige <see cref="AppConfig"/> aus dem aktuellen Editor-Stand — ohne Seiteneffekte.
-    /// Das aktive Profil bekommt die aktuellen Editor-Kurven/-Zuordnungen, ohne den ProfileRow-Snapshot zu ändern.
+    /// Baut die vollständige <see cref="AppConfig"/> aus dem aktuellen Editor-Stand - ohne Seiteneffekte.
+    /// Das <b>im Editor gezeigte</b> Profil bekommt die aktuellen Kurven/Zuordnungen (ohne den
+    /// ProfileRow-Snapshot zu verändern); die laufenden Top-Level-Kurven und Lüfter-Zuordnungen kommen
+    /// dagegen aus dem <b>aktiven</b> Profil - dieselbe Regel, die der Daemon in
+    /// <see cref="ProfileService.Apply"/> ohnehin anwendet. Beim Bearbeiten eines nicht-aktiven Profils
+    /// sind das zwei verschiedene Kurven-Sätze, und genau das ist der Zweck der Trennung.
     /// </summary>
     private AppConfig BuildConfig()
     {
-        List<CurveConfig> curves = CurrentCurveConfigs();
-        List<ProfileAssignment> assignments = CurrentAssignments();
-        string? activeId = SelectedProfile?.Id;
+        List<CurveConfig> editorCurves = CurrentCurveConfigs();
+        List<ProfileAssignment> editorAssignments = CurrentAssignments();
+        string? editedId = SelectedProfile?.Id;
+        string? activeId = ActiveProfile?.Id;
+
+        List<Profile> profiles = Profiles
+            .Select(p => p.Id == editedId ? p.ToProfile(editorCurves, editorAssignments) : p.ToProfile())
+            .ToList();
+
+        Profile? active = profiles.FirstOrDefault(p => p.Id == activeId);
+        List<CurveConfig> liveCurves = (active?.Curves ?? editorCurves).ToList();
+
+        // Doppelte Lüfter-Ids in einer (hand-editierten/migrierten) Config nicht in ein ToDictionary werfen
+        // lassen - erster gewinnt, wie im SnapshotBuilder.
+        var liveAssignments = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (ProfileAssignment a in active?.Assignments ?? editorAssignments)
+            liveAssignments.TryAdd(a.FanId, a.CurveId);
 
         return new AppConfig
         {
-            Curves = curves, // aktive Kurven = aktuelle Editor-Kurven
-            Fans = Fans.Select(f => f.ToConfig()).ToList(),
-            Sensors = Sensors.Select(s => s.ToConfig()).ToList(),
-            Profiles = Profiles
-                .Select(p => p.Id == activeId ? p.ToProfile(curves, assignments) : p.ToProfile())
+            Curves = liveCurves, // laufende Kurven = die des aktiven Profils
+            Fans = Fans.Select(f => f.ToConfig())
+                .Select(f => liveAssignments.TryGetValue(f.FanId, out string? curveId)
+                    ? f with { AssignedCurveId = curveId }
+                    : f)
                 .ToList(),
+            Sensors = Sensors.Select(s => s.ToConfig()).ToList(),
+            Profiles = profiles,
             ActiveProfileId = activeId,
         };
+    }
+
+    /// <summary>
+    /// Zieht einen live geschalteten Profilwechsel in die gespeicherte Baseline nach: der Daemon persistiert
+    /// ihn selbst (<c>ControlLoopService</c> → <see cref="ProfileService.Apply"/> + Save), wie das
+    /// Kurven-An/Aus - er darf also weder den „Nicht gespeichert"-Hinweis zünden noch von „Verwerfen"
+    /// zurückgenommen werden. Angewandt wird exakt die Daemon-Regel, damit Baseline und Dienst übereinstimmen.
+    /// </summary>
+    private void RebaselineActiveProfile(string profileId)
+    {
+        if (_savedConfigJson is null
+            || JsonSerializer.Deserialize<AppConfig>(_savedConfigJson) is not { } baseline)
+            return;
+
+        _savedConfigJson = Serialize(ProfileService.Apply(baseline, profileId));
     }
 
     /// <summary>Setzt die Statuszeile; mit <paramref name="autoHide"/> blendet sie nach ein paar Sekunden aus.</summary>

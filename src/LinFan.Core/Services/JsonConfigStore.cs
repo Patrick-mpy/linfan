@@ -9,7 +9,7 @@ namespace LinFan.Core.Services;
 /// <summary>
 /// JSON-Persistenz der <see cref="AppConfig"/>. Der Pfad ist <c>LINFAN_CONFIG</c> (Override, z. B. für
 /// den Linux-System-Dienst auf <c>/etc/linfan/config.json</c>), sonst OS-konform: Linux/macOS per-User
-/// (<c>~/.config/linfan</c>), Windows <b>maschinenweit</b> (<c>%ProgramData%\linfan</c>) — damit der als
+/// (<c>~/.config/linfan</c>), Windows <b>maschinenweit</b> (<c>%ProgramData%\linfan</c>) - damit der als
 /// SYSTEM laufende Dienst und die User-GUI garantiert dieselbe Datei nutzen (der per-User-<c>%AppData%</c>
 /// des SYSTEM-Profils wäre für die GUI unsichtbar). Speichern erfolgt atomar (temp-Datei + Move).
 /// </summary>
@@ -25,7 +25,7 @@ public sealed class JsonConfigStore : IConfigStore
 
     public string ConfigPath { get; }
 
-    /// <summary>Gibt an, ob bereits eine persistierte Konfiguration existiert — First-Run-Signal.</summary>
+    /// <summary>Gibt an, ob bereits eine persistierte Konfiguration existiert - First-Run-Signal.</summary>
     public bool Exists => File.Exists(ConfigPath);
 
     /// <param name="path">Optionaler expliziter Pfad (v. a. für Tests); sonst der OS-Standardpfad.</param>
@@ -39,7 +39,7 @@ public sealed class JsonConfigStore : IConfigStore
         OperatingSystem.IsWindows());
 
     /// <summary>
-    /// Reine Pfad-Auflösung (testbar): <c>LINFAN_CONFIG</c> gewinnt. Sonst der OS-konforme Basisordner —
+    /// Reine Pfad-Auflösung (testbar): <c>LINFAN_CONFIG</c> gewinnt. Sonst der OS-konforme Basisordner -
     /// auf <b>Windows</b> maschinenweit (<paramref name="commonAppData"/> = <c>%ProgramData%</c>), damit der
     /// als SYSTEM laufende Dienst und die User-GUI dieselbe Datei sehen; auf Linux/macOS per-User
     /// (<paramref name="appData"/> = <c>~/.config</c>). Ist der Basisordner leer, greift

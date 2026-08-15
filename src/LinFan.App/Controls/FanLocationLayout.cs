@@ -8,9 +8,9 @@ namespace LinFan.App.Controls;
 
 /// <summary>
 /// Reine Geometrie + Positions-Algebra für <see cref="FanLocationDiagram"/>: bildet jede Gehäuse-Position
-/// auf ein klickbares Rechteck ab — Silhouette (Seitenansicht) mit Rand-Zonen, seitlichem Einlass und
+/// auf ein klickbares Rechteck ab - Silhouette (Seitenansicht) mit Rand-Zonen, seitlichem Einlass und
 /// gestapelten internen Bauteilen; darunter zwei Chips für „nicht zugeordnet"/„Sonstige". Jede Kante ist
-/// <b>ein Mount</b> mit umschaltbarer Richtung (Einlass/Auslass) — die beiden Varianten teilen sich eine
+/// <b>ein Mount</b> mit umschaltbarer Richtung (Einlass/Auslass) - die beiden Varianten teilen sich eine
 /// Zone (<see cref="Mount"/>/<see cref="Flip"/>). Keine Render- oder Domain-Logik, damit Hit-Test und
 /// Positions-Algebra unabhängig vom Zeichnen unit-testbar sind.
 /// </summary>
@@ -28,7 +28,7 @@ public static class FanLocationLayout
 
     // Einschritt-Cache je Größe: Render + Hit feuern bei jeder Hover-/Zeiger-Bewegung, die Geometrie
     // (Bounds/Location) hängt aber allein von der Größe ab. Deshalb nur neu bauen, wenn sich die Größe ändert.
-    // (Region.Label käme aus dem Localizer, wird aber nirgends konsumiert — das Diagramm leitet Labels beim
+    // (Region.Label käme aus dem Localizer, wird aber nirgends konsumiert - das Diagramm leitet Labels beim
     // Zeichnen frisch aus ShortLabel ab; die Geometrie bleibt der einzige genutzte, größen-deterministische Output.)
     private static Size _cachedSize;
     private static IReadOnlyList<Region>? _cachedRegions;
@@ -97,7 +97,7 @@ public static class FanLocationLayout
         return regions;
     }
 
-    /// <summary>(Mount-)Position unter dem Punkt — konventionelle Richtung —, oder <c>null</c> wenn daneben.</summary>
+    /// <summary>(Mount-)Position unter dem Punkt - konventionelle Richtung -, oder <c>null</c> wenn daneben.</summary>
     public static FanLocation? Hit(Point p, Size size)
     {
         foreach (Region r in Build(size))

@@ -9,7 +9,7 @@ public sealed class OverTemperatureException : Exception
     public double LimitC { get; }
 
     public OverTemperatureException(double temperatureC, double limitC)
-        : base($"Übertemperatur {temperatureC:0.0} °C ≥ {limitC:0.0} °C — Fail-Safe ausgelöst.")
+        : base($"Übertemperatur {temperatureC:0.0} °C ≥ {limitC:0.0} °C - Fail-Safe ausgelöst.")
     {
         TemperatureC = temperatureC;
         LimitC = limitC;

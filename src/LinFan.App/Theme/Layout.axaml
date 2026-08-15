@@ -8,7 +8,7 @@
       Background als DynamicResource → der Theme-Wechsel (Hell/Dunkel) bleibt erhalten.
     -->
 
-    <!-- Inhaltskarte (Tab-Inhalte) — die häufigste Karte. -->
+    <!-- Inhaltskarte (Tab-Inhalte) - die häufigste Karte. -->
     <Style Selector="Border.card">
         <Setter Property="CornerRadius" Value="{StaticResource RadiusXl}" />
         <Setter Property="Padding" Value="18" />
@@ -21,14 +21,6 @@
         <Setter Property="CornerRadius" Value="{StaticResource RadiusXxl}" />
         <Setter Property="Padding" Value="20" />
         <Setter Property="Background" Value="Transparent" />
-    </Style>
-
-    <!-- Schmale Leiste (Profil-Auswahl, Dashboard & Kurven-Tab). Ebenfalls flach ohne Hintergrund. -->
-    <Style Selector="Border.bar">
-        <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
-        <Setter Property="Padding" Value="12,8" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Margin" Value="0,0,0,12" />
     </Style>
 
     <!-- Geräte-Listenzeile (Einstellungen → Sensoren/Lüfter): ruhige, durch eine Hairline getrennte
@@ -60,7 +52,7 @@
     </Style>
 
     <!-- Reiche, interaktive Listenzeile (Dashboard-Lüfter mit Slider/Sparkline, „Aktive Kurven" mit
-         Mini-Graph): umrissene Karte (Divider-Rand, transparent) statt gefülltem Kasten — Fassung für
+         Mini-Graph): umrissene Karte (Divider-Rand, transparent) statt gefülltem Kasten - Fassung für
          Slider/Graph ohne Box-in-Box. Einfache Zeilen (Sensoren) bleiben flach ohne Karte. -->
     <Style Selector="Border.itemCard">
         <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
@@ -78,28 +70,116 @@
         <Setter Property="Background" Value="{DynamicResource BgInset}" />
     </Style>
 
-    <!-- Overlay-Toast (oben rechts): solide Karte, damit sie über beliebigem Inhalt lesbar bleibt;
-         Severity über den linken Akzentstreifen (toastStripe) statt über gefärbte Flächen. -->
+    <!-- Overlay-Toast (oben rechts): solide Karte, damit sie über beliebigem Inhalt lesbar bleibt.
+         Severity trägt der linke Streifen (toastStripe) zusammen mit dem farbigen Icon (toastIcon) -
+         die Fläche bleibt bewusst neutral, damit die Karte über beliebigem Inhalt ruhig wirkt. -->
     <Style Selector="Border.toast">
         <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
         <Setter Property="Padding" Value="12,10" />
         <Setter Property="Background" Value="{DynamicResource BgCardAlt}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Divider}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BoxShadow" Value="0 4 16 0 #40000000" />
+        <Setter Property="BoxShadow" Value="0 6 20 0 #59000000" />
     </Style>
     <Style Selector="Border.toast Border.toastStripe">
-        <Setter Property="Width" Value="3" />
-        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="Width" Value="5" />
+        <Setter Property="CornerRadius" Value="3" />
         <Setter Property="Background" Value="{DynamicResource InfoAccent}" />
-    </Style>
-    <Style Selector="Border.toast.warning Border.toastStripe">
-        <Setter Property="Background" Value="{DynamicResource Warning}" />
     </Style>
     <Style Selector="Border.toast.danger Border.toastStripe">
         <Setter Property="Background" Value="{DynamicResource DangerAccent}" />
     </Style>
     <Style Selector="Border.toast.success Border.toastStripe">
         <Setter Property="Background" Value="{DynamicResource Success}" />
+    </Style>
+
+    <!-- Severity-Icon. Data steht hier (nicht in der View), damit die Toasts mit wechselndem Schweregrad
+         (Status/Backup: Classes.danger am Binding) Symbol UND Farbe mitziehen. Toasts mit festem eigenem
+         Symbol (Kalibrierung, Update) setzen Data inline - ein lokaler Wert schlägt den Style-Setter. -->
+    <Style Selector="Border.toast PathIcon.toastIcon">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Margin" Value="0,0,9,0" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Foreground" Value="{DynamicResource InfoAccent}" />
+        <Setter Property="Data" Value="{DynamicResource IconCheckCircle}" />
+    </Style>
+    <Style Selector="Border.toast.danger PathIcon.toastIcon">
+        <Setter Property="Foreground" Value="{DynamicResource DangerAccent}" />
+        <Setter Property="Data" Value="{DynamicResource IconAlertCircle}" />
+    </Style>
+
+    <!-- Die Kernaussage des Toasts (nicht die Button-Beschriftungen - daher eigene Klasse). Größe hier und
+         nicht inline: ein lokaler Wert in der View würde diesen Setter schlagen. -->
+    <Style Selector="Border.toast TextBlock.toastText">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- Gefüllte Aktions-Buttons. Farbe hat Bedeutung: „primary" = die eine bestätigende Aktion einer
+         Fläche (Speichern/Übernehmen/Weiter), „danger" = zerstörend (Löschen/Verwerfen/Zurücksetzen);
+         alles andere bleibt neutral. Fluent setzt Background/BorderBrush/Foreground je Zustand auf dem
+         ContentPresenter des Templates - dieselben drei müssen hier je Zustand überschrieben werden,
+         inklusive :disabled (sonst bliebe ein gesperrter Button knallbunt). -->
+    <Style Selector="Button.primary /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFill}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentPressed}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentPressed}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+
+    <Style Selector="Button.danger /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource DangerFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerFill}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnDanger}" />
+    </Style>
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource DangerHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnDanger}" />
+    </Style>
+    <Style Selector="Button.danger:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource DangerPressed}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerPressed}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnDanger}" />
+    </Style>
+
+    <Style Selector="Button.primary:disabled /template/ ContentPresenter, Button.danger:disabled /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Divider}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Divider}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFaintest}" />
+    </Style>
+
+    <!-- Der Presenter färbt nur den Inhalt, den er selbst erzeugt (reiner Text-Content). Icon-plus-Text-
+         Buttons bringen ihre eigenen TextBlocks/PathIcons mit - die erben die Presenter-Schrift NICHT und
+         blieben in der Vordergrundfarbe des Fensters (helle Schrift auf heller Fläche). Daher explizit. -->
+    <!-- Je Zieltyp ein eigener Selector: eine gemischte Komma-Liste löst „Foreground" gegen die
+         gemeinsame Basis (Control) auf und lässt sich nicht übersetzen. -->
+    <Style Selector="Button.primary TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+    <Style Selector="Button.primary PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+    <Style Selector="Button.danger TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource OnDanger}" />
+    </Style>
+    <Style Selector="Button.danger PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource OnDanger}" />
+    </Style>
+    <Style Selector="Button.primary:disabled TextBlock, Button.danger:disabled TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextFaintest}" />
+    </Style>
+    <Style Selector="Button.primary:disabled PathIcon, Button.danger:disabled PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource TextFaintest}" />
     </Style>
 </Styles>

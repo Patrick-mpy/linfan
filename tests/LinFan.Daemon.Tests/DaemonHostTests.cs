@@ -9,10 +9,10 @@ namespace LinFan.Daemon.Tests;
 
 /// <summary>
 /// Verdrahtungs-Test für den Daemon-Start. Stellt sicher, dass der DI-Container alles auflöst, was
-/// <see cref="ControlLoopService"/> per Konstruktor braucht — insbesondere <see cref="IIpcServer"/>.
+/// <see cref="ControlLoopService"/> per Konstruktor braucht - insbesondere <see cref="IIpcServer"/>.
 /// Fehlt diese Bindung, stürzt der privilegierte Daemon beim Start ab (kein Watchdog, keine Regelung,
 /// Hardware unbeaufsichtigt). Die Service-Tests umgehen den Container (FakeIpcServer direkt im Ctor)
-/// und würden einen solchen Wiring-Bruch nicht bemerken — dieser Test schließt die Lücke.
+/// und würden einen solchen Wiring-Bruch nicht bemerken - dieser Test schließt die Lücke.
 /// </summary>
 public class DaemonHostTests
 {

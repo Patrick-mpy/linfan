@@ -52,7 +52,7 @@ public class FanLocationLayoutTests
     public void EveryLocation_IncludingDirectionVariants_MapsToABuiltZone()
     {
         // Auch die Richtungs-Gegenstücke (CaseFrontExhaust …) müssen eine der 11 Zonen treffen, damit das
-        // Diagramm sie hervorheben kann — sie teilen die Zone ihres Mounts.
+        // Diagramm sie hervorheben kann - sie teilen die Zone ihres Mounts.
         var zones = FanLocationLayout.Build(Canvas).Select(r => r.Location).ToList();
         foreach (FanLocation loc in Enum.GetValues<FanLocation>())
             Assert.Contains(zones, z => FanLocationLayout.SameMount(z, loc));

@@ -8,9 +8,9 @@ public enum TachMappingOutcome
     /// <summary>Genau ein Drehzahl-Sensor reagierte dominant auf den angetriebenen Lüfter → zugeordnet.</summary>
     Matched,
 
-    /// <summary>Kein Sensor reagierte spürbar (Lüfter ohne Tacho, z. B. AIO-Pumpe) — kein Fehler.</summary>
+    /// <summary>Kein Sensor reagierte spürbar (Lüfter ohne Tacho, z. B. AIO-Pumpe) - kein Fehler.</summary>
     NoResponse,
 
-    /// <summary>Mehrere Sensoren reagierten ähnlich stark (Luft-Übersprechen) — nicht eindeutig zuordenbar.</summary>
+    /// <summary>Mehrere Sensoren reagierten ähnlich stark (Luft-Übersprechen) - nicht eindeutig zuordenbar.</summary>
     Ambiguous,
 }

@@ -8,7 +8,7 @@ namespace LinFan.Hardware.Mac.Tests;
 /// Kuratierte Temperatur-Discovery über dem Fake-SMC: Apple-Silicon-Familien-Erkennung (M1/M2/M3),
 /// die daraus folgenden Labels bei Key-Kollisionen (<c>Tp09</c>, <c>Tp0P</c>) und die stabile
 /// Gruppen-Reihenfolge der Deskriptoren (CPU → GPU → SoC/Board → Storage → Battery → Sonstiges).
-/// Fehlende Keys stören nie — nur vorhandene, plausible Keys werden zu Sensoren.
+/// Fehlende Keys stören nie - nur vorhandene, plausible Keys werden zu Sensoren.
 /// </summary>
 public sealed class MacTemperatureDiscoveryTests
 {
@@ -24,7 +24,7 @@ public sealed class MacTemperatureDiscoveryTests
     public void M2Family_LabelsClusters_AndOrdersGroups()
     {
         var smc = new FakeSmc();
-        // M2-Familie (4 lesbare Cluster-Keys): Tp09 muss hier P-Core 3 sein — auf M1 wäre derselbe
+        // M2-Familie (4 lesbare Cluster-Keys): Tp09 muss hier P-Core 3 sein - auf M1 wäre derselbe
         // Key E-Core 1. Tp1t ist vorhanden, aber implausibel (0 °C): zählt für die Familien-
         // Erkennung, wird aber nicht als Sensor exponiert.
         smc.SetFloat("Tp1h", 38f);
@@ -66,7 +66,7 @@ public sealed class MacTemperatureDiscoveryTests
         Assert.Equal(
             new[]
             {
-                "CPU Efficiency Core 1",   // Tp09 — M1-Bedeutung
+                "CPU Efficiency Core 1",   // Tp09 - M1-Bedeutung
                 "CPU Efficiency Core 2",   // Tp0T
                 "CPU Performance Core 1",  // Tp01
                 "CPU Performance Core 4",  // Tp0H
@@ -93,7 +93,7 @@ public sealed class MacTemperatureDiscoveryTests
     public void Intel_WithoutFamily_UsesFlatLabels_InGroupOrder()
     {
         var smc = new FakeSmc();
-        // Tp0P allein ist EIN M1-Tabellen-Treffer — unter der Familien-Schwelle bleibt er das
+        // Tp0P allein ist EIN M1-Tabellen-Treffer - unter der Familien-Schwelle bleibt er das
         // Intel-Netzteil, kein "CPU Performance Core 6".
         smc.SetFloat("Tp0P", 45f);
         smc.SetFloat("TC0P", 50f);

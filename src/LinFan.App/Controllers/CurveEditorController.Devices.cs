@@ -12,7 +12,7 @@ public partial class CurveEditorController
 
     private void OnSensorRowChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Dirty-Prüfung zuerst — die Seiteneffekt-Zweige unten kehren früh zurück (würden Name nie erreichen).
+        // Dirty-Prüfung zuerst - die Seiteneffekt-Zweige unten kehren früh zurück (würden Name nie erreichen).
         // Live-Wert (LiveValue) bewusst ausgenommen.
         if (e.PropertyName is nameof(SensorOption.Name) or nameof(SensorOption.Visible) or nameof(SensorOption.Group))
             MarkDirty();
@@ -30,7 +30,7 @@ public partial class CurveEditorController
             VisibleSensors.Remove(s);
         RebuildFilteredSensors(); // „Versteckte ausblenden" muss die getoggelte Zeile sofort ein-/ausblenden
 
-        // The eye toggle must update every curve's source checkbox list immediately — each
+        // The eye toggle must update every curve's source checkbox list immediately - each
         // CurveEditRow owns its own list (mirror of RebuildSelectedCurveFans for the fan side).
         foreach (CurveEditRow curve in Curves)
             curve.RebuildSensorChecks();

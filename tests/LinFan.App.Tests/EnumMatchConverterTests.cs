@@ -8,7 +8,7 @@ using Xunit;
 namespace LinFan.App.Tests;
 
 /// <summary>
-/// Sichert die Logik des <see cref="EnumMatchConverter"/> ab — genau der Konverter, der die Schritt-
+/// Sichert die Logik des <see cref="EnumMatchConverter"/> ab - genau der Konverter, der die Schritt-
 /// Sichtbarkeit des Onboarding-Assistenten steuert. Reine C#-Logik, ohne Avalonia-Headless testbar.
 /// </summary>
 public sealed class EnumMatchConverterTests

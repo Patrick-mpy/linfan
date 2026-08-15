@@ -71,7 +71,7 @@
     <value>Theme</value>
   </data>
   <data name="Header.ThemeTooltip" xml:space="preserve">
-    <value>Color scheme — System follows the operating system.</value>
+    <value>Color scheme - System follows the operating system.</value>
   </data>
   <data name="Header.Language" xml:space="preserve">
     <value>Language</value>
@@ -83,25 +83,19 @@
     <value>Keep running in background</value>
   </data>
   <data name="Header.RunInBackgroundTooltip" xml:space="preserve">
-    <value>Close to the notification area instead of quitting — fan control keeps running in the background.</value>
-  </data>
-  <data name="MainWindow.UnsavedChanges" xml:space="preserve">
-    <value>● Unsaved changes</value>
+    <value>Close to the notification area instead of quitting - fan control keeps running in the background.</value>
   </data>
   <data name="MainWindow.ApplyChangesTooltip" xml:space="preserve">
-    <value>Applies the unsaved changes — saves via the background service.</value>
-  </data>
-  <data name="MainWindow.Apply" xml:space="preserve">
-    <value>Apply</value>
+    <value>Apply - applies the unsaved changes, saved via the background service.</value>
   </data>
   <data name="MainWindow.RevertTooltip" xml:space="preserve">
-    <value>Discards all changes since the last save.</value>
+    <value>Discard - discards all changes since the last save.</value>
   </data>
   <data name="MainWindow.Revert" xml:space="preserve">
     <value>Discard</value>
   </data>
   <data name="MainWindow.DaemonUnreachable" xml:space="preserve">
-    <value>⚠ Background service unreachable — is the service running? Check with: systemctl status linfan-daemon</value>
+    <value>Background service unreachable - is the service running? Check with: systemctl status linfan-daemon</value>
   </data>
   <data name="MainWindow.Close" xml:space="preserve">
     <value>Close</value>
@@ -111,6 +105,33 @@
   </data>
   <data name="MainWindow.Profile" xml:space="preserve">
     <value>Profile</value>
+  </data>
+  <data name="MainWindow.Profiles" xml:space="preserve">
+    <value>Profiles</value>
+  </data>
+  <data name="MainWindow.EditProfile" xml:space="preserve">
+    <value>Edit profile</value>
+  </data>
+  <data name="MainWindow.ProfileActive" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="MainWindow.ProfileActiveTooltip" xml:space="preserve">
+    <value>Hands the fans to this profile. Apply pending changes first - the service would switch to its saved copy of the profile, not to what is on screen.</value>
+  </data>
+  <data name="MainWindow.ProfileSwitchLocked" xml:space="preserve">
+    <value>Locked while changes are unsaved - apply or revert them first.</value>
+  </data>
+  <data name="MainWindow.ProfileCurves" xml:space="preserve">
+    <value>Curves in this profile</value>
+  </data>
+  <data name="MainWindow.OpenCurveTooltip" xml:space="preserve">
+    <value>Opens this curve in the editor.</value>
+  </data>
+  <data name="MainWindow.ProfileCurvesSubtitle" xml:space="preserve">
+    <value>Click a curve to edit it; the side menu lists them as well</value>
+  </data>
+  <data name="MainWindow.ProfileNotActiveNote" xml:space="preserve">
+    <value>This profile is not regulating right now - it can be edited without affecting the fans.</value>
   </data>
   <data name="MainWindow.ActiveCurvesToggleTooltip" xml:space="preserve">
     <value>Expand/collapse active curves.</value>
@@ -125,7 +146,7 @@
     <value>Off</value>
   </data>
   <data name="MainWindow.CurveToggleTooltip" xml:space="preserve">
-    <value>Curve on/off — “off” sets the assigned fans to hardware auto.</value>
+    <value>Curve on/off - “off” sets the assigned fans to hardware auto.</value>
   </data>
   <data name="MainWindow.CurveOffHardwareAuto" xml:space="preserve">
     <value>off → hardware auto</value>
@@ -167,7 +188,7 @@
     <value>Auto</value>
   </data>
   <data name="MainWindow.ManualPowerTooltip" xml:space="preserve">
-    <value>Manual fan power in % — only active in manual mode.</value>
+    <value>Manual fan power in % - only active in manual mode.</value>
   </data>
   <data name="MainWindow.CalibrateTooltip" xml:space="preserve">
     <value>Determines the lowest PWM value at which this fan reliably starts.</value>
@@ -203,13 +224,13 @@
     <value>Show/hide everywhere except the settings (still measured).</value>
   </data>
   <data name="MainWindow.GroupSensorTooltip" xml:space="preserve">
-    <value>Groups sensors into one block — same name = one block, in the dashboard and in the curves’ sensor pickers. Empty → “Ungrouped”.</value>
+    <value>Groups sensors into one block - same name = one block, in the dashboard and in the curves sensor pickers. Empty → “Ungrouped”.</value>
   </data>
   <data name="MainWindow.Optional" xml:space="preserve">
     <value>optional</value>
   </data>
   <data name="MainWindow.AddGroup" xml:space="preserve">
-    <value>＋ Group</value>
+    <value>+ Group</value>
   </data>
   <data name="MainWindow.HardwareAddressTooltip" xml:space="preserve">
     <value>Hardware address (kernel / hwmon path).</value>
@@ -230,7 +251,7 @@
     <value>Position</value>
   </data>
   <data name="MainWindow.PositionLabelTooltip" xml:space="preserve">
-    <value>Mounting position / airflow direction — basis for the planned airflow tuning.</value>
+    <value>Mounting position / airflow direction - basis for the planned airflow tuning.</value>
   </data>
   <data name="MainWindow.PickLocationTooltip" xml:space="preserve">
     <value>Choose the mounting position in the case (interactive preview).</value>
@@ -269,13 +290,19 @@
     <value>PWM</value>
   </data>
   <data name="MainWindow.ManualPwmFloorHint" xml:space="preserve">
-    <value>0% is the hardware floor — some fans keep a minimum speed there and cannot be switched off entirely. For reliable identification use the pulse button (Identify) instead.</value>
+    <value>0% is the hardware floor - some fans keep a minimum speed there and cannot be switched off entirely. For reliable identification use the pulse button (Identify) instead.</value>
   </data>
   <data name="MainWindow.AirflowAutoTune" xml:space="preserve">
     <value>Airflow auto-tune</value>
   </data>
   <data name="MainWindow.AirflowAutoTuneSubtitle" xml:space="preserve">
     <value>Derives a pressure balance and matching curves from the mounting positions. Review the suggestion, apply it, then save.</value>
+  </data>
+  <data name="MainWindow.AirflowStatusTitle" xml:space="preserve">
+    <value>Already applied</value>
+  </data>
+  <data name="MainWindow.AirflowStatusSubtitle" xml:space="preserve">
+    <value>These fans follow the airflow analysis' role curves in the profile being edited.</value>
   </data>
   <data name="MainWindow.AnalyzeAirflowTooltip" xml:space="preserve">
     <value>Computes the pressure balance and matching curve suggestions from the fan positions.</value>
@@ -287,19 +314,10 @@
     <value>Apply suggestion</value>
   </data>
   <data name="MainWindow.ApplySuggestionTooltip" xml:space="preserve">
-    <value>Loads the checked curves/assignments into the editor — then apply via Save.</value>
+    <value>Loads the checked curves/assignments into the editor - then apply via Save.</value>
   </data>
   <data name="MainWindow.TabCurves" xml:space="preserve">
     <value>Curves &amp; assignment</value>
-  </data>
-  <data name="MainWindow.ProfileNamePlaceholder" xml:space="preserve">
-    <value>Profile name</value>
-  </data>
-  <data name="MainWindow.Done" xml:space="preserve">
-    <value>Done</value>
-  </data>
-  <data name="MainWindow.CloseNameFieldTooltip" xml:space="preserve">
-    <value>Close the name field.</value>
   </data>
   <data name="MainWindow.AddProfileTooltip" xml:space="preserve">
     <value>Creates an empty profile with a default curve.</value>
@@ -309,9 +327,6 @@
   </data>
   <data name="MainWindow.Duplicate" xml:space="preserve">
     <value>Duplicate</value>
-  </data>
-  <data name="MainWindow.RenameProfileTooltip" xml:space="preserve">
-    <value>Rename the current profile.</value>
   </data>
   <data name="MainWindow.Rename" xml:space="preserve">
     <value>Rename</value>
@@ -323,16 +338,13 @@
     <value>Delete</value>
   </data>
   <data name="MainWindow.NoDevicesForCurves" xml:space="preserve">
-    <value>No devices detected — without sensors and fans no curves can be created.</value>
+    <value>No devices detected - without sensors and fans no curves can be created.</value>
   </data>
   <data name="MainWindow.Curves" xml:space="preserve">
     <value>Curves</value>
   </data>
   <data name="MainWindow.AddCurveTooltip" xml:space="preserve">
     <value>Creates a new fan curve.</value>
-  </data>
-  <data name="MainWindow.Curve" xml:space="preserve">
-    <value>Curve</value>
   </data>
   <data name="MainWindow.DuplicateCurveTooltip" xml:space="preserve">
     <value>Duplicates the selected curve.</value>
@@ -344,7 +356,7 @@
     <value>(off)</value>
   </data>
   <data name="MainWindow.CurveDisabledTooltip" xml:space="preserve">
-    <value>Curve disabled — fans on hardware auto.</value>
+    <value>Curve disabled - fans on hardware auto.</value>
   </data>
   <data name="MainWindow.Name" xml:space="preserve">
     <value>Name</value>
@@ -353,7 +365,7 @@
     <value>Curve (temperature → power) · drag the points</value>
   </data>
   <data name="MainWindow.NoSourceSensor" xml:space="preserve">
-    <value>No source sensor selected — no live operating point.</value>
+    <value>No source sensor selected - no live operating point.</value>
   </data>
   <data name="MainWindow.Sensors" xml:space="preserve">
     <value>Sensors</value>
@@ -379,11 +391,17 @@
   <data name="MainWindow.HysteresisTooltip" xml:space="preserve">
     <value>Dead band in °C: prevents constant readjustment on small temperature fluctuations.</value>
   </data>
+  <data name="MainWindow.Smoothing" xml:space="preserve">
+    <value>Smoothing</value>
+  </data>
+  <data name="MainWindow.SmoothingTooltip" xml:space="preserve">
+    <value>Averages the temperature over this many seconds before the curve is applied. Absorbs the brief spikes that make fans surge and drop back (typical of AMD CPUs). 0 turns it off. The over-temperature protection is unaffected and keeps reacting immediately.</value>
+  </data>
   <data name="MainWindow.PointsToggleTooltip" xml:space="preserve">
     <value>Expand/collapse the point list.</value>
   </data>
   <data name="MainWindow.DecreasingPercentWarning" xml:space="preserve">
-    <value>⚠ Power drops as temperature rises — the fan then cools less the hotter it gets.</value>
+    <value>Power drops as temperature rises - the fan then cools less the hotter it gets.</value>
   </data>
   <data name="MainWindow.TempToPercentHeader" xml:space="preserve">
     <value>°C → %</value>
@@ -410,7 +428,7 @@
     <value>Check which fans use the selected curve</value>
   </data>
   <data name="Onboarding.WindowTitle" xml:space="preserve">
-    <value>LinFan – Setup Assistant</value>
+    <value>LinFan - Setup Assistant</value>
   </data>
   <data name="Onboarding.WelcomeTitle" xml:space="preserve">
     <value>Welcome to LinFan</value>
@@ -476,7 +494,7 @@
     <value>Choose profile</value>
   </data>
   <data name="Onboarding.AirflowProfilesIntro" xml:space="preserve">
-    <value>Fan positions detected: all three profiles are built from the airflow analysis — every fan follows a curve for its role (CPU, GPU, intake, exhaust).</value>
+    <value>Fan positions detected: all three profiles are built from the airflow analysis - every fan follows a curve for its role (CPU, GPU, intake, exhaust).</value>
   </data>
   <data name="Onboarding.AirflowFansLabel" xml:space="preserve">
     <value>Role and curve per fan</value>
@@ -485,7 +503,7 @@
     <value>Primary temperature sensor</value>
   </data>
   <data name="Onboarding.PrimarySensorHint" xml:space="preserve">
-    <value>This sensor drives all fan curves — usually the CPU sensor.</value>
+    <value>This sensor drives all fan curves - usually the CPU sensor.</value>
   </data>
   <data name="Onboarding.FanProfileLabel" xml:space="preserve">
     <value>Fan profile</value>
@@ -497,13 +515,13 @@
     <value>LinFan is now set up. Here's how to find your way around the main window:</value>
   </data>
   <data name="Onboarding.DoneOverview" xml:space="preserve">
-    <value>• Overview — keep an eye on live temperatures, fan speeds and the active curves.</value>
+    <value>• Overview - keep an eye on live temperatures, fan speeds and the active curves.</value>
   </data>
   <data name="Onboarding.DoneCurves" xml:space="preserve">
-    <value>• Curves &amp; assignment — adjust fan curves, assign fans and switch profiles.</value>
+    <value>• Curves &amp; assignment - adjust fan curves, assign fans and switch profiles.</value>
   </data>
   <data name="Onboarding.DoneSettings" xml:space="preserve">
-    <value>• Settings — rename devices, adjust positions and visibility, or run the airflow analysis and this assistant again.</value>
+    <value>• Settings - rename devices, adjust positions and visibility, or run the airflow analysis and this assistant again.</value>
   </data>
   <data name="Onboarding.Close" xml:space="preserve">
     <value>Close</value>
@@ -515,10 +533,10 @@
     <value>Positions assigned: {0} of {1}</value>
   </data>
   <data name="OnboardingCtrl.DoneProfileAirflow" xml:space="preserve">
-    <value>Active profile: {0} — airflow-based role curves</value>
+    <value>Active profile: {0} - airflow-based role curves</value>
   </data>
   <data name="OnboardingCtrl.DoneProfileFallback" xml:space="preserve">
-    <value>Active profile: {0} — driven by primary sensor {1}</value>
+    <value>Active profile: {0} - driven by primary sensor {1}</value>
   </data>
   <data name="Onboarding.Back" xml:space="preserve">
     <value>Back</value>
@@ -551,7 +569,7 @@
     <value>PWM</value>
   </data>
   <data name="FanLocationDialog.HardwareFloorHint" xml:space="preserve">
-    <value>0 % is the hardware floor — some fans keep a minimum speed there and cannot be turned off completely.</value>
+    <value>0 % is the hardware floor - some fans keep a minimum speed there and cannot be turned off completely.</value>
   </data>
   <data name="FanLocationDialog.Cancel" xml:space="preserve">
     <value>Cancel</value>
@@ -605,16 +623,16 @@
     <value>Fan {0} of {1}: {2}</value>
   </data>
   <data name="OnboardingCtrl.CouplingStarting" xml:space="preserve">
-    <value>Coupling speed sensor – fan {0} of {1} …</value>
+    <value>Coupling speed sensor - fan {0} of {1} …</value>
   </data>
   <data name="OnboardingCtrl.CouplingNoTacho" xml:space="preserve">
-    <value>{0}: no speed signal found — calibration skipped</value>
+    <value>{0}: no speed signal found - calibration skipped</value>
   </data>
   <data name="OnboardingCtrl.CouplingAmbiguous" xml:space="preserve">
-    <value>{0}: not unambiguous — assign the sensor manually later in Settings; calibration skipped</value>
+    <value>{0}: not unambiguous - assign the sensor manually later in Settings; calibration skipped</value>
   </data>
   <data name="OnboardingCtrl.CouplingFailed" xml:space="preserve">
-    <value>{0}: coupling failed — {1}</value>
+    <value>{0}: coupling failed - {1}</value>
   </data>
   <data name="OnboardingCtrl.CouplingTimeout" xml:space="preserve">
     <value>Coupling fan {0} of {1}: timed out</value>
@@ -662,13 +680,13 @@
     <value>Fan {0} calibrated (start PWM: {1})</value>
   </data>
   <data name="OnboardingCtrl.CalibrationPhase" xml:space="preserve">
-    <value>{0} – pwm {1}, {2} rpm</value>
+    <value>{0} - pwm {1}, {2} rpm</value>
   </data>
   <data name="OnboardingCtrl.CalibrationStarting" xml:space="preserve">
-    <value>Fan {0}/{1} – starting …</value>
+    <value>Fan {0}/{1} - starting …</value>
   </data>
   <data name="OnboardingCtrl.CalibrationTimeout" xml:space="preserve">
-    <value>Fan {0}/{1}: timed out — aborted.</value>
+    <value>Fan {0}/{1}: timed out - aborted.</value>
   </data>
   <data name="OnboardingCtrl.CalibrationInterrupted" xml:space="preserve">
     <value>Calibration interrupted: {0}</value>
@@ -683,7 +701,7 @@
     <value>Fan {0}</value>
   </data>
   <data name="OnboardingCtrl.SaveFailed" xml:space="preserve">
-    <value>Background service unreachable — settings could not be saved.</value>
+    <value>Background service unreachable - settings could not be saved.</value>
   </data>
   <data name="CurveEditorCtrl.NewCurveName" xml:space="preserve">
     <value>New curve</value>
@@ -698,13 +716,13 @@
     <value>Hardware auto (no curve)</value>
   </data>
   <data name="CurveEditorCtrl.AirflowApplied" xml:space="preserve">
-    <value>Airflow suggestion applied — now save.</value>
+    <value>Airflow suggestion applied - now save.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowWeights" xml:space="preserve">
     <value> (Weighting intake {0} : exhaust {1})</value>
   </data>
   <data name="CurveEditorCtrl.PressurePositive" xml:space="preserve">
-    <value>Pressure balance: positive — good against dust.</value>
+    <value>Pressure balance: positive - good against dust.</value>
   </data>
   <data name="CurveEditorCtrl.PressureNegative" xml:space="preserve">
     <value>Pressure balance: negative.</value>
@@ -725,10 +743,10 @@
     <value>No save target available.</value>
   </data>
   <data name="CurveEditorCtrl.Saved" xml:space="preserve">
-    <value>Saved — changes are being applied</value>
+    <value>Saved - changes are being applied</value>
   </data>
   <data name="CurveEditorCtrl.SaveFailed" xml:space="preserve">
-    <value>Not saved — the background service is currently unreachable.</value>
+    <value>Not saved - the background service is currently unreachable.</value>
   </data>
   <data name="InterpolationOption.Linear" xml:space="preserve">
     <value>Linear (safe, predictable)</value>
@@ -746,7 +764,7 @@
     <value>Average</value>
   </data>
   <data name="FanLocationOption.Unspecified" xml:space="preserve">
-    <value>— unassigned —</value>
+    <value>- unassigned -</value>
   </data>
   <data name="FanLocationOption.CpuCooler" xml:space="preserve">
     <value>CPU cooler</value>
@@ -920,7 +938,7 @@
     <value>Other</value>
   </data>
   <data name="FanDiagram.Unspecified" xml:space="preserve">
-    <value>— unassigned —</value>
+    <value>- unassigned -</value>
   </data>
   <data name="CurveChart.NoPoints" xml:space="preserve">
     <value>No points</value>
@@ -949,6 +967,15 @@
   <data name="CurveEditRow.InactiveNoFan" xml:space="preserve">
     <value>Inactive: no fan assigned.</value>
   </data>
+  <data name="CurveEditRow.InactiveProfile" xml:space="preserve">
+    <value>Inactive: this curve belongs to a profile that is not the running one.</value>
+  </data>
+  <data name="ProfileRow.ActiveHint" xml:space="preserve">
+    <value>The service is regulating with this profile.</value>
+  </data>
+  <data name="ProfileRow.InactiveHint" xml:space="preserve">
+    <value>Not running - open it and switch it on to hand the fans over.</value>
+  </data>
   <data name="FanAssignRow.Error" xml:space="preserve">
     <value>Error: {0}</value>
   </data>
@@ -956,7 +983,7 @@
     <value>Aborted: {0}</value>
   </data>
   <data name="FanAssignRow.CalibDone" xml:space="preserve">
-    <value>Done — start at pwm {0}</value>
+    <value>Done - start at pwm {0}</value>
   </data>
   <data name="FanAssignRow.Identifying" xml:space="preserve">
     <value>Identifying … (100 %, others throttled)</value>
@@ -971,7 +998,7 @@
     <value>Calibration aborted: {0}</value>
   </data>
   <data name="CalibrationStatus.Done" xml:space="preserve">
-    <value>Calibration done — start point at pwm {0}</value>
+    <value>Calibration done - start point at pwm {0}</value>
   </data>
   <data name="CalibrationStatus.Calibrating" xml:space="preserve">
     <value>Calibrating {0}</value>
@@ -983,10 +1010,10 @@
     <value>Already calibrated · start at {0} %</value>
   </data>
   <data name="IpcLiveMonitor.Unreachable" xml:space="preserve">
-    <value>Background service unreachable ({0}) — reconnecting …</value>
+    <value>Background service unreachable ({0}) - reconnecting …</value>
   </data>
   <data name="IpcLiveMonitor.AccessDenied" xml:space="preserve">
-    <value>The background service is running, but access to it was denied. Make sure your user is in the IPC access group — "linfan" on Linux, "LinFan Users" on Windows — then log out and back in.</value>
+    <value>The background service is running, but access to it was denied. Make sure your user is in the IPC access group - "linfan" on Linux, "LinFan Users" on Windows - then log out and back in.</value>
   </data>
   <data name="Ipc.Status.Active" xml:space="preserve">
     <value>Active</value>
@@ -1004,19 +1031,19 @@
     <value>Aborted</value>
   </data>
   <data name="Ipc.Fail.OverTemperature" xml:space="preserve">
-    <value>Overtemperature {0:0.0} °C ≥ {1:0.0} °C — fail-safe triggered.</value>
+    <value>Overtemperature {0:0.0} °C ≥ {1:0.0} °C - fail-safe triggered.</value>
   </data>
   <data name="Ipc.Fail.NotControllable" xml:space="preserve">
     <value>Not controllable (requires root).</value>
   </data>
   <data name="Ipc.Fail.Busy" xml:space="preserve">
-    <value>Another fan action is still running — please try again.</value>
+    <value>Another fan action is still running - please try again.</value>
   </data>
   <data name="Ipc.Fail.NoTacho" xml:space="preserve">
-    <value>No tacho signal — calibration not possible.</value>
+    <value>No tacho signal - calibration not possible.</value>
   </data>
   <data name="Ipc.Fail.NoTemperatureReading" xml:space="preserve">
-    <value>No readable temperature — no watchdog.</value>
+    <value>No readable temperature - no watchdog.</value>
   </data>
   <data name="Ipc.Fail.Unknown" xml:space="preserve">
     <value>Unknown error.</value>
@@ -1028,10 +1055,10 @@
     <value>No speed signal found (fan without tacho).</value>
   </data>
   <data name="Ipc.Tach.Ambiguous" xml:space="preserve">
-    <value>Not unambiguous — please assign manually.</value>
+    <value>Not unambiguous - please assign manually.</value>
   </data>
   <data name="FanAssignRow.NoTachometer" xml:space="preserve">
-    <value>— (none) —</value>
+    <value>- (none) -</value>
   </data>
   <data name="FanAssignRow.Coupling" xml:space="preserve">
     <value>Coupling … (spinning up, measuring speeds)</value>
@@ -1043,7 +1070,7 @@
     <value>Couple sensor</value>
   </data>
   <data name="MainWindow.CoupleSensorTooltip" xml:space="preserve">
-    <value>Automatically finds this fan’s speed sensor: spins the fan up, throttles the others, and assigns the tacho that responds.</value>
+    <value>Automatically finds this fans speed sensor: spins the fan up, throttles the others, and assigns the tacho that responds.</value>
   </data>
   <data name="MainWindow.CancelCouple" xml:space="preserve">
     <value>Cancel</value>
@@ -1055,7 +1082,7 @@
     <value>Speed sensor</value>
   </data>
   <data name="MainWindow.TachometerTooltip" xml:space="preserve">
-    <value>Manually assign the speed sensor (tacho) that belongs to this fan. “— (none) —” clears the assignment.</value>
+    <value>Manually assign the speed sensor (tacho) that belongs to this fan. “- (none) -” clears the assignment.</value>
   </data>
   <data name="MainWindow.TabSettings" xml:space="preserve">
     <value>Settings</value>
@@ -1136,7 +1163,7 @@
     <value>Import backup…</value>
   </data>
   <data name="Settings.ImportTooltip" xml:space="preserve">
-    <value>Restore settings from a backup file — replaces the current configuration.</value>
+    <value>Restore settings from a backup file - replaces the current configuration.</value>
   </data>
   <data name="Settings.DangerZone" xml:space="preserve">
     <value>Danger zone</value>
@@ -1178,13 +1205,13 @@
     <value>Unsupported backup version {0}.</value>
   </data>
   <data name="Settings.ImportFailedDaemon" xml:space="preserve">
-    <value>Service unreachable — import failed.</value>
+    <value>Service unreachable - import failed.</value>
   </data>
   <data name="Settings.ConfigReset" xml:space="preserve">
     <value>Reset to factory defaults.</value>
   </data>
   <data name="Settings.ResetFailedDaemon" xml:space="preserve">
-    <value>Service unreachable — reset failed.</value>
+    <value>Service unreachable - reset failed.</value>
   </data>
   <data name="MainWindow.UpdateAvailable" xml:space="preserve">
     <value>New version available:</value>
@@ -1220,30 +1247,30 @@
     <value>Stays on hardware auto (no software curve).</value>
   </data>
   <data name="CurveEditorCtrl.AirflowReasonNoPosition" xml:space="preserve">
-    <value>No position set – neutral default curve; set a position for a better suggestion.</value>
+    <value>No position set - neutral default curve; set a position for a better suggestion.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowReasonLocationCurve" xml:space="preserve">
     <value>{0} → curve: {1}</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoSensors" xml:space="preserve">
-    <value>No sensors configured – pick the source sensor of the suggested curves manually.</value>
+    <value>No sensors configured - pick the source sensor of the suggested curves manually.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoCaseFans" xml:space="preserve">
-    <value>No case fans with an intake/exhaust position – the pressure balance cannot be determined.</value>
+    <value>No case fans with an intake/exhaust position - the pressure balance cannot be determined.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintCountEstimate" xml:space="preserve">
     <value>Without full calibration the balance is estimated by fan count only (no RPM proxy).</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoIntake" xml:space="preserve">
-    <value>No intake fan detected – check the fresh-air supply.</value>
+    <value>No intake fan detected - check the fresh-air supply.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoExhaust" xml:space="preserve">
-    <value>No exhaust fan detected – check the heat exhaust.</value>
+    <value>No exhaust fan detected - check the heat exhaust.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNegativePressure" xml:space="preserve">
-    <value>Negative pressure: more exhaust than intake – consider more intake or throttle the exhaust (otherwise dust gets pulled in through gaps).</value>
+    <value>Negative pressure: more exhaust than intake - consider more intake or throttle the exhaust (otherwise dust gets pulled in through gaps).</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoCpuSensor" xml:space="preserve">
-    <value>No CPU sensor recognized by name – check the source of the CPU curve.</value>
+    <value>No CPU sensor recognized by name - check the source of the CPU curve.</value>
   </data>
 </root>

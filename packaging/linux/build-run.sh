@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds  LinFan-Setup-<version>-linux-x64.run  — a self-extracting installer (makeself) that bundles
+# Builds  LinFan-Setup-<version>-linux-x64.run  - a self-extracting installer (makeself) that bundles
 # the self-contained linux-x64 build and runs packaging/linux/install-bin.sh on extraction. The Linux
 # analogue of the Windows one-click .exe; no .NET runtime needed on the target. Needs: dotnet + makeself.
 #
@@ -28,7 +28,7 @@ find "$STAGE/bin" -name '*.pdb' -delete
 echo "==> stage packaging/ (installer + assets + uninstaller)"
 cp -r "$SCRIPT_DIR" "$STAGE/packaging/linux"
 cp "$REPO/packaging/linfan.desktop" "$STAGE/packaging/linfan.desktop"
-# The archive has no src/ tree — stage the app icon next to the desktop entry for install-bin.sh.
+# The archive has no src/ tree - stage the app icon next to the desktop entry for install-bin.sh.
 cp "$REPO/src/LinFan.App/Assets/linfan-icon.svg" "$STAGE/packaging/linfan.svg"
 cp "$REPO/packaging/uninstall.sh" "$STAGE/packaging/uninstall.sh"
 chmod +x "$STAGE/packaging/linux/install-bin.sh"

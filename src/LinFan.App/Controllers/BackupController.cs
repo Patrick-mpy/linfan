@@ -10,7 +10,7 @@ namespace LinFan.App.Controllers;
 
 /// <summary>
 /// MVC-Controller für Sicherung/Wiederherstellung/Reset im Einstellungen-Tab. Bewusst <b>UI-frei</b>
-/// (keine Datei-Dialoge — die macht das View-Code-Behind) und über Delegates verdrahtet, damit die
+/// (keine Datei-Dialoge - die macht das View-Code-Behind) und über Delegates verdrahtet, damit die
 /// Logik (Serialisieren, Validieren, Anwenden) ohne Daemon/Socket unit-testbar bleibt. Import/Reset
 /// gehen über den IPC-Client (<see cref="ICommandSink"/>): Import <b>ersetzt</b> die Config vollständig
 /// (nicht Merge), Reset setzt auf Werkszustand. Die GUI-Prefs (Theme/Sprache/Tray) werden auf den
@@ -82,7 +82,7 @@ public sealed class BackupController
 
     /// <summary>
     /// Liest ein Backup-JSON, validiert Format/Version und wendet es an: Config vollständig ersetzen
-    /// (ReplaceConfig) und — nur bei Erfolg — die GUI-Prefs übernehmen. Wirft nie; liefert Erfolg + Meldung.
+    /// (ReplaceConfig) und - nur bei Erfolg - die GUI-Prefs übernehmen. Wirft nie; liefert Erfolg + Meldung.
     /// </summary>
     public async Task<BackupImportResult> ImportFromJsonAsync(string json)
     {

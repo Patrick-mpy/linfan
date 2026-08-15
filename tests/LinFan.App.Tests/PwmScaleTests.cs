@@ -7,7 +7,7 @@ namespace LinFan.App.Tests;
 /// <summary>
 /// Sichert die einheitliche PWM↔Prozent-Umrechnung. Der Kern-Regressionsfall: vor dem Fix zeigte der
 /// „pwm … · …%"-Text die trunkierte Ganzzahl-Division (<c>pwm*100/255</c>), während die Slider-Anzeige
-/// (<c>pwm*100.0/255</c> mit Format <c>{0:0}</c>) rundet — Differenz bis 1 % auf derselben Lüfterkarte.
+/// (<c>pwm*100.0/255</c> mit Format <c>{0:0}</c>) rundet - Differenz bis 1 % auf derselben Lüfterkarte.
 /// </summary>
 public sealed class PwmScaleTests
 {
@@ -23,7 +23,7 @@ public sealed class PwmScaleTests
     public void ToPercent_matches_slider_display_basis_for_every_pwm()
     {
         // Die Slider-Anzeige formatiert pwm*100.0/255 mit „{0:0}" (rundet). ToPercent muss exakt dasselbe
-        // liefern — sonst weichen Text und Slider auf der Karte voneinander ab. Über den gesamten Bereich prüfen.
+        // liefern - sonst weichen Text und Slider auf der Karte voneinander ab. Über den gesamten Bereich prüfen.
         for (int pwm = 0; pwm <= 255; pwm++)
         {
             int sliderDisplay = (int)Math.Round((double)(pwm * 100.0 / 255.0));

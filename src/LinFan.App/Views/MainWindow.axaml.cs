@@ -15,13 +15,13 @@ using LinFan.Core.Models;
 namespace LinFan.App.Views;
 
 /// <summary>
-/// Hauptfenster. Code-Behind bleibt minimal (nur reine UI-Belange) — Logik liegt im Controller.
+/// Hauptfenster. Code-Behind bleibt minimal (nur reine UI-Belange) - Logik liegt im Controller.
 /// Zuständig hier: Onboarding-Dialog (folgt <see cref="MainController.Onboarding"/>), die
 /// Unsaved-Nachfrage beim Schließen und das Merken der Fenster-Geometrie (<see cref="UiSettingsStore"/>).
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly UiSettingsStore _settingsStore = new();
+    private readonly UiSettingsStore _settingsStore;
     private OnboardingWindow? _onboardingWindow;
     private bool _allowClose;
     private bool _quitRequested;
@@ -36,8 +36,15 @@ public partial class MainWindow : Window
     private double? _normalHeight;
     private PixelPoint? _normalPosition;
 
-    public MainWindow()
+    public MainWindow() : this(new UiSettingsStore())
     {
+    }
+
+    /// <summary>Store-Injektion für Tests (wie <see cref="SettingsController"/>) - sonst schriebe jeder Test,
+    /// der das Fenster schließt, die echte Geometrie des Nutzers um.</summary>
+    internal MainWindow(UiSettingsStore settingsStore)
+    {
+        _settingsStore = settingsStore;
         InitializeComponent();
         RestoreGeometry(_settingsStore.Load());
 
@@ -57,7 +64,7 @@ public partial class MainWindow : Window
     /// Click-away focus release: Avalonia only moves keyboard focus when a press lands on a focusable
     /// control, so a click into empty space used to leave the focus (accent border, pending LostFocus
     /// commits) on the last input forever. If the press target has no focusable ancestor, the window
-    /// takes focus itself — the previous control gets its LostFocus. Popup contents (dropdowns, flyouts,
+    /// takes focus itself - the previous control gets its LostFocus. Popup contents (dropdowns, flyouts,
     /// context menus) live in their own visual roots and never route through this window handler.
     /// </summary>
     private void OnGlobalPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -102,7 +109,7 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
 
-        // Position erst jetzt prüfen — die Screens stehen erst nach dem Anzeigen bereit. Liegt das Fenster
+        // Position erst jetzt prüfen - die Screens stehen erst nach dem Anzeigen bereit. Liegt das Fenster
         // off-screen (gespeicherter Monitor weg / Auflösung geändert), auf den Hauptbildschirm zentrieren.
         if (_normalPosition is { } pos && Screens is { } screens)
         {
@@ -159,6 +166,17 @@ public partial class MainWindow : Window
         Close();
     }
 
+    /// <summary>
+    /// The system asked the app to go away - logoff/shutdown, or an installer closing it through the
+    /// Windows Restart Manager. From here on a close really closes: neither the minimize-to-tray path nor
+    /// the unsaved-changes dialog may cancel it. Cancelling would answer the request with "no": the OS
+    /// aborts the logoff, and the setup stops with "unable to automatically close all applications" while
+    /// this process still holds the files it is about to replace. Unsaved editor changes are lost, same as
+    /// in any other app the system closes - they only ever lived in the GUI, the daemon keeps running with
+    /// the last saved config either way.
+    /// </summary>
+    public void PrepareForShutdown() => _allowClose = true;
+
     private bool MinimizeToTrayEnabled =>
         DataContext is MainController controller && controller.Settings.MinimizeToTray;
 
@@ -166,7 +184,7 @@ public partial class MainWindow : Window
     {
         base.OnClosing(e);
 
-        // „In den Tray minimieren": das Schließen abfangen und das Fenster nur verstecken — außer es wurde
+        // „In den Tray minimieren": das Schließen abfangen und das Fenster nur verstecken - außer es wurde
         // ein echtes Beenden angefordert (Tray) oder es läuft bereits ein bestätigtes Schließen (_allowClose).
         // Nur mit tatsächlich vorhandenem Tray, sonst würde das Fenster unerreichbar. Die ungespeicherten
         // Änderungen bleiben im Speicher; die Geometrie wird erst beim echten Beenden persistiert.
@@ -189,14 +207,14 @@ public partial class MainWindow : Window
         {
             UnsavedChoice choice = await new UnsavedChangesDialog().ShowDialog<UnsavedChoice>(this);
             if (choice == UnsavedChoice.Cancel)
-                return; // Fenster offen lassen — Geometrie NICHT speichern
+                return; // Fenster offen lassen - Geometrie NICHT speichern
             if (choice == UnsavedChoice.Save)
                 await controller.Editor.SaveCommand.ExecuteAsync(null);
         }
         catch
         {
             // Defensive: ein unerwarteter Dialog-/Save-Fehler darf diesen async-void-Handler nicht
-            // in einen unbehandelten Crash kippen — dann lieber schließen (Save geht nur über IPC,
+            // in einen unbehandelten Crash kippen - dann lieber schließen (Save geht nur über IPC,
             // kein Hardware-Zustand bleibt hängen).
         }
 
@@ -223,7 +241,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainController controller)
             return;
-        // Bestätigte Löschung persistiert sich selbst (bedingt) — siehe CurveEditorController.DeleteProfile.
+        // Bestätigte Löschung persistiert sich selbst (bedingt) - siehe CurveEditorController.DeleteProfile.
         await ConfirmThen(
             Localizer.Instance["Dialog.DeleteProfileTitle"],
             Localizer.Instance["Dialog.DeleteProfileMessage"],
@@ -242,8 +260,23 @@ public partial class MainWindow : Window
             () => controller.Editor.DeleteCurveCommand.ExecuteAsync(null));
     }
 
+    // Which of the two editors the curves tab shows follows the last click in the side menu. Bound to Tapped
+    // and not to SelectionChanged on purpose: coming back from a curve to its profile clicks a row that is
+    // already selected, which raises no selection change at all.
+    private void OnProfileListTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is MainController controller)
+            controller.Editor.Pane = CurveTabPane.Profile;
+    }
+
+    private void OnCurveListTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is MainController controller)
+            controller.Editor.Pane = CurveTabPane.Curve;
+    }
+
     // Positions-Modal je Lüfterzeile: die Zeile kommt aus dem DataContext des Buttons; das Ergebnis wird
-    // zurück in die gebundene Location geschrieben (reine UI — wie ConfirmThen). Abbrechen lässt sie unberührt.
+    // zurück in die gebundene Location geschrieben (reine UI - wie ConfirmThen). Abbrechen lässt sie unberührt.
     private async void OnPickLocation(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is not FanAssignRow row)
@@ -271,7 +304,7 @@ public partial class MainWindow : Window
 
     private static void CommitGroupChip(AutoCompleteBox box)
     {
-        // Raw text only — normalization (trim, empty -> null) stays controller-side (SensorOption.ToConfig).
+        // Raw text only - normalization (trim, empty -> null) stays controller-side (SensorOption.ToConfig).
         if (box.DataContext is SensorOption row)
             row.Group = box.Text ?? "";
     }

@@ -7,7 +7,7 @@ namespace LinFan.Hardware.Mac.Smc;
 
 /// <summary>
 /// Realer <see cref="ISmc"/>-Adapter über den AppleSMC-UserClient (IOKit). Kapselt die gesamte
-/// native Interop (P/Invoke, <c>SMCKeyData_t</c>-Layout, Kommando-Selektoren) — die einzige Stelle im
+/// native Interop (P/Invoke, <c>SMCKeyData_t</c>-Layout, Kommando-Selektoren) - die einzige Stelle im
 /// Backend mit macOS-Bindung. Lesen ist ohne erhöhte Rechte möglich; Schreiben (Steuer-Pfad) braucht Root.
 /// <para>
 /// Struktur- und Interop-Details wurden auf echter Apple-Silicon-Hardware verifiziert:
@@ -76,7 +76,7 @@ internal sealed class AppleSmc : ISmc
     {
         if (!_open || value.Data.Length is 0 or > 32) return false;
 
-        // dataSize der Firmware ermitteln — nur schreiben, wenn die Länge passt (kein Raten am Steuer-Register).
+        // dataSize der Firmware ermitteln - nur schreiben, wenn die Länge passt (kein Raten am Steuer-Register).
         var probe = SMCKeyData.New();
         probe.key = FourCC(key);
         probe.data8 = CmdReadKeyInfo;
@@ -129,7 +129,7 @@ internal sealed class AppleSmc : ISmc
 
     /// <summary>
     /// Task-Port des eigenen Prozesses. <c>mach_task_self()</c> ist ein Makro auf das exportierte
-    /// <b>Datensymbol</b> <c>mach_task_self_</c> — nicht per <c>DllImport</c> aufrufbar; daher über
+    /// <b>Datensymbol</b> <c>mach_task_self_</c> - nicht per <c>DllImport</c> aufrufbar; daher über
     /// <see cref="NativeLibrary"/> die Adresse holen und den Wert lesen.
     /// </summary>
     private static uint MachTaskSelf()

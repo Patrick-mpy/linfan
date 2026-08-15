@@ -5,7 +5,9 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LinFan.App.Controllers;
 using LinFan.App.Services;
 using LinFan.App.Views;
@@ -14,7 +16,7 @@ using LinFan.Core.Models;
 namespace LinFan.App.UiTests;
 
 /// <summary>
-/// Tier-2-Smoke-Tests: Interaktions-/Zustands-Bindings im Hauptfenster — Disconnect-Banner,
+/// Tier-2-Smoke-Tests: Interaktions-/Zustands-Bindings im Hauptfenster - Disconnect-Banner,
 /// Kalibrier-Button-Sichtbarkeit nach <c>CanControl</c> und die Löschen-Bestätigung (kein direkter Command).
 /// </summary>
 public class MainWindowInteractionSmokeTests
@@ -102,7 +104,7 @@ public class MainWindowInteractionSmokeTests
         SelectTab(window, TabSettings);
         SelectSettingsSection(ctrl, SettingsSection.Fans); // Kalibrieren lebt in der Lüfter-Sektion
 
-        // Kalibrieren sitzt in der aufklappbaren „Erweitert"-Sektion — aufklappen, sonst entscheidet das
+        // Kalibrieren sitzt in der aufklappbaren „Erweitert"-Sektion - aufklappen, sonst entscheidet das
         // Aufklapp-Flag (nicht CanControl) über die effektive Sichtbarkeit.
         foreach (FanAssignRow f in ctrl.Editor.Fans)
             f.ShowAdvanced = true;
@@ -119,6 +121,127 @@ public class MainWindowInteractionSmokeTests
         }
     }
 
+    /// <summary>
+    /// Der Airflow-Ergebnis-Block: unsichtbar ohne Tuning, danach mit Lüfter- und Kurvennamen aus den
+    /// Editor-Zeilen. Prüft die Bindings zur Laufzeit (Sichtbarkeit schaltet wirklich, Template realisiert).
+    /// </summary>
+    [AvaloniaFact]
+    public void Airflow_StatusCard_AppearsAfterTuning()
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        SelectTab(window, TabSettings);
+        SelectSettingsSection(ctrl, SettingsSection.Airflow);
+
+        TextBlock title = Assert.Single(window.Find<TextBlock>(), t => t.Text == "Bereits angewendet");
+        Assert.False(title.IsEffectivelyVisible); // SampleSnapshot trägt die Kurve „c1“, kein Airflow-Tuning
+        Assert.DoesNotContain(window.Find<TextBlock>(), t => t.DataContext is AirflowStatusRow);
+
+        ctrl.Editor.AnalyzeAirflowCommand.Execute(null);
+        ctrl.Editor.ApplyAirflowCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(title.IsEffectivelyVisible);
+        var rows = window.Find<TextBlock>().Where(t => t.DataContext is AirflowStatusRow).ToList();
+        Assert.Contains(rows, t => t.Text == "CPU Fan");           // Fan.DisplayName
+        Assert.Contains(rows, t => t.Text == "Airflow · Standard"); // Curve.Name (ohne Position → Default-Rolle)
+        Assert.All(rows, t => Assert.True(t.IsEffectivelyVisible));
+
+        // Druckbilanz: ohne positionierte Gehäuselüfter nicht bestimmbar - der Text steht trotzdem im Block.
+        Assert.Contains(window.Find<TextBlock>(),
+            t => t.Text != null && t.Text.StartsWith("Druckbilanz", StringComparison.Ordinal) && t.IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// Der gesperrte Profilwechsel muss seinen Grund nennen: Warn-Icon neben der Kopf-Auswahl (Tooltip auf
+    /// einem <b>aktiven</b> Element, nicht auf der gesperrten ComboBox) und ein Hinweis unter dem Aktiv-Schalter.
+    /// </summary>
+    [AvaloniaFact]
+    public void ProfileSwitch_LockedByUnsavedChanges_NamesTheReason()
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        SelectTab(window, TabCurves);
+        ctrl.Editor.Pane = CurveTabPane.Profile; // Profil-Editor (dort sitzt der Aktiv-Schalter)
+        Dispatcher.UIThread.RunJobs();
+
+        const string reason = "Gesperrt, solange Änderungen nicht gespeichert sind - erst übernehmen oder verwerfen.";
+        PathIcon headerIcon = Assert.Single(window.Find<PathIcon>(), p => p.Name == "ProfileLockedIcon");
+        TextBlock hint = Assert.Single(window.Find<TextBlock>(), t => t.Text == reason);
+
+        // Frisch geladen: nichts offen, das gezeigte Profil ist das laufende → kein Hinweis.
+        Assert.False(headerIcon.IsEffectivelyVisible);
+        Assert.False(hint.IsEffectivelyVisible);
+
+        // Ein neues Profil anlegen: gezeigtes ≠ laufendes Profil UND ungespeicherte Änderungen.
+        ctrl.Editor.AddProfileCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(ctrl.Editor.HasUnsavedChanges);
+        Assert.False(ctrl.Editor.CanActivateSelectedProfile);
+        Assert.True(headerIcon.IsEffectivelyVisible);
+        Assert.True(hint.IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// Die beiden Knöpfe, die nur noch ihr Symbol tragen, müssen ihre Beschriftung im Tooltip führen -
+    /// sonst sind sie stumm.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("HeaderSaveButton", "Übernehmen")]
+    [InlineData("HeaderRevertButton", "Verwerfen")]
+    public void IconOnlyButtons_CarryTheirLabelInTheTooltip(string name, string label)
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        ctrl.Editor.HasUnsavedChanges = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Button button = Assert.Single(window.Find<Button>(), b => b.Name == name);
+        Assert.Null(UiTestHelpers.ButtonLabel(button)); // wirklich nur das Symbol
+        Assert.Contains(label, Assert.IsType<string>(ToolTip.GetTip(button)));
+    }
+
+    /// <summary>
+    /// Der Status-Toast wechselt seinen Schweregrad zur Laufzeit - Streifen und Icon (Farbe UND Symbol)
+    /// müssen mitziehen, nicht nur beim ersten Aufbau.
+    /// </summary>
+    [AvaloniaFact]
+    public void StatusToast_TurnsRed_OnError()
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+
+        ctrl.Editor.Status.Set("Gespeichert.");
+        Dispatcher.UIThread.RunJobs();
+        PathIcon icon = Assert.Single(ToastIconsOf(window, "Gespeichert."));
+        Assert.Equal(Token(window, "InfoAccent"), Brush(icon.Foreground));
+        Assert.Same(Resource(window, "IconCheckCircle"), icon.Data);
+
+        ctrl.Editor.Status.Set("Speichern fehlgeschlagen.", isError: true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Token(window, "DangerAccent"), Brush(icon.Foreground));
+        Assert.Same(Resource(window, "IconAlertCircle"), icon.Data);
+    }
+
+    /// <summary>Die Severity-Icons des Toasts, der <paramref name="text"/> zeigt (über den gemeinsamen Grid-Vorfahren).</summary>
+    private static IEnumerable<PathIcon> ToastIconsOf(MainWindow window, string text) =>
+        window.Find<TextBlock>()
+            .Where(t => t.Text == text)
+            .SelectMany(t => t.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("toast"))
+                              .GetVisualDescendants().OfType<PathIcon>())
+            .Where(p => p.Classes.Contains("toastIcon"));
+
+    private static object Resource(MainWindow window, string key)
+    {
+        Assert.True(window.TryFindResource(key, window.ActualThemeVariant, out object? value), $"Ressource '{key}' fehlt.");
+        return value!;
+    }
+
+    private static Color Token(MainWindow window, string key) => Brush(Resource(window, key));
+
+    private static Color Brush(object? value) => Assert.IsAssignableFrom<ISolidColorBrush>(value).Color;
+
     [AvaloniaFact]
     public void Delete_HasNoDirectCommand_AndDeleteCommandsWork()
     {
@@ -126,8 +249,11 @@ public class MainWindowInteractionSmokeTests
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
         SelectTab(window, TabCurves); // Kurven & Zuordnung (Profil- und Kurven-Löschen leben hier)
 
-        var deleteButtons = window.Find<Button>().Where(b => UiTestHelpers.ButtonLabel(b) == "Löschen").ToList();
-        Assert.Equal(2, deleteButtons.Count); // Profil + Kurve
+        // Über den Namen gesucht, nicht über die Beschriftung: der Profil-Knopf im Seitenmenü trägt nur
+        // noch sein Icon (die 240-px-Spalte fasst keine vier beschrifteten Knöpfe).
+        Button profileDelete = Assert.Single(window.Find<Button>(), b => b.Name == "ProfileDeleteButton");
+        Button curveDelete = Assert.Single(window.Find<Button>(), b => b.Name == "CurveDeleteButton");
+        var deleteButtons = new[] { profileDelete, curveDelete };
 
         // Löschen ist über einen modalen ConfirmDialog (Click-Handler im Code-Behind) bestätigungs-gegated,
         // NICHT über einen direkten Command am Button. Ein versehentliches direktes Command-Binding (das ohne
@@ -158,9 +284,11 @@ public class MainWindowInteractionSmokeTests
             : UiTestHelpers.SampleSnapshot() with { Status = "getrennt", Connected = false };
         var (ctrl, window) = ShowMain(snap);
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady && ctrl.Connected == connected);
-        ctrl.Editor.HasUnsavedChanges = true; // globales Banner (Übernehmen/Verwerfen) einblenden
+        ctrl.Editor.HasUnsavedChanges = true; // Übernehmen/Verwerfen in der Kopfzeile einblenden
 
-        Button apply = window.Find<Button>().Single(b => UiTestHelpers.ButtonLabel(b) == "Übernehmen");
+        // Bei getrenntem Dienst muss „Übernehmen" sperren, sonst liefe SaveConfig ins Leere. Über den
+        // Namen gesucht: der Knopf trägt nur noch sein Symbol, keine Beschriftung.
+        Button apply = Assert.Single(window.Find<Button>(), b => b.Name == "HeaderSaveButton");
 
         // DataContext am Button ist der MainController: {Binding Connected} löst gegen ihn auf.
         Assert.IsType<MainController>(apply.DataContext);
@@ -226,11 +354,11 @@ public class MainWindowInteractionSmokeTests
         SelectTab(window, TabCurves); // Kurven & Zuordnung
 
         TextBlock noDevices = window.Find<TextBlock>()
-            .Single(t => t.Text != null && t.Text.Contains("Keine Geräte erkannt — ohne Sensoren"));
+            .Single(t => t.Text != null && t.Text.Contains("Keine Geräte erkannt - ohne Sensoren"));
         TextBlock loading = window.Find<TextBlock>().Single(t => t.DataContext == ctrl
             && t.Text != null && (t.Text == "Verbinde mit dem Hintergrunddienst …" || t.Text == "Lade Kurven …"));
 
-        // Verbunden+leer: Leer-Hinweis sichtbar, Lade-Hinweis weg. Getrennt: umgekehrt — kein ewiges „Lädt".
+        // Verbunden+leer: Leer-Hinweis sichtbar, Lade-Hinweis weg. Getrennt: umgekehrt - kein ewiges „Lädt".
         Assert.Equal(connected, ctrl.ShowNoDevices);
         Assert.Equal(connected, noDevices.IsEffectivelyVisible);
         Assert.Equal(!connected, ctrl.ShowCurveLoading);
@@ -268,7 +396,7 @@ public class MainWindowInteractionSmokeTests
         SelectTab(window, TabSettings);
         SelectSettingsSection(ctrl, SettingsSection.Fans); // Min/Max-PWM leben in der Lüfter-Sektion
 
-        // Min/Max-PWM samt Hinweis stecken in der „Erweitert"-Sektion — aufklappen, sonst nie effektiv sichtbar.
+        // Min/Max-PWM samt Hinweis stecken in der „Erweitert"-Sektion - aufklappen, sonst nie effektiv sichtbar.
         foreach (FanAssignRow f in ctrl.Editor.Fans)
             f.ShowAdvanced = true;
         Dispatcher.UIThread.RunJobs();
@@ -319,7 +447,7 @@ public class MainWindowInteractionSmokeTests
         Assert.Same(ctrl.Editor.AvailableGroups, sensorBox.ItemsSource);
         Assert.Equal(new[] { "CPU" }, ctrl.Editor.AvailableGroups);
 
-        // The fan group field is gone — a reappearing AutoCompleteBox in the fans section would be a regression.
+        // The fan group field is gone - a reappearing AutoCompleteBox in the fans section would be a regression.
         SelectSettingsSection(ctrl, SettingsSection.Fans);
         Assert.DoesNotContain(window.Find<AutoCompleteBox>(), b => b.DataContext is FanAssignRow);
     }
@@ -394,7 +522,7 @@ public class MainWindowInteractionSmokeTests
 
         // Click-away: focus moves to another focusable control. Depending on whether typing opened the
         // popup, the commit runs via LostFocus (closed) or via the DropDownClosed that the focus loss
-        // triggers — either path must land the typed text in the row.
+        // triggers - either path must land the typed text in the row.
         window.Find<TextBox>().First(t => t.Name == "SensorSearchBox").Focus();
         Dispatcher.UIThread.RunJobs();
 

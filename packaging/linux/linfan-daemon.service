@@ -1,4 +1,4 @@
-# systemd unit for the privileged LinFan daemon — SELF-CONTAINED build variant.
+# systemd unit for the privileged LinFan daemon - SELF-CONTAINED build variant.
 # Unlike packaging/linfan-daemon.service (which runs the framework-dependent build via
 # `dotnet LinFan.Daemon.dll`), this one launches the self-contained single-file executable
 # directly, so NO .NET runtime is required on the target. Shipped by the .deb, the .run and the
@@ -17,10 +17,10 @@ User=root
 ExecStart=/opt/linfan/LinFan.Daemon run
 WorkingDirectory=/opt/linfan
 
-# systemd creates /run/linfan (0755, root) and cleans it up on stop — the socket lives there.
+# systemd creates /run/linfan (0755, root) and cleans it up on stop - the socket lives there.
 RuntimeDirectory=linfan
 Environment=LINFAN_SOCKET=/run/linfan/linfan.sock
-# systemd creates /etc/linfan (0755, root) — the shared configuration used by the daemon and CLI.
+# systemd creates /etc/linfan (0755, root) - the shared configuration used by the daemon and CLI.
 ConfigurationDirectory=linfan
 Environment=LINFAN_CONFIG=/etc/linfan/config.json
 

@@ -4,8 +4,8 @@
     Geteiltes Conformance-Test-Kit: die ausführbare Spezifikation des Backend-Vertrags
     (BackendConformanceTests, INV-1..INV-10) plus das hardwarefreie Referenz-Backend und die
     Fehler-Injektoren. Backend-Test-Projekte (LinFan.Core.Tests heute, LinFan.Hardware.Windows.Tests
-    künftig) referenzieren dieses Kit und leiten die Suite ab — Struktur nur einmal definiert.
-    Kennt NUR LinFan.Core (Abstraktionen/POCOs); NICHT LinFan.Hardware.* (Schichtgrenze — das
+    künftig) referenzieren dieses Kit und leiten die Suite ab - Struktur nur einmal definiert.
+    Kennt NUR LinFan.Core (Abstraktionen/POCOs); NICHT LinFan.Hardware.* (Schichtgrenze - das
     konkrete Backend bringt der Konsument mit). Selbst kein Test-Projekt: enthält nur die abstrakte
     Basis + Fixtures, die erst in einem ableitenden Projekt zu laufenden Tests werden.
   -->

@@ -5,9 +5,9 @@ namespace LinFan.App.Controllers;
 /// <summary>
 /// Gedrosselte Coalescing-Pumpe für manuelle PWM-Stellwerte. Der Slider feuert kontinuierlich
 /// (~ein Event je PWM-Integer); ungedrosselt flutet ein einziger Zug ~180 IPC-Befehle an den Daemon
-/// (Pipe-/Log-Last) — die Hardware ist daemon-seitig ohnehin tick-coalesced. Die Pumpe hält maximal
+/// (Pipe-/Log-Last) - die Hardware ist daemon-seitig ohnehin tick-coalesced. Die Pumpe hält maximal
 /// EINEN Send in der Luft und sendet je Intervall nur den jeweils neuesten Stellwert; der Endwert wird
-/// garantiert zuletzt gesendet. Läuft auf dem UI-Thread (Avalonia-SynchronizationContext) — kein Lock nötig.
+/// garantiert zuletzt gesendet. Läuft auf dem UI-Thread (Avalonia-SynchronizationContext) - kein Lock nötig.
 /// <para>
 /// Wird von allen manuellen Steuer-Flächen geteilt (Dashboard, Geräte-Tab, Onboarding, Positions-Modal),
 /// damit der Slider-Flut-Schutz an genau einer Stelle lebt. Der Send-Callback ist spät bindbar
@@ -31,10 +31,10 @@ internal sealed class ManualPwmPump
     /// <summary>Mindestabstand zwischen zwei Sends während eines Zugs. Test-Naht: in Tests auf <c>Zero</c>.</summary>
     public TimeSpan Throttle { get; set; } = TimeSpan.FromMilliseconds(150);
 
-    /// <summary>Läuft, solange die Pumpe noch sendet — Test-Naht zum deterministischen Abwarten.</summary>
+    /// <summary>Läuft, solange die Pumpe noch sendet - Test-Naht zum deterministischen Abwarten.</summary>
     public Task Completion => _pumpTask;
 
-    /// <summary>Meldet einen neuen Zielwert (roher PWM 0–255) an und startet die Pumpe bei Bedarf.</summary>
+    /// <summary>Meldet einen neuen Zielwert (roher PWM 0-255) an und startet die Pumpe bei Bedarf.</summary>
     public void Set(byte pwm)
     {
         _active = true;

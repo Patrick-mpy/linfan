@@ -3,6 +3,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using LinFan.App.Controllers;
@@ -13,7 +14,7 @@ namespace LinFan.App.UiTests;
 
 /// <summary>
 /// Sichert den Live-Theme-Wechsel: das Umschalten von <see cref="ThemeVariant"/> löst die DynamicResource-
-/// Tokens neu auf, ohne zu werfen — sowohl im Hauptfenster als auch im selbstgezeichneten
+/// Tokens neu auf, ohne zu werfen - im Hauptfenster, in einem modalen Dialog und im selbstgezeichneten
 /// <see cref="CurveChart"/> (der seine Pinsel bei <c>ActualThemeVariantChanged</c> neu auflöst).
 /// </summary>
 public class ThemeSmokeTests
@@ -34,6 +35,38 @@ public class ThemeSmokeTests
 
         Assert.NotNull(window.Content);
         // Fenster bewusst NICHT schließen (würde Geometrie in die echte ui.json schreiben).
+    }
+
+    /// <summary>
+    /// Ein Dialog fordert selbst keine Variante an - er muss die der <see cref="Application"/> erben und
+    /// seinen Hintergrund entsprechend neu auflösen. Die native Titelleiste hängt am selben
+    /// <c>ActualThemeVariant</c>, ist headless aber nicht prüfbar (kein HWND) - siehe WindowFrameTheme.
+    /// </summary>
+    [AvaloniaFact]
+    public void ConfirmDialog_follows_the_application_theme()
+    {
+        ThemeVariant? before = Application.Current!.RequestedThemeVariant;
+        try
+        {
+            var dialog = new ConfirmDialog("Titel", "Meldung", "OK");
+            dialog.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            Color BackgroundIn(ThemeVariant variant)
+            {
+                Application.Current!.RequestedThemeVariant = variant;
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(variant, dialog.ActualThemeVariant);
+                return Assert.IsAssignableFrom<ISolidColorBrush>(dialog.Background).Color;
+            }
+
+            Assert.NotEqual(BackgroundIn(ThemeVariant.Light), BackgroundIn(ThemeVariant.Dark));
+            dialog.Close();
+        }
+        finally
+        {
+            Application.Current!.RequestedThemeVariant = before;
+        }
     }
 
     [AvaloniaFact]

@@ -5,7 +5,7 @@ using LinFan.Conformance;
 namespace LinFan.Hardware.Mac.Tests;
 
 /// <summary>
-/// Wendet die geteilte Conformance-Suite (INV-1..INV-10) auf das echte <see cref="MacSmcBackend"/> an —
+/// Wendet die geteilte Conformance-Suite (INV-1..INV-10) auf das echte <see cref="MacSmcBackend"/> an -
 /// über ein Fake-SMC injiziert, daher ohne IOKit/Root und auf jedem OS lauffähig. Vertragstreue-Beweis
 /// des macOS-Backends, parallel zur Referenz-/Linux-/Windows-Verankerung.
 /// <para>
@@ -23,14 +23,14 @@ public sealed class MacSmcConformanceTests : BackendConformanceTests
         var smc = new FakeSmc();
         smc.SetUi8("FNum", 2);
 
-        // Fan 0 — steuerbar: Ist-/Ziel-Drehzahl, Modus (startet Auto ⇒ INV-4-Vorbedingung), Grenzen.
+        // Fan 0 - steuerbar: Ist-/Ziel-Drehzahl, Modus (startet Auto ⇒ INV-4-Vorbedingung), Grenzen.
         smc.SetFloat("F0Ac", 1200f);
         smc.SetFloat("F0Tg", 1200f);
         smc.SetUi8("F0Md", 0);
         smc.SetFloat("F0Mn", 1200f);
         smc.SetFloat("F0Mx", 5000f);
 
-        // Fan 1 — nicht steuerbar (keine Tg/Md-Keys). F1Ac absichtlich zu kurz ⇒ Decode NaN
+        // Fan 1 - nicht steuerbar (keine Tg/Md-Keys). F1Ac absichtlich zu kurz ⇒ Decode NaN
         // (der geforderte NaN-fähige Sensor: ein bekannter Kanal, der gerade keinen Wert liefert).
         smc.Set("F1Ac", "flt ", new byte[] { 0, 0 });
 

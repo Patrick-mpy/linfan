@@ -18,6 +18,6 @@ public enum AirflowDirection
     /// <summary>Bläst Luft aus dem Gehäuse (hinten/oben).</summary>
     Exhaust,
 
-    /// <summary>Interner Kühler (CPU/GPU/Radiator/Netzteil) – nicht Teil der Gehäuse-Druckbilanz.</summary>
+    /// <summary>Interner Kühler (CPU/GPU/Radiator/Netzteil) - nicht Teil der Gehäuse-Druckbilanz.</summary>
     Internal,
 }

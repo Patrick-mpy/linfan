@@ -77,7 +77,7 @@ public class ConfigMapperTests
     [InlineData("not-a-location")]
     public void Merge_InvalidFanLocation_FallsBackToUnspecified(string raw)
     {
-        // Hinweis: Enum.TryParse akzeptiert numerische Strings ("123") als Roh-Enumwert — das ist
+        // Hinweis: Enum.TryParse akzeptiert numerische Strings ("123") als Roh-Enumwert - das ist
         // bewusst NICHT als "ungültig" getestet, da es die tatsächliche (existierende) Semantik wäre.
         var incoming = IpcWith(new IpcFanAssignment("f1", "F", 0, 255, null, Location: raw));
 
@@ -170,6 +170,8 @@ public class ConfigMapperTests
         Assert.Equal("c1", curve.Id);
         Assert.Equal("Silent", curve.Name);
         Assert.Equal(3.0, curve.HysteresisC);
+        // Ältere GUI kennt das Feld nicht (null) → Core-Default statt still 0 (Glättung aus).
+        Assert.Equal(CurveConfig.DefaultSmoothingSeconds, curve.SmoothingSeconds);
         Assert.Equal(2, curve.Points.Count);
 
         Profile profile = Assert.Single(merged.Profiles);
@@ -192,7 +194,7 @@ public class ConfigMapperTests
             {
                 new CurveConfig
                 {
-                    Id = "c1", Name = "Silent", SourceSensorId = "s1", HysteresisC = 2.5,
+                    Id = "c1", Name = "Silent", SourceSensorId = "s1", HysteresisC = 2.5, SmoothingSeconds = 8,
                     Points = new[] { new CurvePoint(40, 20), new CurvePoint(80, 100) },
                 },
             },
@@ -237,6 +239,7 @@ public class ConfigMapperTests
         Assert.Equal(new[] { "s1" }, curve.SourceSensorIds); // altes Einzelfeld → Mehrfach-Quelle migriert
         Assert.Equal(SensorAggregation.Max, curve.Aggregation); // Default-Aggregation
         Assert.Equal(2.5, curve.HysteresisC);
+        Assert.Equal(8, curve.SmoothingSeconds);
         Assert.Equal(2, curve.Points.Count);
 
         SensorConfig sensor = Assert.Single(back.Sensors);

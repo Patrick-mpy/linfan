@@ -16,7 +16,7 @@ namespace LinFan.App.Controllers;
 public partial class SensorOption : ObservableObject
 {
     private readonly string _unit;
-    private readonly string _originalName; // Hardware-/Anzeigename beim Laden — Fallback gegen Datenverlust
+    private readonly string _originalName; // Hardware-/Anzeigename beim Laden - Fallback gegen Datenverlust
 
     public string Id { get; }
 
@@ -25,7 +25,7 @@ public partial class SensorOption : ObservableObject
     [ObservableProperty] private string _group;
 
     /// <summary>Formatierte Live-Temperatur für den Geräte-Tab (reine Anzeige, fließt nicht in die Config).</summary>
-    [ObservableProperty] private string _liveValue = "—";
+    [ObservableProperty] private string _liveValue = "-";
 
     /// <summary>Vorhandene Gruppennamen für die Auto-Vervollständigung des Gruppen-Felds (geteilte Controller-Liste).</summary>
     public ObservableCollection<string> AvailableGroups { get; }
@@ -55,7 +55,7 @@ public partial class SensorOption : ObservableObject
     };
 
     /// <summary>
-    /// Setzt den editierbaren View-Zustand (Name/Sichtbarkeit/Gruppe) aus der Config zurück — für „Verwerfen".
+    /// Setzt den editierbaren View-Zustand (Name/Sichtbarkeit/Gruppe) aus der Config zurück - für „Verwerfen".
     /// Null (nicht in der Config) → Defaults wie beim ersten Laden (Originalname, sichtbar, keine Gruppe).
     /// </summary>
     public void ApplyConfig(SensorConfig? config)

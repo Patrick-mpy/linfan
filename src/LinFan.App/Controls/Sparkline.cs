@@ -10,7 +10,7 @@ namespace LinFan.App.Controls;
 
 /// <summary>
 /// Schlanke, dependency-freie Verlaufskurve (Sparkline): zeichnet eine Zahlenreihe als normalisierte
-/// Linie über die Breite. Read-only — auto-skaliert auf Min/Max der Daten. Reine View-Mechanik.
+/// Linie über die Breite. Read-only - auto-skaliert auf Min/Max der Daten. Reine View-Mechanik.
 /// </summary>
 public sealed class Sparkline : Control
 {
@@ -47,7 +47,7 @@ public sealed class Sparkline : Control
     }
 
     // Das CollectionChanged-Abo läuft nur, solange die Sparkline im Visual-Tree hängt UND auf genau der
-    // aktuellen Values-Sammlung. Beim Detach lösen, beim (Wieder-)Attach neu setzen — sonst hielte eine
+    // aktuellen Values-Sammlung. Beim Detach lösen, beim (Wieder-)Attach neu setzen - sonst hielte eine
     // Sammlung, die die Sparkline überlebt (sie gehört dem Controller), sie über CollectionChanged am Leben.
     private INotifyCollectionChanged? _subscribed;
     private bool _attached;

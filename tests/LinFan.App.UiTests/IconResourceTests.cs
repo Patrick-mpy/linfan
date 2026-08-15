@@ -28,7 +28,17 @@ public class IconResourceTests
     [InlineData("IconChevronDown")]
     [InlineData("IconGauge")]
     [InlineData("IconCheckCircle")]
+    [InlineData("IconAlertCircle")]
+    [InlineData("IconDashboard")]
+    [InlineData("IconChartLine")]
+    [InlineData("IconCog")]
+    [InlineData("IconWind")]
+    [InlineData("IconPalette")]
+    [InlineData("IconGlobe")]
+    [InlineData("IconWindow")]
+    [InlineData("IconArchive")]
     [InlineData("IconClose")]
+    [InlineData("IconSparkle")]
     public void Icon_geometry_resolves(string key)
     {
         Assert.NotNull(Application.Current);

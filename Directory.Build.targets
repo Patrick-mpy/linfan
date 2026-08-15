@@ -3,7 +3,7 @@
   <!--
     JUnit-XML-Logger für den GitLab-Testreport (ohne JUnit meldet die Pipeline "There are no test
     reports"; das .trx-Format versteht GitLab nicht). Hier in Directory.Build.targets (nicht -props),
-    weil es NACH dem Projekt-Body importiert wird — erst dort ist das im jeweiligen csproj gesetzte
+    weil es NACH dem Projekt-Body importiert wird - erst dort ist das im jeweiligen csproj gesetzte
     IsTestProject bekannt. So bekommen NUR die Test-Projekte den Logger; src/ und das Conformance-Kit
     (IsTestProject=false) bleiben unberührt. Aktiviert wird er in der CI über den junit-Logger von
     `dotnet test` (.gitlab-ci.yml → test:linux).

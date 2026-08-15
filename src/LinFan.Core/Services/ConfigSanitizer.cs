@@ -17,6 +17,7 @@ public static class ConfigSanitizer
     public const double MaxFailSafeC = 105.0;
     public const double DefaultFailSafeC = AppConfig.DefaultFailSafeTempC; // zentrale Quelle: AppConfig
     public const int MinPollIntervalMs = 200;
+    public const double MaxSmoothingSeconds = TemperatureSmoother.MaxWindowSeconds; // zentrale Quelle: der Filter
 
     /// <summary>Liefert eine bereinigte Kopie und sammelt menschenlesbare Warnungen zu Korrekturen.</summary>
     public static AppConfig Sanitize(AppConfig config, out IReadOnlyList<string> warnings)
@@ -27,7 +28,7 @@ public static class ConfigSanitizer
         double failSafe = config.FailSafeTempC;
         if (double.IsNaN(failSafe) || failSafe < MinFailSafeC || failSafe > MaxFailSafeC)
         {
-            w.Add($"FailSafeTempC {failSafe:0.#} außerhalb [{MinFailSafeC:0}–{MaxFailSafeC:0}] °C — " +
+            w.Add($"FailSafeTempC {failSafe:0.#} außerhalb [{MinFailSafeC:0}-{MaxFailSafeC:0}] °C - " +
                   $"auf sicheren Default {DefaultFailSafeC:0} °C gesetzt.");
             failSafe = DefaultFailSafeC;
         }
@@ -35,7 +36,7 @@ public static class ConfigSanitizer
         int poll = config.PollIntervalMs;
         if (poll < MinPollIntervalMs)
         {
-            w.Add($"PollIntervalMs {poll} < {MinPollIntervalMs} — auf {MinPollIntervalMs} gesetzt.");
+            w.Add($"PollIntervalMs {poll} < {MinPollIntervalMs} - auf {MinPollIntervalMs} gesetzt.");
             poll = MinPollIntervalMs;
         }
 
@@ -45,7 +46,7 @@ public static class ConfigSanitizer
 
         warnings = w;
         // Auch ohne Warnung kann die Schema-1→2-Migration (SourceSensorId → SourceSensorIds) eine neue
-        // Kurven-Liste erzeugt haben — dann darf nicht die alte Instanz zurückgegeben werden.
+        // Kurven-Liste erzeugt haben - dann darf nicht die alte Instanz zurückgegeben werden.
         bool changed = w.Count > 0 || !ReferenceEquals(curves, config.Curves);
         return changed
             ? config with
@@ -63,7 +64,7 @@ public static class ConfigSanitizer
     /// Entfernt Einträge mit doppelter Id (erster gewinnt). Doppelte Fan-/Sensor-Ids können durch die
     /// hwmon-Id-Migration entstehen (zwei instabile Alt-Ids kollabieren auf dieselbe stabile Id) oder
     /// durch eine von Hand editierte Datei. Ein <c>ToDictionary</c> weiter oben (Snapshot-Bau, GUI) würde
-    /// daran werfen und die App abstürzen lassen — hier einmalig, autoritär und mit Warnung bereinigt.
+    /// daran werfen und die App abstürzen lassen - hier einmalig, autoritär und mit Warnung bereinigt.
     /// Bei doppelfreier Eingabe wird dieselbe Instanz zurückgegeben (keine Allokation, keine „geändert"-Flags).
     /// </summary>
     private static IReadOnlyList<T> DistinctById<T>(
@@ -100,7 +101,7 @@ public static class ConfigSanitizer
             FanConfig f = fans[i];
             if (f.MaxPwm < f.MinPwm)
             {
-                w.Add($"Lüfter {f.FanId}: MaxPwm {f.MaxPwm} < MinPwm {f.MinPwm} — MaxPwm auf {f.MinPwm} angehoben.");
+                w.Add($"Lüfter {f.FanId}: MaxPwm {f.MaxPwm} < MinPwm {f.MinPwm} - MaxPwm auf {f.MinPwm} angehoben.");
                 fixedFans ??= new List<FanConfig>(fans);
                 fixedFans[i] = f with { MaxPwm = f.MinPwm };
             }
@@ -112,7 +113,7 @@ public static class ConfigSanitizer
     /// Entfernt nicht-endliche Stützpunkte (NaN/∞), die das Sortieren/Interpolieren stören würden, und
     /// migriert das alte Einzel-Quellfeld (Schema 1) auf die Mehrfach-Quelle (Schema 2): ein gesetztes
     /// <see cref="CurveConfig.SourceSensorId"/> wandert in ein leeres <see cref="CurveConfig.SourceSensorIds"/>.
-    /// Die Migration ist eine stille Normalisierung (keine Warnung) — ohne sie verlöre eine Altkurve
+    /// Die Migration ist eine stille Normalisierung (keine Warnung) - ohne sie verlöre eine Altkurve
     /// ihren Quell-Sensor.
     /// </summary>
     private static IReadOnlyList<CurveConfig> SanitizeCurves(IReadOnlyList<CurveConfig> curves, List<string> w)
@@ -131,13 +132,44 @@ public static class ConfigSanitizer
             if (pointsDropped)
                 w.Add($"Kurve '{c.Name}': {migrated.Points.Count - clean.Count} ungültige Stützpunkte (NaN/∞) entfernt.");
 
-            if (!ReferenceEquals(migrated, c) || pointsDropped)
+            double smoothing = SanitizeSmoothing(migrated, w);
+            bool smoothingFixed = smoothing != migrated.SmoothingSeconds;
+
+            if (!ReferenceEquals(migrated, c) || pointsDropped || smoothingFixed)
             {
                 fixedCurves ??= new List<CurveConfig>(curves);
-                fixedCurves[i] = pointsDropped ? migrated with { Points = clean } : migrated;
+                CurveConfig fixedCurve = migrated;
+                if (pointsDropped)
+                    fixedCurve = fixedCurve with { Points = clean };
+                if (smoothingFixed)
+                    fixedCurve = fixedCurve with { SmoothingSeconds = smoothing };
+                fixedCurves[i] = fixedCurve;
             }
         }
         return fixedCurves ?? curves;
+    }
+
+    /// <summary>
+    /// Keeps the smoothing window sane. NaN or a negative value falls back to the default; anything beyond
+    /// <see cref="MaxSmoothingSeconds"/> is clamped - a window far past a heatsink's time constant would
+    /// make the curve feel broken rather than calm. Not safety-critical (the watchdog reads raw values
+    /// regardless), so an out-of-range value is corrected rather than rejected.
+    /// </summary>
+    private static double SanitizeSmoothing(CurveConfig c, List<string> w)
+    {
+        double seconds = c.SmoothingSeconds;
+        if (double.IsNaN(seconds) || seconds < 0)
+        {
+            w.Add($"Kurve '{c.Name}': Glättung {seconds:0.#} s ungültig - auf " +
+                  $"{CurveConfig.DefaultSmoothingSeconds:0.#} s gesetzt.");
+            return CurveConfig.DefaultSmoothingSeconds;
+        }
+        if (seconds > MaxSmoothingSeconds)
+        {
+            w.Add($"Kurve '{c.Name}': Glättung {seconds:0.#} s > {MaxSmoothingSeconds:0} s - geklemmt.");
+            return MaxSmoothingSeconds;
+        }
+        return seconds;
     }
 
     /// <summary>Schema-1→2-Migration einer Kurve: leeres SourceSensorIds + gesetztes SourceSensorId → [SourceSensorId].</summary>

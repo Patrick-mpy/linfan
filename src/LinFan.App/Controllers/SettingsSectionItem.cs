@@ -7,7 +7,7 @@ namespace LinFan.App.Controllers;
 /// <summary>
 /// Ein Eintrag im Einstellungen-Seitenmenü: Sektion + lokalisiertes Label/Gruppe + Icon-Ressourcenschlüssel.
 /// <see cref="Group"/>/<see cref="Label"/> lesen live aus dem <see cref="Localizer"/> (der <c>SettingsController</c>
-/// baut die Liste bei Sprachwechsel neu auf). <see cref="IconKey"/> ist ein reiner String — die View löst ihn
+/// baut die Liste bei Sprachwechsel neu auf). <see cref="IconKey"/> ist ein reiner String - die View löst ihn
 /// per <c>ResourceKeyConverter</c> zur Geometrie auf, sodass die Controller-Schicht frei von Avalonia-Rendering-
 /// Typen bleibt (und der Typ ohne laufende App konstruierbar ist, z. B. in Unit-Tests).
 /// </summary>

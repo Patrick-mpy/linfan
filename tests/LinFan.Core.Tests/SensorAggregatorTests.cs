@@ -95,7 +95,7 @@ public class SensorAggregatorTests
     }
 
     // Regression: ein Backend, das für unbekannte IDs WIRFT (wie LinuxHwmonBackend / die Conformance-Referenz),
-    // darf den Aggregator — und damit den ganzen Regel-Tick — nicht abreißen. Reproduziert den Praxis-Crash,
+    // darf den Aggregator - und damit den ganzen Regel-Tick - nicht abreißen. Reproduziert den Praxis-Crash,
     // wenn die Config auf einen Sensor zeigt, dessen hwmon-Nummer sich seit dem Speichern geändert hat.
     [Fact]
     public void ThrowingBackend_UnknownSensorId_TreatedAsNaN_DoesNotThrow()
@@ -107,7 +107,7 @@ public class SensorAggregatorTests
         Assert.True(double.IsNaN(SensorAggregator.Aggregate(new[] { "missing" }, hw, SensorAggregation.Max)));
     }
 
-    // Regression (verschärft): NICHT nur KeyNotFoundException — AUCH jede andere Backend-Exception
+    // Regression (verschärft): NICHT nur KeyNotFoundException - AUCH jede andere Backend-Exception
     // (z. B. IOException/EIO, unerwartete Fehler) muss wie „nicht lesbar" zählen, statt den ganzen
     // Regel-Tick (inkl. Übertemp-Watchdog) abzureißen. Der Aggregator fängt daher breit.
     [Fact]
@@ -151,7 +151,7 @@ public class SensorAggregatorTests
     [Fact]
     public void Hottest_SkipsThrowingSensor_ReturnsReadableMax()
     {
-        // Ein werfender Einzel-Kanal (EIO) wird übersprungen, der lesbare bleibt maßgeblich — kein Abriss.
+        // Ein werfender Einzel-Kanal (EIO) wird übersprungen, der lesbare bleibt maßgeblich - kein Abriss.
         Assert.Equal(62, SensorAggregator.Hottest(new OneGoodOneThrowingBackend()));
     }
 
@@ -177,7 +177,7 @@ public class SensorAggregatorTests
         public void Dispose() { }
     }
 
-    /// <summary>Minimal-Backend, das — wie der echte Linux-Backend — für unbekannte Sensor-IDs wirft.</summary>
+    /// <summary>Minimal-Backend, das - wie der echte Linux-Backend - für unbekannte Sensor-IDs wirft.</summary>
     private sealed class ThrowingBackend : ISensorBackend
     {
         private readonly Dictionary<string, double> _values;
@@ -194,7 +194,7 @@ public class SensorAggregatorTests
         public void Dispose() { }
     }
 
-    /// <summary>Backend, dessen <see cref="ReadValue"/> immer wirft (kein KeyNotFound) — z. B. EIO/Treiberfehler.</summary>
+    /// <summary>Backend, dessen <see cref="ReadValue"/> immer wirft (kein KeyNotFound) - z. B. EIO/Treiberfehler.</summary>
     private sealed class AlwaysThrowingBackend : ISensorBackend
     {
         private readonly string _id;

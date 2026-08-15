@@ -6,12 +6,17 @@ using LinFan.Core.Models;
 namespace LinFan.Core.Services;
 
 /// <summary>
-/// Der Regel-Kern: ein <see cref="Tick"/> liest pro geregeltem Lüfter den Quell-Sensor, wertet die
-/// zugeordnete Kurve aus (mit Hysterese), klemmt auf die PWM-Grenzen des Lüfters und setzt den Wert.
+/// Der Regel-Kern: ein <see cref="Tick"/> liest pro geregeltem Lüfter den Quell-Sensor, glättet ihn
+/// (<see cref="TemperatureSmoother"/>), wertet die zugeordnete Kurve aus (mit Hysterese), klemmt auf die
+/// PWM-Grenzen des Lüfters und setzt den Wert.
 /// <para>
 /// Vor allem anderen prüft jeder Tick den Temperatur-Watchdog: bei Übertemperatur sofort
 /// <see cref="IFanController.RestoreDefaults"/> (Hardware-Auto / Fail-Safe). Im <c>dryRun</c>-Modus
 /// wird nur gerechnet, nicht geschrieben (z. B. ohne Root).
+/// </para>
+/// <para>
+/// The smoothing sits on the curve input only. The watchdog below deliberately reads raw values, so a
+/// genuine over-temperature still trips in the very tick it appears, however long the window is.
 /// </para>
 /// </summary>
 public sealed class ControlLoop
@@ -22,6 +27,7 @@ public sealed class ControlLoop
     private readonly ISensorBackend _sensors;
     private readonly IFanController _fans;
     private readonly bool _dryRun;
+    private readonly TemperatureSmoother _smoother;
     private readonly Dictionary<string, double> _lastAppliedTemp = new();
     private int _blindTicks;
 
@@ -33,19 +39,25 @@ public sealed class ControlLoop
     private readonly HashSet<string> _suspended = new();
     private HashSet<string> _previouslyManual = new();
 
-    public ControlLoop(ISensorBackend sensors, IFanController fans, bool dryRun = false)
+    public ControlLoop(ISensorBackend sensors, IFanController fans, bool dryRun = false, TimeProvider? time = null)
     {
         _sensors = sensors;
         _fans = fans;
         _dryRun = dryRun;
+        _smoother = new TemperatureSmoother(time);
     }
 
     /// <summary>
-    /// Verwirft den Hysterese-Cache, damit der nächste Tick alle Lüfter neu bewertet. Nach einer
-    /// Konfigurationsänderung aufrufen — sonst hielte die Hysterese den alten PWM, bis die Temperatur
-    /// zufällig genug driftet, und die neue Kurve würde verzögert greifen.
+    /// Verwirft den Hysterese-Cache <i>und</i> die Glättungs-Puffer, damit der nächste Tick alle Lüfter neu
+    /// bewertet. Nach einer Konfigurationsänderung aufrufen - sonst hielte die Hysterese den alten PWM, bis
+    /// die Temperatur zufällig genug driftet, und die neue Kurve würde verzögert greifen (und sie bekäme
+    /// Mittelwerte aus der alten zu sehen).
     /// </summary>
-    public void ResetHysteresis() => _lastAppliedTemp.Clear();
+    public void ResetFilters()
+    {
+        _lastAppliedTemp.Clear();
+        _smoother.Reset();
+    }
 
     /// <summary>Setzt (oder löscht mit <c>null</c>) einen festen manuellen PWM-Wert für einen Lüfter.</summary>
     public void SetManualOverride(string fanId, byte? pwm)
@@ -78,7 +90,7 @@ public sealed class ControlLoop
             _suspended.Remove(fanId);
     }
 
-    /// <summary>Aktuell manuell gesteuerte Lüfter (Kopie) — für die Snapshot-Anzeige.</summary>
+    /// <summary>Aktuell manuell gesteuerte Lüfter (Kopie) - für die Snapshot-Anzeige.</summary>
     public IReadOnlySet<string> ManualFanIds()
     {
         lock (_gate)
@@ -89,7 +101,7 @@ public sealed class ControlLoop
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        // 0) Steuerhoheit pro Lüfter thread-sicher kopieren — VOR dem Watchdog, da auch ein rein
+        // 0) Steuerhoheit pro Lüfter thread-sicher kopieren - VOR dem Watchdog, da auch ein rein
         //    manuell gesteuerter Lüfter (ohne Kurve) überwacht werden muss.
         Dictionary<string, byte> manual;
         HashSet<string> suspended;
@@ -123,7 +135,7 @@ public sealed class ControlLoop
 
         var actions = new List<FanAction>();
 
-        // 2a) Manuelle Overrides (GUI) übersteuern die Kurve — fester PWM (Watchdog hat oben geschützt).
+        // 2a) Manuelle Overrides (GUI) übersteuern die Kurve - fester PWM (Watchdog hat oben geschützt).
         foreach (var (fanId, pwm) in manual)
         {
             if (suspended.Contains(fanId))
@@ -156,11 +168,13 @@ public sealed class ControlLoop
         // 3) Pro geregeltem Lüfter die Kurve anwenden (außer manuell/suspendiert). Jeder Lüfter ist gegen
         //    die anderen isoliert: ein unerwarteter Fehler bei einem Kanal degradiert zu FanAction.Failed
         //    für DIESEN Lüfter, statt den ganzen Tick (und damit die Regelung aller übrigen) abzureißen.
+        //    curveInputs caches the smoothed input per curve for this tick - see CurveInput.
+        var curveInputs = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach (var fan in config.Fans)
         {
             try
             {
-                ApplyFanCurve(fan, config, manual, suspended, actions);
+                ApplyFanCurve(fan, config, manual, suspended, actions, curveInputs);
             }
             catch (Exception ex)
             {
@@ -177,7 +191,7 @@ public sealed class ControlLoop
     /// </summary>
     private void ApplyFanCurve(
         FanConfig fan, AppConfig config, IReadOnlyDictionary<string, byte> manual,
-        IReadOnlySet<string> suspended, List<FanAction> actions)
+        IReadOnlySet<string> suspended, List<FanAction> actions, Dictionary<string, double> curveInputs)
     {
         if (suspended.Contains(fan.FanId))
         {
@@ -188,7 +202,7 @@ public sealed class ControlLoop
             return; // bereits manuell gesetzt
 
         // Ohne Kurven-Zuordnung den Lüfter NICHT einfrieren (reines Überspringen hielte einen zuvor
-        // gesetzten Manuell-/Kurven-PWM), sondern aktiv auf Hardware-Auto stellen — die Firmware regelt.
+        // gesetzten Manuell-/Kurven-PWM), sondern aktiv auf Hardware-Auto stellen - die Firmware regelt.
         if (fan.AssignedCurveId is null)
         {
             FallBackToAuto(fan.FanId, "ohne Kurve → Auto", actions);
@@ -212,10 +226,10 @@ public sealed class ControlLoop
             return;
         }
 
-        double temp = SensorAggregator.Aggregate(curve.SourceSensorIds, _sensors, curve.Aggregation);
+        double temp = CurveInput(curve, curveInputs);
         if (double.IsNaN(temp))
         {
-            string srcs = curve.SourceSensorIds.Count == 0 ? "—" : string.Join(", ", curve.SourceSensorIds);
+            string srcs = curve.SourceSensorIds.Count == 0 ? "-" : string.Join(", ", curve.SourceSensorIds);
             actions.Add(FanAction.Skipped(fan.FanId, $"Sensor {srcs} n/a"));
             return;
         }
@@ -250,10 +264,38 @@ public sealed class ControlLoop
         }
     }
 
+    /// <summary>
+    /// The temperature a curve is evaluated at: its sources aggregated, then smoothed over the curve's
+    /// window. Computed once per curve per tick and cached in <paramref name="cache"/> - several fans may
+    /// share a curve, and the smoother must not be fed twice per tick (nor may the fans disagree about the
+    /// value in the same tick).
+    /// <para>
+    /// An unreadable input (<see cref="double.NaN"/>) never reaches the smoother and is handed straight
+    /// back: the caller then skips the fan exactly as before, instead of regulating on what is left in the
+    /// buffer. "Temperature unknown" must not be smoothed into "temperature fine".
+    /// </para>
+    /// <para>
+    /// A curve whose fans are all manual or suspended is not evaluated at all, so its sample series thins
+    /// out for that stretch and the next mean leans on what is left. Accepted: sample ageing bounds it to
+    /// one window, and feeding curves nobody is regulating would mean reading sensors for nothing.
+    /// </para>
+    /// </summary>
+    private double CurveInput(CurveConfig curve, Dictionary<string, double> cache)
+    {
+        if (cache.TryGetValue(curve.Id, out double cached))
+            return cached;
+
+        double raw = SensorAggregator.Aggregate(curve.SourceSensorIds, _sensors, curve.Aggregation);
+        double value = double.IsNaN(raw) ? raw : _smoother.Smooth(curve.Id, raw, curve.SmoothingSeconds);
+        cache[curve.Id] = value;
+        return value;
+    }
+
     private ControlTick FailSafe(double hottest, string reason)
     {
         _fans.RestoreDefaults();
         _lastAppliedTemp.Clear();
+        _smoother.Reset(); // wie jeder „vergiss den Regelzustand"-Pfad: nach dem Fail-Safe nicht über Werte von davor mitteln
         _blindTicks = 0;
         lock (_gate)
             _manualOverride.Clear(); // nach Fail-Safe nicht automatisch in den Manual-Zustand zurück
@@ -263,7 +305,7 @@ public sealed class ControlLoop
     /// <summary>
     /// Stellt einen Lüfter aktiv auf Hardware-Auto (Firmware regelt) und verwirft seinen Hysterese-Cache,
     /// damit eine spätere (Wieder-)Zuordnung sofort greift. Idempotent je Tick (selbstheilend). Gemeinsam
-    /// genutzt für „ohne Kurve" und „Kurve deaktiviert" — beide dürfen den Lüfter nicht eingefroren lassen.
+    /// genutzt für „ohne Kurve" und „Kurve deaktiviert" - beide dürfen den Lüfter nicht eingefroren lassen.
     /// </summary>
     private void FallBackToAuto(string fanId, string reason, List<FanAction> actions)
     {

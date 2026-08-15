@@ -38,7 +38,7 @@ internal static class CliApp
             cts.Cancel();
         };
 
-        // IPC-Client-Befehle sprechen nur mit dem Daemon — kein eigenes Hardware-Backend laden.
+        // IPC-Client-Befehle sprechen nur mit dem Daemon - kein eigenes Hardware-Backend laden.
         switch (command)
         {
             case "monitor-ipc": return await MonitorIpcAsync(cts.Token);
@@ -60,7 +60,7 @@ internal static class CliApp
 
         // Fail-Safe-Restore nur nach Kommandos, die PWM tatsächlich verändern. Ein pauschales
         // RestoreDefaults nach read-only-Kommandos (`list`/`monitor`/`init`) würfe ALLE Lüfter kurz auf
-        // Hardware-Auto — neben einem laufenden Daemon riss das dessen Kurvenregelung für einen Moment weg.
+        // Hardware-Auto - neben einem laufenden Daemon riss das dessen Kurvenregelung für einen Moment weg.
         bool touchesPwm = CommandTouchesPwm(command);
         try
         {
@@ -105,7 +105,7 @@ internal static class CliApp
             return 2;
         }
 
-        Console.WriteLine($"Verbunden mit {client.ConnectedPath} — Strg+C beendet.");
+        Console.WriteLine($"Verbunden mit {client.ConnectedPath} - Strg+C beendet.");
         try
         {
             await foreach (IpcSnapshot snap in client.ReadSnapshotsAsync(ct))
@@ -143,7 +143,7 @@ internal static class CliApp
         }
 
         await client.SendCommandAsync(new IpcCommand(IpcCommand.Reload), ct);
-        Console.WriteLine("reload gesendet — der Daemon liest die Konfiguration neu ein.");
+        Console.WriteLine("reload gesendet - der Daemon liest die Konfiguration neu ein.");
         return 0;
     }
 
@@ -196,7 +196,7 @@ internal static class CliApp
         var temps = all.Where(s => s.Kind == SensorKind.Temperature).ToList();
         var rpms = all.Where(s => s.Kind == SensorKind.FanRpm).ToList();
 
-        Console.WriteLine("Live-Monitor — Strg+C beendet.");
+        Console.WriteLine("Live-Monitor - Strg+C beendet.");
         while (!ct.IsCancellationRequested)
         {
             var sb = new StringBuilder();
@@ -235,14 +235,14 @@ internal static class CliApp
         }
 
         if (!Privileges.IsElevated())
-            Console.WriteLine($"Warnung: nicht als {Privileges.ElevationTerm} — Schreibzugriff schlägt voraussichtlich fehl.");
+            Console.WriteLine($"Warnung: nicht als {Privileges.ElevationTerm} - Schreibzugriff schlägt voraussichtlich fehl.");
 
         // Fail-Safe vor dem Eingriff: bei Übertemperatur gar nicht erst manuell werden.
         double hottest = SensorAggregator.Hottest(sensors);
         if (!double.IsNaN(hottest) && hottest >= SafetyLimitC)
         {
             Console.Error.WriteLine(
-                $"Abbruch: {hottest:0.0} °C ≥ {SafetyLimitC} °C — Fail-Safe, kein manueller Eingriff.");
+                $"Abbruch: {hottest:0.0} °C ≥ {SafetyLimitC} °C - Fail-Safe, kein manueller Eingriff.");
             return 3;
         }
 
@@ -266,11 +266,11 @@ internal static class CliApp
         while (!ct.IsCancellationRequested)
         {
             double t = SensorAggregator.Hottest(sensors);
-            string rpm = "—";
+            string rpm = "-";
             if (fan.Tachometer is { } tach)
             {
                 // Defensiv wie SensorAggregator.ReadOrNaN: ein werfender Tacho-Kanal (EIO o. Ä.) darf den
-                // Watchdog-Loop nicht abreißen — sonst greift der Blind-Hold-Abbruch bei gleichzeitig
+                // Watchdog-Loop nicht abreißen - sonst greift der Blind-Hold-Abbruch bei gleichzeitig
                 // kaputtem Tacho nie. Der Wert ist reine Anzeige; die Regelung hängt an `t` (bereits defensiv).
                 try { rpm = Fmt(sensors.ReadValue(tach), "RPM"); }
                 catch { rpm = Fmt(double.NaN, "RPM"); }
@@ -279,7 +279,7 @@ internal static class CliApp
 
             if (!double.IsNaN(t) && t >= SafetyLimitC)
             {
-                Console.Error.WriteLine($"Übertemperatur {t:0.0} °C — Fail-Safe: zurück auf Auto.");
+                Console.Error.WriteLine($"Übertemperatur {t:0.0} °C - Fail-Safe: zurück auf Auto.");
                 fans.RestoreDefaults();
                 return 3;
             }
@@ -291,7 +291,7 @@ internal static class CliApp
                 if (++blindHolds >= MaxBlindHolds)
                 {
                     Console.Error.WriteLine(
-                        $"Keine lesbare Temperatur seit {blindHolds} Zyklen — Fail-Safe: zurück auf Auto.");
+                        $"Keine lesbare Temperatur seit {blindHolds} Zyklen - Fail-Safe: zurück auf Auto.");
                     fans.RestoreDefaults();
                     return 3;
                 }
@@ -334,7 +334,7 @@ internal static class CliApp
         var temps = sensors.DiscoverSensors().Where(s => s.Kind == SensorKind.Temperature).ToList();
         if (temps.Count == 0)
         {
-            Console.Error.WriteLine("Keine Temperatursensoren gefunden — Abbruch.");
+            Console.Error.WriteLine("Keine Temperatursensoren gefunden - Abbruch.");
             return 1;
         }
 
@@ -355,7 +355,7 @@ internal static class CliApp
             },
         };
 
-        // Ohne Namen anlegen: FanConfig.Name ist der EIGENE Name des Nutzers, leer heißt „keiner" — dann
+        // Ohne Namen anlegen: FanConfig.Name ist der EIGENE Name des Nutzers, leer heißt „keiner" - dann
         // greift überall die Hardware-Bezeichnung. Sie hier einzutragen fröre sie als eigenen Namen ein.
         var fanConfigs = fans.DiscoverFans()
             .Select(f => new FanConfig { FanId = f.Id.Value, AssignedCurveId = curve.Id })
@@ -414,13 +414,13 @@ internal static class CliApp
         }
 
         if (!Privileges.IsElevated())
-            Console.WriteLine($"Warnung: nicht als {Privileges.ElevationTerm} — Kalibrierung (PWM schreiben) schlägt voraussichtlich fehl.");
+            Console.WriteLine($"Warnung: nicht als {Privileges.ElevationTerm} - Kalibrierung (PWM schreiben) schlägt voraussichtlich fehl.");
 
         // Config früh laden: liefert die Watchdog-Obergrenze und wird unten für die Ergebnis-Persistenz wiederverwendet.
         var store = new JsonConfigStore();
         AppConfig config = store.Load();
 
-        // Anders als der Daemon hat der CLI-Pfad keinen zweiten Loop-Watchdog — die Obergrenze daher hier
+        // Anders als der Daemon hat der CLI-Pfad keinen zweiten Loop-Watchdog - die Obergrenze daher hier
         // defensiv durch denselben Sanitizer klemmen (handeditierte 200 °C / NaN dürfen den Watchdog nicht entschärfen).
         double failSafeTempC = ConfigSanitizer.Sanitize(config, out _).FailSafeTempC;
         var options = new CalibrationOptions { FailSafeTempC = failSafeTempC };
@@ -446,12 +446,12 @@ internal static class CliApp
             return 3;
         }
 
-        Console.WriteLine($"Ergebnis: Anlauf bei pwm={result.StartPwm}, Drehzahl {result.MinRpm}–{result.MaxRpm} RPM");
+        Console.WriteLine($"Ergebnis: Anlauf bei pwm={result.StartPwm}, Drehzahl {result.MinRpm}-{result.MaxRpm} RPM");
 
-        // Anlaufpunkt + Messreihe in die (oben geladene) Konfiguration übernehmen — über denselben
+        // Anlaufpunkt + Messreihe in die (oben geladene) Konfiguration übernehmen - über denselben
         // Fail-Safe-Pfad wie der Daemon: MinPwm wird nur bei echtem Anlaufpunkt (MinRpm > 0) gesetzt,
         // sonst würde StartPwm==255 („nicht angelaufen") den Lüfter dauerhaft auf Volllast zwingen.
-        // Ist der Lüfter noch nicht konfiguriert, vorher anlegen — ohne Namen, wie ConfigMapper.NewFan:
+        // Ist der Lüfter noch nicht konfiguriert, vorher anlegen - ohne Namen, wie ConfigMapper.NewFan:
         // leer heißt „kein eigener Name", die Hardware-Bezeichnung gilt.
         AppConfig seeded = config.Fans.Any(f => f.FanId == id.Value)
             ? config
@@ -460,7 +460,7 @@ internal static class CliApp
 
         Console.WriteLine(result.MinRpm > 0
             ? $"In {store.ConfigPath} gespeichert (MinPwm = {result.StartPwm})."
-            : $"In {store.ConfigPath} gespeichert (kein Anlaufpunkt gefunden — MinPwm unverändert).");
+            : $"In {store.ConfigPath} gespeichert (kein Anlaufpunkt gefunden - MinPwm unverändert).");
         return 0;
     }
 
@@ -468,7 +468,7 @@ internal static class CliApp
     {
         Console.WriteLine(
             """
-            LinFan — Daemon-CLI (Linux hwmon)
+            LinFan - Daemon-CLI (Linux hwmon)
 
             Befehle:
               list                 Sensoren & Lüfter anzeigen (Standard)

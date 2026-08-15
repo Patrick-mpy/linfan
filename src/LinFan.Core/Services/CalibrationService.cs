@@ -42,7 +42,7 @@ public sealed class CalibrationService
             throw new FanNotControllableException($"Lüfter {fanId} ist nicht steuerbar (Root nötig).");
         // Das explizit zugeordnete RpmSource-Override gewinnt vor dem Backend-Guess (manuelle/auto Kopplung).
         if ((options.TachometerOverride ?? fan.Tachometer) is not { } tach)
-            throw new NoTachometerException($"Lüfter {fanId} hat kein Tachosignal — Kalibrierung nicht möglich.");
+            throw new NoTachometerException($"Lüfter {fanId} hat kein Tachosignal - Kalibrierung nicht möglich.");
 
         int step = Math.Clamp(options.StepSize, 1, 255);
         var samples = new List<CalibrationSample>();
@@ -92,7 +92,7 @@ public sealed class CalibrationService
         {
             if (blindGuards + 1 >= MaxBlindGuards)
                 throw new NoTemperatureReadingException(
-                    "Keine lesbare Temperatur während der Kalibrierung — abgebrochen (kein Watchdog).");
+                    "Keine lesbare Temperatur während der Kalibrierung - abgebrochen (kein Watchdog).");
             return blindGuards + 1;
         }
         return 0;

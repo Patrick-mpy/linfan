@@ -19,7 +19,7 @@ public class RunGateTests
 
         Assert.True(gate.TryBegin(out _));
         Assert.True(gate.IsRunning);
-        Assert.False(gate.TryBegin(out _)); // läuft bereits — genau ein Lauf gleichzeitig
+        Assert.False(gate.TryBegin(out _)); // läuft bereits - genau ein Lauf gleichzeitig
 
         gate.End();
         Assert.False(gate.IsRunning);
@@ -79,7 +79,7 @@ public class RunGateTests
         var gate = new RunGate(CancellationToken.None);
         Assert.True(gate.TryBegin(out CancellationToken token));
 
-        // Ein Lauf, der bis zum Abbruch hängt und im finally — wie die Koordinatoren — das Gate schließt.
+        // Ein Lauf, der bis zum Abbruch hängt und im finally - wie die Koordinatoren - das Gate schließt.
         Task run = Task.Run(async () =>
         {
             try { await Task.Delay(Timeout.Infinite, token); }

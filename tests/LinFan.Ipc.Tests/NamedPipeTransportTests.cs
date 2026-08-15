@@ -11,14 +11,14 @@ namespace LinFan.Ipc.Tests;
 /// <summary>
 /// End-to-End über den Windows-Named-Pipe-Transport, durch die echte Protokoll-Schicht
 /// (<see cref="IpcServer"/>/<see cref="IpcClient"/>). .NET emuliert Named Pipes auf Linux/macOS über
-/// Unix-Domain-Sockets, daher läuft dieser Test überall — Connect/Accept/Duplex/NDJSON werden hier
+/// Unix-Domain-Sockets, daher läuft dieser Test überall - Connect/Accept/Duplex/NDJSON werden hier
 /// verifiziert. Die Windows-spezifische DACL ist nicht testbar und wird am MVP-Gate (Stage 4) auf
 /// echter Hardware geprüft. Der Transport wird explizit injiziert (Factory-Default wäre hier Unix).
 /// </summary>
 public class NamedPipeTransportTests
 {
     // Upper bound per test, not a performance statement: it is only there so a hung connect fails the
-    // run instead of hanging it. Generous on purpose — `dotnet test` runs the test projects of the
+    // run instead of hanging it. Generous on purpose - `dotnet test` runs the test projects of the
     // solution in parallel, and under that load connect/accept plus the first snapshot occasionally
     // needed more than the 15 s this used to allow, which failed the run without anything being wrong.
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
@@ -105,7 +105,7 @@ public class NamedPipeTransportTests
         using var cts = new CancellationTokenSource(Timeout);
         await server.StartAsync(cts.Token);
 
-        // Zwei Clients gleichzeitig — pro Verbindung erzeugt der Transport eine eigene Pipe-Instanz.
+        // Zwei Clients gleichzeitig - pro Verbindung erzeugt der Transport eine eigene Pipe-Instanz.
         await using var c1 = new IpcClient(name, new NamedPipeClientTransport());
         await using var c2 = new IpcClient(name, new NamedPipeClientTransport());
         await c1.ConnectAsync(cts.Token);

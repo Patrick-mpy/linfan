@@ -25,11 +25,11 @@ public partial class ManualControl : ObservableObject
     /// <summary>Slider engagiert? <c>true</c> → manuell geregelt, <c>false</c> → zurück auf Kurve/Hardware-Auto.</summary>
     [ObservableProperty] private bool _isActive;
 
-    /// <summary>Slider-Stellung in Prozent (0–100).</summary>
+    /// <summary>Slider-Stellung in Prozent (0-100).</summary>
     [ObservableProperty] private double _percent;
 
-    /// <summary>Formatierte Live-Drehzahl (reine Anzeige) — gespeist vom Poll-Loop der jeweiligen Fläche.</summary>
-    [ObservableProperty] private string _liveRpm = "—";
+    /// <summary>Formatierte Live-Drehzahl (reine Anzeige) - gespeist vom Poll-Loop der jeweiligen Fläche.</summary>
+    [ObservableProperty] private string _liveRpm = "-";
 
     public ManualControl(string fanId, bool canControl,
                          Func<string, byte, Task>? sendManual, Func<string, Task>? sendAuto)

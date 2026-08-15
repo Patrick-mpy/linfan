@@ -6,7 +6,7 @@ namespace LinFan.App.Services;
 
 /// <summary>
 /// Steuerbefehle, die die GUI an den Daemon sendet (über IPC). Der <see cref="MainController"/> hängt an
-/// dieser Abstraktion statt am konkreten <see cref="IpcLiveMonitor"/> — so bleibt die GUI-seitige
+/// dieser Abstraktion statt am konkreten <see cref="IpcLiveMonitor"/> - so bleibt die GUI-seitige
 /// Befehlsrichtung testbar (Fake-Sink) und MVC-konform (kein Hardware-/Transport-Detail im Controller).
 /// </summary>
 public interface ICommandSink
@@ -34,7 +34,7 @@ public interface ICommandSink
     Task SendSetCurveEnabledAsync(string curveId, bool enabled);
 
     /// <summary>
-    /// Ersetzt die Daemon-Config <b>vollständig</b> durch <paramref name="config"/> (Import/Restore) — anders
+    /// Ersetzt die Daemon-Config <b>vollständig</b> durch <paramref name="config"/> (Import/Restore) - anders
     /// als <see cref="SendConfigAsync"/> (Merge) inkl. der mitgeschickten Kalibrierung. Liefert, ob es gelang.
     /// </summary>
     Task<bool> SendReplaceConfigAsync(AppConfig config);

@@ -22,7 +22,7 @@ public static class CurveEngine
 
         // Nur bei tatsächlich unsortierter Eingabe defensiv umsortieren. Der Hot-Path (Regel-Tick wertet
         // jede Kurve je Lüfter aus) liefert die Punkte bereits aufsteigend (in der Config so normalisiert),
-        // dann fällt die Sortier-Allokation je Auswertung weg — der O(n)-Check ist allokationsfrei.
+        // dann fällt die Sortier-Allokation je Auswertung weg - der O(n)-Check ist allokationsfrei.
         IReadOnlyList<CurvePoint> ordered = IsSortedAscending(points)
             ? points
             : points.OrderBy(p => p.TemperatureC).ToArray();
@@ -68,7 +68,7 @@ public static class CurveEngine
     }
 
     /// <summary>
-    /// Stufen-Interpolation: Die Punkte wirken als Schwellwerte — zwischen zwei Stützpunkten gilt der
+    /// Stufen-Interpolation: Die Punkte wirken als Schwellwerte - zwischen zwei Stützpunkten gilt der
     /// Wert des unteren Punkts, erst beim Erreichen des nächsten Punkts springt die Leistung auf dessen
     /// Wert. Monoton bei monotonen Stützpunkten; bei doppelter Temperatur gewinnt der spätere Punkt
     /// (deterministisch, wie bei der Spline).
@@ -91,7 +91,7 @@ public static class CurveEngine
     /// wird exakt getroffen.
     /// <para>
     /// Bewusst <b>ohne</b> Sehnen-Untergrenze: Eine frühere Fassung klemmte das Ergebnis per
-    /// <c>Math.Max(spline, linear)</c> nie unter die lineare Verbindung — auf konvexen Segmenten (der
+    /// <c>Math.Max(spline, linear)</c> nie unter die lineare Verbindung - auf konvexen Segmenten (der
     /// Normalfall bei Lüfterkurven) degenerierte die Spline damit exakt zur Linearen und der Modus hatte
     /// praktisch keinen Effekt. Die Fritsch-Carlson-Garantien tragen die Sicherheit auch ohne Klammer:
     /// Zwischen zwei Punkten bleibt der Wert immer ≥ dem unteren gezeichneten Stützpunkt, und der

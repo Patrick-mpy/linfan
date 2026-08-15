@@ -11,7 +11,7 @@ public interface IConfigStore
     string ConfigPath { get; }
 
     /// <summary>
-    /// Gibt an, ob bereits eine persistierte Konfiguration existiert — First-Run-Signal.
+    /// Gibt an, ob bereits eine persistierte Konfiguration existiert - First-Run-Signal.
     /// </summary>
     bool Exists { get; }
 

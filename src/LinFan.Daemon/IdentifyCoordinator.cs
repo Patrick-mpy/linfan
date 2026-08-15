@@ -11,14 +11,14 @@ namespace LinFan.Daemon;
 /// <summary>
 /// Koordiniert eine GUI-getriebene Lüfter-<b>Identifikation</b>: den Ziel-Lüfter kurz auf 100 % drehen
 /// und ALLE anderen steuerbaren Lüfter drosseln (PWM 0), damit klar erkennbar ist, welcher physische
-/// Lüfter zu einem Kanal gehört (Hochdrehen statt Stoppen — wegen des Hardware-Drehzahl-Floors lässt
+/// Lüfter zu einem Kanal gehört (Hochdrehen statt Stoppen - wegen des Hardware-Drehzahl-Floors lässt
 /// sich nicht herunterregeln). Spiegelt das Suspend→treiben→Resume-Muster der Kalibrierung.
 /// <para>
 /// Fail-Safe: Anders als ein reiner Spin-up reduziert das Drosseln der <em>anderen</em> Lüfter die
-/// Kühlung — treibt also in die gefährliche Richtung. Deshalb (1) läuft während des kurzen Hold ein
+/// Kühlung - treibt also in die gefährliche Richtung. Deshalb (1) läuft während des kurzen Hold ein
 /// Temperatur-Watchdog (Übertemp ODER keine lesbare Temperatur → sofortiger Abbruch), (2) ist die Dauer
 /// eng begrenzt, und (3) ruft der <c>finally</c>-Pfad IMMER <see cref="IFanController.RestoreDefaults"/>
-/// (alle Lüfter sofort auf Hardware-Auto) und gibt jeden Lüfter per Resume an den Loop zurück — auch bei
+/// (alle Lüfter sofort auf Hardware-Auto) und gibt jeden Lüfter per Resume an den Loop zurück - auch bei
 /// Abbruch/Shutdown/Exception. Der Haupt-Loop bleibt als zweiter Watchdog aktiv (er tickt weiter, kann
 /// selbst Fail-Safe auslösen und bricht diese Aktion im Fail-Safe-Tick ab).
 /// </para>
@@ -31,7 +31,7 @@ internal sealed class IdentifyCoordinator
     /// <summary>
     /// Mindest-Abklingzeit nach dem Ende eines Laufs, bevor ein neuer starten darf. Verhindert, dass
     /// aufeinanderfolgende Identifikationen die <em>anderen</em> Lüfter dauerhaft nahe PWM 0 (weniger
-    /// Kühlung) halten — die Firmware regelt in der Pause wieder normal.
+    /// Kühlung) halten - die Firmware regelt in der Pause wieder normal.
     /// </summary>
     private static readonly TimeSpan DefaultCooldown = TimeSpan.FromSeconds(3);
 
@@ -91,9 +91,9 @@ internal sealed class IdentifyCoordinator
     {
         var controllable = _fans.DiscoverFans().Where(f => f.CanControl).Select(f => f.Id).ToList();
         if (!controllable.Contains(target))
-            return; // Ziel nicht steuerbar — der Aufrufer prüft das ebenfalls
+            return; // Ziel nicht steuerbar - der Aufrufer prüft das ebenfalls
 
-        // Cooldown wird unter der Gate-Sperre geprüft — atomar mit dem Lauf-Beginn und dem Setzen von
+        // Cooldown wird unter der Gate-Sperre geprüft - atomar mit dem Lauf-Beginn und dem Setzen von
         // _lastRunEndedAt im finally des Vorlaufs.
         if (!_run.TryBegin(out CancellationToken token, canStart: CooldownElapsed))
             return; // läuft bereits ODER Cooldown noch aktiv
@@ -106,7 +106,7 @@ internal sealed class IdentifyCoordinator
     /// <summary>
     /// Ist der Cooldown seit dem letzten Lauf abgelaufen? Läuft unter der RunGate-Sperre. Zu früh →
     /// ablehnen, damit ein wiederholter Aufruf die anderen Lüfter nicht dauerhaft nahe PWM 0 (weniger
-    /// Kühlung) hält — die Firmware regelt in der Pause wieder normal.
+    /// Kühlung) hält - die Firmware regelt in der Pause wieder normal.
     /// </summary>
     private bool CooldownElapsed()
     {
@@ -148,7 +148,7 @@ internal sealed class IdentifyCoordinator
                 remaining -= slice;
             }
 
-            _status = null; // fertig — kein Status mehr, Button wieder frei
+            _status = null; // fertig - kein Status mehr, Button wieder frei
             _log.LogInformation("Identifikation beendet: {Fan}.", target.Value);
         }
         catch (OperationCanceledException)
@@ -164,7 +164,7 @@ internal sealed class IdentifyCoordinator
         catch (NoTemperatureReadingException ex)
         {
             _status = new IpcIdentify(target.Value, Running: false, FailReason: IdentifyFailReason.NoTemperatureReading);
-            _log.LogWarning("Identifikation abgebrochen (kein Watchdog): {Fan} — {Reason}", target.Value, ex.Message);
+            _log.LogWarning("Identifikation abgebrochen (kein Watchdog): {Fan} - {Reason}", target.Value, ex.Message);
         }
         catch (Exception ex)
         {
@@ -195,7 +195,7 @@ internal sealed class IdentifyCoordinator
         {
             if (blindGuards + 1 >= MaxBlindGuards)
                 throw new NoTemperatureReadingException(
-                    "Keine lesbare Temperatur während der Identifikation — abgebrochen (kein Watchdog).");
+                    "Keine lesbare Temperatur während der Identifikation - abgebrochen (kein Watchdog).");
             return blindGuards + 1;
         }
         return 0;

@@ -48,7 +48,7 @@ public class OnboardingWindowSmokeTests
         Dispatcher.UIThread.RunJobs();
 
         // Exercised hier: EnumMatchConverter mit Einzel- ('Welcome') und Mehrwert-Parameter
-        // ('Calibration,Devices,ChooseProfile' — der Komma-Trap-Fall, einfach-gequotet).
+        // ('Calibration,Devices,ChooseProfile' - der Komma-Trap-Fall, einfach-gequotet).
         // Done ist die Quittungsseite: nur „Schließen", kein Zurück/Fertigstellen/Überspringen mehr.
         Assert.Equal(weiter, Nav(window, "Weiter").IsVisible);
         Assert.Equal(zurueck, Nav(window, "Zurück").IsVisible);
@@ -61,7 +61,7 @@ public class OnboardingWindowSmokeTests
     public void Onboarding_FanPositionButton_ReflectsLocationChange()
     {
         // Verifiziert das Sub-Property-Binding `{Binding Location.Display}`: ersetzt der Positions-Dialog
-        // `row.Location` (ObservableProperty), muss der gebundene Button-Text nachziehen — sonst zeigt das
+        // `row.Location` (ObservableProperty), muss der gebundene Button-Text nachziehen - sonst zeigt das
         // Modal die Auswahl, der Button aber weiter die alte Position.
         var (ctrl, window) = ShowWizard();
         ctrl.Apply(new MonitorSnapshot(
@@ -73,14 +73,14 @@ public class OnboardingWindowSmokeTests
         Dispatcher.UIThread.RunJobs();
 
         OnboardingFanRow row = ctrl.Fans.Single(f => f.FanId == "f1");
-        Assert.Contains(window.Find<TextBlock>(), t => t.Text == "— nicht zugeordnet —"); // Ausgangszustand
+        Assert.Contains(window.Find<TextBlock>(), t => t.Text == "- nicht zugeordnet -"); // Ausgangszustand
 
         row.Location = FanLocationOption.For(FanLocation.CaseRearExhaust);
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Gehäuse hinten · Auslass", row.Location.Display); // Sanity: Datenseite stimmt
         Assert.Contains(window.Find<TextBlock>(), t => t.Text == "Gehäuse hinten · Auslass"); // UI zog nach
-        Assert.DoesNotContain(window.Find<TextBlock>(), t => t.Text == "— nicht zugeordnet —");
+        Assert.DoesNotContain(window.Find<TextBlock>(), t => t.Text == "- nicht zugeordnet -");
     }
 
     [AvaloniaFact]

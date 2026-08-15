@@ -6,7 +6,7 @@ using LinFan.Core.Services;
 namespace LinFan.Core.Tests;
 
 /// <summary>Tests für <see cref="JsonConfigStore.Exists"/> (First-Run-Signal).</summary>
-// Serialisiert mit JsonConfigStoreTests über LINFAN_CONFIG — siehe Hinweis dort.
+// Serialisiert mit JsonConfigStoreTests über LINFAN_CONFIG - siehe Hinweis dort.
 [Collection("env-config")]
 public sealed class JsonConfigStoreExistsTests : IDisposable
 {

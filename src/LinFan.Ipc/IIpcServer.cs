@@ -16,7 +16,7 @@ public interface IIpcServer : IAsyncDisposable
     /// <summary>Wird bei jeder Verbindungs-Änderung mit der aktuellen Client-Anzahl aufgerufen.</summary>
     Action<int>? ClientsChanged { get; set; }
 
-    /// <summary>Endpunkt, an dem gelauscht wird — Socket-Pfad bzw. Pipe-Name (für Logging).</summary>
+    /// <summary>Endpunkt, an dem gelauscht wird - Socket-Pfad bzw. Pipe-Name (für Logging).</summary>
     string Path { get; }
 
     /// <summary>Startet den Server und beginnt, Verbindungen zu akzeptieren.</summary>

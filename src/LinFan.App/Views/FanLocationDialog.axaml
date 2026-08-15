@@ -20,7 +20,7 @@
             <ctrl:FanLocationDiagram Height="440" SelectedLocation="{Binding SelectedLocation, Mode=TwoWay}" />
         </Border>
 
-        <!-- Einlass/Auslass-Umschalter — nur für Gehäuse-Positionen (interne Bauteile haben keine Richtung). -->
+        <!-- Einlass/Auslass-Umschalter - nur für Gehäuse-Positionen (interne Bauteile haben keine Richtung). -->
         <StackPanel x:Name="DirectionPanel" Orientation="Horizontal" Spacing="{StaticResource SpacingMd}" IsVisible="False">
             <TextBlock Text="{l:Tr FanLocationDialog.Direction}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
             <TextBlock x:Name="DirectionText" Foreground="{DynamicResource TextSecondary}"
@@ -73,7 +73,7 @@
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource SpacingMd}">
             <Button Content="{l:Tr FanLocationDialog.Cancel}" Click="OnCancel" IsCancel="True" />
-            <Button Content="{l:Tr FanLocationDialog.Apply}" Click="OnConfirm" IsDefault="True" />
+            <Button Classes="primary" Content="{l:Tr FanLocationDialog.Apply}" Click="OnConfirm" IsDefault="True" />
         </StackPanel>
     </StackPanel>
 </Window>

@@ -44,7 +44,7 @@ public partial class App : Application
             desktop.MainWindow = window;
             TrySetupTray(window);
 
-            // --minimized (Login-Autostart): mit Tray das Fenster direkt nach dem ersten Öffnen verstecken —
+            // --minimized (Login-Autostart): mit Tray das Fenster direkt nach dem ersten Öffnen verstecken -
             // das Lifetime ruft Show() nach dieser Methode selbst auf, ein früheres Hide() würde überschrieben.
             // Ohne Tray-Backend wäre ein verstecktes Fenster unerreichbar → dann nur minimiert starten.
             if (desktop.Args?.Contains("--minimized") == true)
@@ -54,7 +54,7 @@ public partial class App : Application
                     EventHandler? hideOnce = null;
                     hideOnce = (_, _) =>
                     {
-                        window.Opened -= hideOnce; // nur der Start — spätere Show() (Tray-Klick) nicht wieder verstecken
+                        window.Opened -= hideOnce; // nur der Start - spätere Show() (Tray-Klick) nicht wieder verstecken
                         window.Hide();
                     };
                     window.Opened += hideOnce;
@@ -65,15 +65,21 @@ public partial class App : Application
                 }
             }
 
-            // Further launches (desktop icon, start menu, autostart) do not start a second GUI — they
+            // Further launches (desktop icon, start menu, autostart) do not start a second GUI - they
             // reach this instance instead, which shows itself, including back out of the tray.
             Program.Instance?.ListenForActivation(() => Dispatcher.UIThread.Post(() => ShowWindow(window)));
 
-            // Einmaliger, additiver Update-Check (GitHub-Release) — nach dem Fenster-Setup, best-effort/still.
+            // Einmaliger, additiver Update-Check (GitHub-Release) - nach dem Fenster-Setup, best-effort/still.
             controller.BeginUpdateCheck();
 
-            // Poll-Loop beim Beenden sauber stoppen.
-            desktop.ShutdownRequested += (_, _) => controller.Dispose();
+            // Beenden auf Wunsch des Systems (Abmelden/Herunterfahren, oder ein Setup, das die App über den
+            // Restart Manager schließt): erst das Fenster wirklich schließen lassen - ins Tray zu minimieren
+            // hieße hier, die Anfrage abzulehnen -, dann den Poll-Loop sauber stoppen.
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                window.PrepareForShutdown();
+                controller.Dispose();
+            };
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -86,7 +92,7 @@ public partial class App : Application
         Localizer.Instance.SetLanguage(choice);
 
     /// <summary>
-    /// Erstellt das Tray-Icon programmatisch — bewusst nicht in App.axaml, sonst würde die Headless-Test-App
+    /// Erstellt das Tray-Icon programmatisch - bewusst nicht in App.axaml, sonst würde die Headless-Test-App
     /// es mitladen. Auf Desktops ohne Tray-Backend schlägt das Erzeugen fehl; dann läuft die App ohne Tray
     /// weiter und „In den Tray minimieren" greift nicht (das Fenster schließt normal).
     /// </summary>

@@ -72,7 +72,7 @@ public sealed class JsonConfigStoreTests : IDisposable
     [Fact]
     public void Save_BareFilenameWithoutDirectory_WritesInCurrentDirectory()
     {
-        // Path.GetDirectoryName("config.json") liefert "" (nicht null) — früher warf Save darüber in
+        // Path.GetDirectoryName("config.json") liefert "" (nicht null) - früher warf Save darüber in
         // Directory.CreateDirectory(""). Ein reiner Dateiname landet im aktuellen Arbeitsverzeichnis.
         Directory.CreateDirectory(_dir);
         string previousCwd = Directory.GetCurrentDirectory();
@@ -91,6 +91,35 @@ public sealed class JsonConfigStoreTests : IDisposable
         {
             Directory.SetCurrentDirectory(previousCwd);
         }
+    }
+
+    [Fact]
+    public void SaveThenLoad_RoundTripsSmoothing()
+    {
+        var store = new JsonConfigStore(Path_);
+        store.Save(new AppConfig
+        {
+            Curves = new[] { new CurveConfig { Id = "c1", Name = "Quiet", SmoothingSeconds = 7 } },
+        });
+
+        Assert.Equal(7, Assert.Single(store.Load().Curves).SmoothingSeconds);
+    }
+
+    [Fact]
+    public void Load_ConfigWithoutSmoothingField_UsesDefault()
+    {
+        // Bestandsdatei von vor der Glättung: das fehlende Feld muss auf den Default deserialisieren,
+        // nicht auf 0 - sonst bekäme genau der Bestand, für den die Glättung gebaut wurde, sie nicht.
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path_, """
+            {
+              "schemaVersion": 3,
+              "curves": [ { "id": "c1", "name": "Quiet", "hysteresisC": 2 } ]
+            }
+            """);
+
+        CurveConfig curve = Assert.Single(new JsonConfigStore(Path_).Load().Curves);
+        Assert.Equal(CurveConfig.DefaultSmoothingSeconds, curve.SmoothingSeconds);
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public sealed class CalibrationStatusTests
 
     /// <summary>
     /// The name comes from the <b>live fan list</b> (where the daemon has already resolved it: own name,
-    /// else hardware label) — not from the config. A fan that was never saved carries no name there, so the
+    /// else hardware label) - not from the config. A fan that was never saved carries no name there, so the
     /// message used to show the raw hardware id ("Calibrating /lpc/…/control/5").
     /// </summary>
     [Fact]
@@ -36,7 +36,7 @@ public sealed class CalibrationStatusTests
             new[] { new IpcFan("/lpc/nct6797d/0/control/5", "Nuvoton NCT6797D Fan #6", 1123, 0, "Manual", true) },
             Config: new IpcConfig(
                 Array.Empty<IpcCurve>(),
-                // Config entry without an own name — exactly the case after calibration or coupling.
+                // Config entry without an own name - exactly the case after calibration or coupling.
                 new[] { new IpcFanAssignment("/lpc/nct6797d/0/control/5", "", 0, 255, null) },
                 Array.Empty<IpcSensorName>(),
                 Array.Empty<IpcProfile>(),

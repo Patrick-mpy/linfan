@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace LinFan.Ipc.Transport;
 
 /// <summary>
-/// Wählt die Transport-Implementierung passend zum Betriebssystem — analog zu <c>BackendFactory</c>
+/// Wählt die Transport-Implementierung passend zum Betriebssystem - analog zu <c>BackendFactory</c>
 /// im Daemon. Linux/macOS nutzen Unix-Domain-Sockets, Windows eine Named Pipe. Die OS-Auswahl ist die
 /// einzige Verzweigung; <see cref="IpcClient"/>/<see cref="IpcServer"/> und die GUI bleiben transport-neutral.
 /// </summary>

@@ -289,7 +289,7 @@ public sealed class OnboardingControllerTests
         Assert.Contains(cfg.Profiles, p => p.Id == "balanced");
         Assert.Contains(cfg.Profiles, p => p.Id == "performance");
 
-        // Finish no longer closes — it navigates to the Done receipt page; Close ends the wizard.
+        // Finish no longer closes - it navigates to the Done receipt page; Close ends the wizard.
         Assert.False(closeCalled);
         Assert.Equal(OnboardingStep.Done, ctrl.CurrentStep);
 
@@ -365,7 +365,7 @@ public sealed class OnboardingControllerTests
     {
         // Übersprungene Kalibrierung → persistierte Config ohne Lüfter. Finish nimmt trotzdem alle
         // entdeckten Lüfter aus der Live-Discovery auf (Positionen!), ordnet die Profilkurve aber nur den
-        // steuerbaren zu — read-only Kanäle bleiben ohne Zuordnung.
+        // steuerbaren zu - read-only Kanäle bleiben ohne Zuordnung.
         var (ctrl, sent) = MakeController();
         ctrl.Apply(MakeSnapshot(config: AppConfig.Empty)); // DefaultFans: pwm1+pwm2 steuerbar, pwm3 read-only
 
@@ -410,7 +410,7 @@ public sealed class OnboardingControllerTests
 
         Assert.True(ctrl.UseAirflowProfiles);
         Assert.NotEqual("", ctrl.AirflowPressureText);
-        // Summary lists only controllable fans (pwm1, pwm2) — the read-only pwm3 gets no assignment.
+        // Summary lists only controllable fans (pwm1, pwm2) - the read-only pwm3 gets no assignment.
         Assert.Equal(new[] { "hwmon0/pwm1", "hwmon0/pwm2" }, ctrl.AirflowSummary.Select(r => r.FanId));
     }
 
@@ -464,14 +464,14 @@ public sealed class OnboardingControllerTests
 
         await ctrl.FinishCommand.ExecuteAsync(null);
 
-        Assert.Single(sent); // sent despite missing primary sensor — sources come from the heuristic
+        Assert.Single(sent); // sent despite missing primary sensor - sources come from the heuristic
     }
 
     [Fact]
     public async Task Finish_AirflowMode_AllSensorsHidden_BlocksWithMessage()
     {
         // With every temperature sensor hidden the role curves would get empty source lists and
-        // silently regulate nothing — Finish must block like the fallback branch does.
+        // silently regulate nothing - Finish must block like the fallback branch does.
         var (ctrl, sent) = MakeController();
         ctrl.Apply(MakeSnapshot());
         ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1").Location = FanLocationOption.For(FanLocation.CpuCooler);
@@ -573,7 +573,7 @@ public sealed class OnboardingControllerTests
         ctrl.NextCommand.Execute(null);
         Assert.Equal(OnboardingStep.ChooseProfile, ctrl.CurrentStep);
 
-        // Done is a receipt page reachable only via a successful Finish — Next stops here.
+        // Done is a receipt page reachable only via a successful Finish - Next stops here.
         ctrl.NextCommand.Execute(null);
         Assert.Equal(OnboardingStep.ChooseProfile, ctrl.CurrentStep);
     }
@@ -602,7 +602,7 @@ public sealed class OnboardingControllerTests
 
         await ctrl.FinishCommand.ExecuteAsync(null);
         // Das Schließen des Fensters (X auf der Done-Seite) ruft OnClosing → SkipCommand; der Latch muss
-        // das Senden unterdrücken, sonst überschriebe eine profillose Config die gesendeten Profile —
+        // das Senden unterdrücken, sonst überschriebe eine profillose Config die gesendeten Profile -
         // aber der Wizard muss trotzdem sauber schließen (Localizer-Abo lösen, Besitzer zurücksetzen).
         await ctrl.SkipCommand.ExecuteAsync(null);
 
@@ -640,7 +640,7 @@ public sealed class OnboardingControllerTests
         var fans = new[] { new FanReading("hwmon8/pwm1", "thinkpad pwm1", 0, 0, FanMode.Auto, CanControl: true) };
         ctrl.Apply(MakeSnapshot(fans: fans));
 
-        // Kalibrierung starten — blockiert bei „warte auf Done", bis wir unten einen Done-Snapshot einspielen.
+        // Kalibrierung starten - blockiert bei „warte auf Done", bis wir unten einen Done-Snapshot einspielen.
         Task calTask = ctrl.CalibrateAllCommand.ExecuteAsync(null);
 
         var done = new CalibrationStatus("hwmon8/pwm1", CalibrationPhase.Done, 0, 0, Running: false, Done: true, StartPwm: 96, FailReason: null);
@@ -1038,7 +1038,7 @@ public sealed class OnboardingControllerTests
 
         // Finish replaces the whole curve set → "old-curve" no longer exists. The persisted config
         // must not keep the dangling reference: null = hardware auto, a regular state. (The
-        // ControlLoop additionally treats dangling ids like null at runtime — defense in depth.)
+        // ControlLoop additionally treats dangling ids like null at runtime - defense in depth.)
         AppConfig result = Assert.Single(sent);
         Assert.Null(result.Fans.Single(f => f.FanId == "hwmon0/pwm2").AssignedCurveId);
     }
@@ -1047,7 +1047,7 @@ public sealed class OnboardingControllerTests
     public async Task Finish_KeepsConfigOfUndiscoveredSensor()
     {
         // A config entry whose sensor is missing from the current discovery (unplugged, EIO) has no
-        // wizard row — Finish must carry it over verbatim instead of dropping name/group/visibility.
+        // wizard row - Finish must carry it over verbatim instead of dropping name/group/visibility.
         var gone = new SensorConfig { SensorId = "gone/temp1", Name = "USB Probe", Group = "Extern", Hidden = true };
         (OnboardingController ctrl, List<AppConfig> sent) = MakeController();
         ctrl.Apply(MakeSnapshot(config: new AppConfig { Sensors = new[] { gone } }));

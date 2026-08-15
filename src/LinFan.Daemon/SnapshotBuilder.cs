@@ -20,7 +20,7 @@ internal static class SnapshotBuilder
 
         // Custom-Namen aus der Konfiguration haben Vorrang vor den hwmon-Roh-Labels. Einmalig nach Id
         // indizieren statt pro Kanal linear zu suchen (O(Kanäle) statt O(Kanäle×Config) je Snapshot-Tick).
-        // TryAdd = erster Treffer gewinnt — verhält sich wie das frühere FirstOrDefault.
+        // TryAdd = erster Treffer gewinnt - verhält sich wie das frühere FirstOrDefault.
         var sensorById = new Dictionary<string, SensorConfig>();
         foreach (SensorConfig s in config.Sensors)
             sensorById.TryAdd(s.SensorId, s);

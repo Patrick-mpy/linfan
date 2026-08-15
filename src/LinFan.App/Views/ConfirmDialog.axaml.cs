@@ -6,7 +6,7 @@ using Avalonia.Interactivity;
 namespace LinFan.App.Views;
 
 /// <summary>
-/// Kleiner modaler Bestätigungsdialog für destruktive Aktionen (Löschen/Verwerfen) — ersetzt die
+/// Kleiner modaler Bestätigungsdialog für destruktive Aktionen (Löschen/Verwerfen) - ersetzt die
 /// alten Aufklapp-Flyouts. Liefert <c>true</c> (bestätigt) bzw. <c>false</c> (abgebrochen, auch bei
 /// Fenster-X/Esc) über <c>ShowDialog&lt;bool&gt;</c> zurück. Reine UI, keine Domain-Logik.
 /// </summary>

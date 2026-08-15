@@ -20,13 +20,13 @@ public enum CalibrationFailReason
 
     /// <summary>
     /// Lüfter ist nicht steuerbar (NotSupportedException, „nicht steuerbar (Root nötig)"). Einer von
-    /// zwei NotSupportedException-Fällen — vom <see cref="NoTacho"/>-Fall nur über die Meldung trennbar
+    /// zwei NotSupportedException-Fällen - vom <see cref="NoTacho"/>-Fall nur über die Meldung trennbar
     /// (siehe Handoff: Producer muss die beiden NotSupportedException-Quellen unterscheiden).
     /// </summary>
     NotControllable,
 
     /// <summary>
-    /// Kein Tachosignal — Drehzahl nicht messbar (NotSupportedException, „kein Tachosignal …"). Zweiter
+    /// Kein Tachosignal - Drehzahl nicht messbar (NotSupportedException, „kein Tachosignal …"). Zweiter
     /// NotSupportedException-Fall, siehe <see cref="NotControllable"/>.
     /// </summary>
     NoTacho,

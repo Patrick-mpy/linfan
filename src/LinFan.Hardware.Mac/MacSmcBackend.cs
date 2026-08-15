@@ -9,11 +9,11 @@ namespace LinFan.Hardware.Mac;
 
 /// <summary>
 /// macOS-Backend über IOKit/AppleSMC. Liest Temperaturen (kuratierte SMC-Keys, siehe
-/// <see cref="MacTemperatureKeys"/>) und Lüfterdrehzahlen (<c>F{i}Ac</c>) und steuert — wo verfügbar —
+/// <see cref="MacTemperatureKeys"/>) und Lüfterdrehzahlen (<c>F{i}Ac</c>) und steuert - wo verfügbar -
 /// Lüfter über Ziel-Drehzahl (<c>F{i}Tg</c>) und Modus (<c>F{i}Md</c>).
 /// <para>
 /// <b>Steuerbarkeit ist die Ausnahme, nicht die Regel:</b> Lesen geht ohne Root. Schreiben braucht Root
-/// <em>und</em> passende Hardware — auf <b>Apple Silicon</b> ist SMC-Lüftersteuerung nicht verfügbar, dort
+/// <em>und</em> passende Hardware - auf <b>Apple Silicon</b> ist SMC-Lüftersteuerung nicht verfügbar, dort
 /// bleiben alle Kanäle <see cref="FanDescriptor.CanControl"/> == <c>false</c> (regulärer read-only-Zustand,
 /// kein Fehler). <see cref="RestoreDefaults"/>/<see cref="Dispose"/> fahren jeden steuerbaren Kanal in den
 /// sicheren Zustand (Firmware-Auto), bewusst NICHT in den bei Discovery gelesenen Zustand (Fail-Safe).
@@ -61,7 +61,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
             throw new KeyNotFoundException($"Unbekannter Sensor: {id}");
 
         if (!_smc.TryReadKey(ch.Key, out var raw))
-            return double.NaN; // Kanal momentan nicht lesbar — defensiv, kein Fehler
+            return double.NaN; // Kanal momentan nicht lesbar - defensiv, kein Fehler
 
         double v = SmcCodec.Decode(raw);
         // Drehzahl darf nicht negativ sein; ein unplausibler Rohwert gilt als „kein Wert".
@@ -105,7 +105,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         var fan = Fan(id);
         if (!fan.CanControl || fan.TargetKey is null || fan.TargetType is null)
             throw new NotSupportedException(
-                $"Lüfter {id} ist nicht steuerbar (Apple Silicon oder ohne Root — read-only).");
+                $"Lüfter {id} ist nicht steuerbar (Apple Silicon oder ohne Root - read-only).");
 
         // Vor dem Schreiben Manual erzwingen, sonst überschreibt die Firmware das Ziel sofort wieder.
         WriteMode(fan, FanMode.Manual);
@@ -114,7 +114,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
 
     public void RestoreDefaults()
     {
-        // Sicherer Zustand ist IMMER Firmware-Auto (Md=0) — bewusst NICHT der bei Discovery gelesene
+        // Sicherer Zustand ist IMMER Firmware-Auto (Md=0) - bewusst NICHT der bei Discovery gelesene
         // Zustand: der kann Manual/niedrig gewesen sein (früherer Absturz) und würde den Lüfter ohne
         // aktiven Watchdog dort festhalten. Zwei UNABHÄNGIGE Wege in einen kühlenden Zustand: primär
         // Auto (Md=0); schlägt der Write fehl oder fehlt der Modus-Key, Rückfall auf Volllast
@@ -161,7 +161,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         ScanTemperatures();
 
         // Temperaturen in kuratierter Gruppen-Reihenfolge (CPU → GPU → … → Sonstiges, siehe
-        // MacTemperatureKeys), Lüfter-Tachos nach Lüfter-Index — deterministisch statt alphabetisch,
+        // MacTemperatureKeys), Lüfter-Tachos nach Lüfter-Index - deterministisch statt alphabetisch,
         // damit die GUI-Sensorliste stabil gruppiert ist.
         _sensorDescriptors = _sensors.Values
             .OrderBy(c => c.Kind)
@@ -185,7 +185,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         int count = _smc.TryReadKey("FNum", out var fnum) ? (int)SmcCodec.Decode(fnum) : 0;
         if (count <= 0) return;
         // SMC-Lüfter-Keys nutzen einen EINSTELLIGEN Index (F0..F9); ein zweistelliger würde beim
-        // 4-Zeichen-FourCC abgeschnitten (F10Tg → F10T). Reale Macs haben < 10 Lüfter — hart begrenzen.
+        // 4-Zeichen-FourCC abgeschnitten (F10Tg → F10T). Reale Macs haben < 10 Lüfter - hart begrenzen.
         count = Math.Min(count, 10);
 
         for (int i = 0; i < count; i++)
@@ -198,7 +198,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
 
             // Steuer-Keys: Ziel-Drehzahl (Tg) + Modus (Md), Grenzen (Mn/Mx). Steuerbar nur, wenn die
             // Plattform Steuerung erlaubt (Intel + Root; Apple Silicon nie), alle Keys vorhanden sind,
-            // die Grenzen plausibel sind UND Ziel/Modus tatsächlich KODIERBAR sind — sonst schaltete
+            // die Grenzen plausibel sind UND Ziel/Modus tatsächlich KODIERBAR sind - sonst schaltete
             // SetPwm auf Manual (Firmware aus) und überspränge den Ziel-Write mangels Encoder.
             string? tgKey = KeyIfReadable($"F{i}Tg", out var tgType);
             string? mdKey = KeyIfReadable($"F{i}Md", out var mdType);
@@ -227,7 +227,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
 
         // Apple-Silicon-Cluster zuerst (E-Cores → P-Cores → GPU; Familie per Key-Präsenz erkannt),
         // danach die flache kuratierte Liste. Die Cluster-Tabelle hat Vorrang, weil sich Keys
-        // überlagern (z. B. Tp0P: M1 P-Core 6 vs. Intel Netzteil-Proximity) — `seen` verhindert,
+        // überlagern (z. B. Tp0P: M1 P-Core 6 vs. Intel Netzteil-Proximity) - `seen` verhindert,
         // dass die flache Liste einen Familien-Key erneut (falsch beschriftet) aufnimmt.
         foreach (var (key, name) in MacTemperatureKeys.SelectAppleSiliconCluster(
                      k => _smc.TryReadKey(k, out _)))
@@ -291,7 +291,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
     }
 
     /// <summary>
-    /// Bestimmt, ob Lüftersteuerung möglich ist. Voraussetzung ist <b>Root</b> — SMC-Steuer-Writes sind
+    /// Bestimmt, ob Lüftersteuerung möglich ist. Voraussetzung ist <b>Root</b> - SMC-Steuer-Writes sind
     /// privilegiert. Gilt für Intel <b>und</b> Apple Silicon: neuere Apple-Silicon-Macs nehmen SMC-Writes
     /// auf <c>F{i}Md</c>/<c>F{i}Tg</c> an (wie Macs Fan Control u. a. zeigen). Ob ein <em>konkreter</em>
     /// Kanal steuerbar ist, entscheidet zusätzlich <see cref="ScanFans"/> (Steuer-Keys vorhanden +
@@ -301,7 +301,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
     {
         if (Geteuid() != 0)
             return new ControlCapability(false,
-                "Lüftersteuerung braucht Root — den Daemon per sudo starten; sonst sind die Kanäle read-only.");
+                "Lüftersteuerung braucht Root - den Daemon per sudo starten; sonst sind die Kanäle read-only.");
         return new ControlCapability(true, null);
     }
 

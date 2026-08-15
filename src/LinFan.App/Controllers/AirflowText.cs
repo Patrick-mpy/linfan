@@ -7,7 +7,7 @@ using LinFan.Core.Models;
 namespace LinFan.App.Controllers;
 
 /// <summary>
-/// Shared localization mappers for the airflow analysis — used by the settings' airflow section and
+/// Shared localization mappers for the airflow analysis - used by the settings' airflow section and
 /// the onboarding profile step. The Core service stays language-neutral (stable ids + codes); every
 /// user-facing airflow string funnels through here so both surfaces stay consistent.
 /// </summary>

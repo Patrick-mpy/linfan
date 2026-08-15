@@ -5,7 +5,7 @@ namespace LinFan.Core.Models;
 /// <summary>
 /// Einbau-Position eines Lüfters. Strukturiert (nicht Freitext), damit eine spätere Airflow-Logik
 /// Einlass-/Auslass-Bilanz und Position automatisch auswerten kann (Über-/Unterdruck, Zonen).
-/// Die Richtung (Intake/Exhaust) steckt bewusst im Namen — jede Gehäuse-Position gibt es als Einlass-
+/// Die Richtung (Intake/Exhaust) steckt bewusst im Namen - jede Gehäuse-Position gibt es als Einlass-
 /// <b>und</b> Auslass-Variante, da ein Lüfter an derselben Stelle in beide Richtungen blasen kann.
 /// </summary>
 /// <remarks>

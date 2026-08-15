@@ -13,14 +13,14 @@ public enum InterpolationMode
 
     /// <summary>
     /// Monotone kubische Hermite-Interpolation (Fritsch-Carlson). Weicher Verlauf, der die Monotonie
-    /// der Stützpunkte erhält und – anders als eine naive natürliche Spline – nicht über deren
+    /// der Stützpunkte erhält und - anders als eine naive natürliche Spline - nicht über deren
     /// Wertebereich hinausschwingt: Zwischen zwei Punkten bleibt der Wert stets im Bereich der beiden
     /// Punkte, jeder Stützpunkt wird exakt getroffen.
     /// </summary>
     Spline = 1,
 
     /// <summary>
-    /// Stufen: Die Punkte wirken als Schwellwerte — zwischen zwei Stützpunkten hält die Kurve den Wert
+    /// Stufen: Die Punkte wirken als Schwellwerte - zwischen zwei Stützpunkten hält die Kurve den Wert
     /// des unteren Punkts und springt erst beim Erreichen des nächsten Punkts (Verhalten klassischer
     /// BIOS-Lüftersteuerungen; vermeidet ständiges Nachregeln).
     /// </summary>

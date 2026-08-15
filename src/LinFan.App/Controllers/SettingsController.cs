@@ -12,7 +12,7 @@ namespace LinFan.App.Controllers;
 /// Persistiert über <see cref="UiSettingsStore"/> als <b>Load-modify-write</b>, damit die getrennt
 /// gespeicherte Fenster-Geometrie nicht überschrieben wird. Das eigentliche Anwenden des Themes
 /// (<c>Application.RequestedThemeVariant</c>) liegt bewusst nicht hier, sondern in der App-/View-Schicht
-/// — dieser Controller meldet die Änderung nur per <see cref="ObservableObject.PropertyChanged"/>.
+/// - dieser Controller meldet die Änderung nur per <see cref="ObservableObject.PropertyChanged"/>.
 /// </summary>
 public partial class SettingsController : ObservableObject, IDisposable
 {
@@ -84,7 +84,7 @@ public partial class SettingsController : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(SelectedSection))]
     private SettingsSectionItem? _selectedSectionItem;
 
-    /// <summary>Die aktive Sektion — steuert per <c>EnumMatchConverter</c> das sichtbare rechte Panel.</summary>
+    /// <summary>Die aktive Sektion - steuert per <c>EnumMatchConverter</c> das sichtbare rechte Panel.</summary>
     public SettingsSection SelectedSection => SelectedSectionItem?.Section ?? SettingsSection.Sensors;
 
     private static IReadOnlyList<SettingsSectionItem> BuildSections() => new[]

@@ -7,7 +7,7 @@ namespace LinFan.App.Services;
 /// <summary>
 /// Prüft die GitHub-<i>latest-release</i>-API (<c>api.github.com/repos/{slug}/releases/latest</c>) und meldet eine
 /// neuere Version. Nativ über <see cref="HttpClient"/> (keine zusätzliche Abhängigkeit). <b>Wirft nie</b>: jeder
-/// Fehler — offline, Timeout, HTTP-Fehler (404 vor dem ersten Release, 403 Rate-Limit), kaputtes JSON — ergibt
+/// Fehler - offline, Timeout, HTTP-Fehler (404 vor dem ersten Release, 403 Rate-Limit), kaputtes JSON - ergibt
 /// <c>null</c>, damit der Update-Hinweis rein additiv ist und nie nervt.
 /// </summary>
 public sealed class UpdateCheckService : IUpdateCheckService

@@ -12,7 +12,7 @@
   <!--
     Single Source of Truth für die Version. Der '-dev'-Suffix markiert lokale/Dev-Builds als
     Vor-Release; bei Release setzt die Pipeline aus dem Git-Tag -p:Version=X.Y.Z und überschreibt
-    diesen Wert. AssemblyInformationalVersion wird "X.Y.Z+<sha>" — ein späterer Update-Check
+    diesen Wert. AssemblyInformationalVersion wird "X.Y.Z+<sha>" - ein späterer Update-Check
     parst den Teil vor '+'.
   -->
   <PropertyGroup>

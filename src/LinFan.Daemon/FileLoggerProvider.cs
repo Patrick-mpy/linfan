@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace LinFan.Daemon;
 
 /// <summary>
-/// Schlanker, size-capped Datei-Logger (nativ, keine Dependency) für die Diagnose — vor allem auf Windows,
+/// Schlanker, size-capped Datei-Logger (nativ, keine Dependency) für die Diagnose - vor allem auf Windows,
 /// wo der Dienst nur ins Event-Log schreibt und keine Konsole hat. Schreibt Klartext-Zeilen unter
 /// <c>&lt;configdir&gt;/logs/linfan.log</c> und rolliert bei Überschreiten der Größe auf <c>linfan.log.1</c>.
 /// <para>

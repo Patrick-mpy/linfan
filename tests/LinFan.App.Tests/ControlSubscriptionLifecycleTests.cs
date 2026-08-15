@@ -18,7 +18,7 @@ namespace LinFan.App.Tests;
 /// exakt ein Abo bestehen bleibt und nach dem Re-Attach kein zweites hinzukommt.
 ///
 /// Die UI-Arbeit läuft über eine manuell gestartete <see cref="HeadlessUnitTestSession"/> (der
-/// [AvaloniaFact]-Weg scheidet aus: Avalonia.Headless.XUnit 12.0.4 verlangt xunit.v3 — Konflikt mit
+/// [AvaloniaFact]-Weg scheidet aus: Avalonia.Headless.XUnit 12.0.4 verlangt xunit.v3 - Konflikt mit
 /// dem hier genutzten xunit 2.x). Die App-Definition liefert das assembly-weite
 /// <c>[AvaloniaTestApplication]</c> in HeadlessTestApp.
 /// </summary>
@@ -81,7 +81,7 @@ public sealed class ControlSubscriptionLifecycleTests
 
         host.Children.Add(chart); // Re-Attach
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(1, points.SubscriberCount); // genau eins — kein Doppel-Abo
+        Assert.Equal(1, points.SubscriberCount); // genau eins - kein Doppel-Abo
 
         // Nach dem Re-Attach ist der Handler wieder verdrahtet: eine Änderung läuft durch (InvalidateVisual),
         // ohne zu werfen. (Ein echter Pixel-Render braucht Skia; das Headless-Drawing genügt fürs Wiring.)

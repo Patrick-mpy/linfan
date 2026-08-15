@@ -7,7 +7,7 @@ using Avalonia.Media;
 namespace LinFan.App.Controls;
 
 /// <summary>
-/// The LinFan symbol (three swept blades with a shaded spine around a hub) as a vector control — the
+/// The LinFan symbol (three swept blades with a shaded spine around a hub) as a vector control - the
 /// drawing mirrors <c>Assets/linfan-icon.svg</c> one to one. Avalonia cannot render SVG, and an SVG
 /// library would be a dependency for a single image, so the mark is drawn here (theme brushes like
 /// <see cref="CurveChart"/>). Purely decorative: no state, no interaction; size it via Width/Height.

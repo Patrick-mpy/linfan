@@ -5,7 +5,7 @@ namespace LinFan.Ipc.Transport;
 /// <summary>
 /// Transport-Naht der Client-Seite: stellt zu einem Endpunkt eine Duplex-Verbindung her und liefert
 /// sie als <see cref="Stream"/>. Die Protokoll-Schicht (NDJSON in <see cref="IpcClient"/>) kennt nur
-/// den Stream — ob darunter ein Unix-Domain-Socket (Linux/macOS) oder eine Named Pipe (Windows)
+/// den Stream - ob darunter ein Unix-Domain-Socket (Linux/macOS) oder eine Named Pipe (Windows)
 /// liegt, entscheidet die konkrete Implementierung (<see cref="IpcTransportFactory"/>).
 /// </summary>
 public interface IIpcClientTransport

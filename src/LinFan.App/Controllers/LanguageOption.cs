@@ -6,7 +6,7 @@ namespace LinFan.App.Controllers;
 
 /// <summary>
 /// Anzeige-Option für <see cref="LanguageChoice"/> im Header-Umschalter. Die Sprachnamen sind
-/// <b>Endonyme</b> (jede Sprache in sich selbst geschrieben) und bewusst NICHT lokalisiert — sie
+/// <b>Endonyme</b> (jede Sprache in sich selbst geschrieben) und bewusst NICHT lokalisiert - sie
 /// bleiben in beiden Sprachlisten gleich (vermeidet das Henne-Ei-Problem beim Umschalten).
 /// Spiegelt <see cref="ThemeOption"/>.
 /// </summary>

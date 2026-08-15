@@ -11,26 +11,26 @@ namespace LinFan.Daemon;
 /// <summary>
 /// Thread-sicherer Wrapper um einen <see cref="IFanController"/>: serialisiert alle Hardware-Zugriffe
 /// über ein gemeinsames Gate. So kommen sich Regel-Loop und Kalibrierung (verschiedene Threads) beim
-/// Schreiben nicht in die Quere — insbesondere darf ein Watchdog-<c>RestoreDefaults</c> nicht mit
+/// Schreiben nicht in die Quere - insbesondere darf ein Watchdog-<c>RestoreDefaults</c> nicht mit
 /// einem gleichzeitigen Rampen-Write auf demselben Kanal verschränken.
 /// <para>
 /// <b>Fail-Safe-Ausnahme:</b> <see cref="RestoreDefaults"/> wartet nur <see cref="FailSafeGateTimeout"/>
 /// lang aufs Gate und schreibt danach <i>am Gate vorbei</i>. Grund: die Backend-Writes dahinter sind
-/// synchron und ohne Timeout — hängt ein Write (EC-/Treiber-Wedge), hielte er das Gate sonst für immer,
+/// synchron und ohne Timeout - hängt ein Write (EC-/Treiber-Wedge), hielte er das Gate sonst für immer,
 /// und der <b>einzige</b> Rückfall-Mechanismus wäre selbst deadlockbar (ein Übertemp-<c>RestoreDefaults</c>
 /// aus dem Loop-Thread blockiert auf dem Gate, das ein Kalibrier-/Identify-Write hält).
 /// </para>
 /// <para>
 /// Der gate-freie Restore zielt konkret auf den <b>Linux-sysfs-Fall</b>: dort nutzt jeder Write einen
-/// eigenen File-Deskriptor und der Kernel serialisiert <c>write()</c> pro Attribut — ein Bypass kann also
+/// eigenen File-Deskriptor und der Kernel serialisiert <c>write()</c> pro Attribut - ein Bypass kann also
 /// nur die Reihenfolge betreffen, nichts korrumpieren. Das Windows-LHM-Backend ist nicht dokumentiert
 /// thread-sicher; dort ist der Bypass praktisch nie aktiv (LHM-Writes ~1 ms erreichen die
-/// <see cref="FailSafeGateTimeout"/> nie — nur ein echter EC-/sysfs-Wedge tut das).
+/// <see cref="FailSafeGateTimeout"/> nie - nur ein echter EC-/sysfs-Wedge tut das).
 /// </para>
 /// <para>
 /// Misst zusätzlich die reine Backend-Dauer jedes Schreib-Aufrufs (<c>SetMode</c>/<c>SetPwm</c>/
 /// <c>RestoreDefaults</c> = LHM <c>Control.SetSoftware</c> bzw. der sysfs-Write). Hintergrund: das
-/// grobe Gate ist nur tragbar, solange Writes schnell sind — ein langsames Backend würde unter Last
+/// grobe Gate ist nur tragbar, solange Writes schnell sind - ein langsames Backend würde unter Last
 /// ein Watchdog-<c>RestoreDefaults</c> hinter sich stauen.
 /// Die Messung soll die Zahl für diese Entscheidung liefern.
 /// </para>
@@ -46,7 +46,7 @@ internal sealed class SynchronizedFanController : IFanController
     /// <summary>
     /// Maximale Wartezeit, die ein Fail-Safe-<see cref="RestoreDefaults"/> aufs Gate verwendet, bevor es
     /// am Gate vorbei schreibt. Großzügig gegenüber einem gesunden Write (Messungen: sub-ms sysfs, ~1 ms
-    /// LHM), aber weit unter dem systemd-<c>TimeoutStopSec</c> und jeder relevanten Übertemp-Frist — ein
+    /// LHM), aber weit unter dem systemd-<c>TimeoutStopSec</c> und jeder relevanten Übertemp-Frist - ein
     /// echter Wedge fällt so nach Bruchteilen einer Sekunde in den gate-freien Restore-Pfad.
     /// </summary>
     private static readonly TimeSpan FailSafeGateTimeout = TimeSpan.FromMilliseconds(500);
@@ -55,7 +55,7 @@ internal sealed class SynchronizedFanController : IFanController
     private readonly ILogger _log;
     private readonly object _gate = new();
 
-    /// <summary>Schützt <see cref="_maxWriteMs"/> — Writes laufen aus Regel-Loop und Kalibrierung nebenläufig.</summary>
+    /// <summary>Schützt <see cref="_maxWriteMs"/> - Writes laufen aus Regel-Loop und Kalibrierung nebenläufig.</summary>
     private readonly object _statGate = new();
     private double _maxWriteMs;
 
@@ -93,7 +93,7 @@ internal sealed class SynchronizedFanController : IFanController
 
     /// <summary>
     /// Fail-Safe-Restore auf Hardware-Auto. Wartet nur <see cref="FailSafeGateTimeout"/> aufs Gate und
-    /// schreibt sonst am Gate vorbei — der sichere Zustand darf nie hinter einem hängenden Write
+    /// schreibt sonst am Gate vorbei - der sichere Zustand darf nie hinter einem hängenden Write
     /// blockieren (siehe Klassen-Doku). Der Restore selbst wirft laut Vertrag nicht.
     /// </summary>
     public void RestoreDefaults()
@@ -105,7 +105,7 @@ internal sealed class SynchronizedFanController : IFanController
             Monitor.TryEnter(_gate, FailSafeGateTimeout, ref taken);
             if (!taken)
                 _log.LogError(
-                    "Fail-Safe RestoreDefaults: Gate nach {Ms:F0} ms nicht frei (hängender Hardware-Write?) — "
+                    "Fail-Safe RestoreDefaults: Gate nach {Ms:F0} ms nicht frei (hängender Hardware-Write?) - "
                     + "schreibe am Gate vorbei, um den sicheren Zustand nicht zu blockieren.",
                     FailSafeGateTimeout.TotalMilliseconds);
 
@@ -128,7 +128,7 @@ internal sealed class SynchronizedFanController : IFanController
 
     /// <summary>
     /// Führt einen Schreib-Aufruf unter dem Gate aus und misst die reine Backend-Dauer. Der Stopwatch
-    /// läuft NUR um den inneren Aufruf; das Loggen passiert AUSSERHALB des Locks — die Messung darf die
+    /// läuft NUR um den inneren Aufruf; das Loggen passiert AUSSERHALB des Locks - die Messung darf die
     /// Lock-Hold-Zeit (genau die hier untersuchte Größe) nicht selbst verlängern.
     /// </summary>
     private void TimedWrite(string op, string fan, Action write)
@@ -145,7 +145,7 @@ internal sealed class SynchronizedFanController : IFanController
 
     private void Record(string op, string fan, TimeSpan elapsed)
     {
-        // Reine Diagnose: ein scheiterndes Logging darf einen Steuer-/Fail-Safe-Write nie reißen — der
+        // Reine Diagnose: ein scheiterndes Logging darf einen Steuer-/Fail-Safe-Write nie reißen - der
         // RestoreDefaults-Vertrag garantiert „wirft nicht", und der HW-Write ist hier ohnehin schon erfolgt.
         try
         {
@@ -154,7 +154,7 @@ internal sealed class SynchronizedFanController : IFanController
 
             if (ms >= SlowWriteThresholdMs)
                 _log.LogWarning(
-                    "Langsamer Hardware-Write {Op} {Fan}: {Ms:F1} ms (≥ {Threshold} ms) — staut unter Last "
+                    "Langsamer Hardware-Write {Op} {Fan}: {Ms:F1} ms (≥ {Threshold} ms) - staut unter Last "
                     + "das Gate und kann ein Watchdog-RestoreDefaults verzögern.",
                     op, fan, ms, SlowWriteThresholdMs);
 

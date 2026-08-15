@@ -12,7 +12,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <!-- Avalonia 12 koppelt Headless.XUnit an xunit v3 — daher hier v3 (die übrigen Test-Projekte
+    <!-- Avalonia 12 koppelt Headless.XUnit an xunit v3 - daher hier v3 (die übrigen Test-Projekte
          bleiben auf v2; eigene Assemblies, kein Konflikt). -->
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />

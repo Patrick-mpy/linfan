@@ -1,4 +1,4 @@
-# LinFan — Hardware Access & Calibration
+# LinFan - Hardware Access & Calibration
 
 All platform code lives behind `ISensorBackend` / `IFanController` in
 `LinFan.Hardware.{Linux,Windows,Mac}` (contract: [docs/ARCHITECTURE.md](ARCHITECTURE.md) §6).
@@ -10,7 +10,7 @@ Installation & operation: [docs/INSTALL.md](INSTALL.md).
 
 - **Interface:** the kernel `hwmon` subsystem via `sysfs` (`/sys/class/hwmon/hwmonX/`).
   - `fanN_input` → current speed (RPM), **world-readable** (reading without root).
-  - `pwmN` → control value 0–255 (writing → **root**).
+  - `pwmN` → control value 0-255 (writing → **root**).
   - `pwmN_enable` → 1 = manual mode (must be set to be able to control).
   - `tempN_input` → temperature (m°C).
 - **Required kernel modules** (depending on mainboard/CPU):
@@ -48,11 +48,11 @@ Installation & operation: [docs/INSTALL.md](INSTALL.md).
 | Windows  | LHM         | LHM `SetSoftware` | administrator        |
 | macOS    | IOKit/SMC   | SMC `F*Tg`/`F*Md` | root (LaunchDaemon)  |
 
-"Not controllable" is a **regular state**, not an error — the UI shows such channels as read-only.
+"Not controllable" is a **regular state**, not an error - the UI shows such channels as read-only.
 
 ## 2. Libraries & dependencies
 
-### NuGet (App/Core — all platforms)
+### NuGet (App/Core - all platforms)
 
 | Package                                                    | Purpose                     | License |
 |------------------------------------------------------------|-----------------------------|---------|
@@ -70,7 +70,7 @@ Installation & operation: [docs/INSTALL.md](INSTALL.md).
 |-------------------------|------------------------------------|---------|
 | LibreHardwareMonitorLib | Super-I/O/CPU/GPU + kernel driver  | MPL-2.0 |
 
-### Linux — system requirements (not NuGet libs, but kernel/distro)
+### Linux - system requirements (not NuGet libs, but kernel/distro)
 
 - A running `hwmon` subsystem + matching kernel modules (see §1.1).
 - `lm-sensors` (recommended, for `sensors-detect`/fallback).
@@ -78,7 +78,7 @@ Installation & operation: [docs/INSTALL.md](INSTALL.md).
 - systemd (for the privileged service).
 - .NET 8 runtime (or a self-contained build → no runtime needed).
 
-### macOS — requirements
+### macOS - requirements
 
 - IOKit (system framework).
 - Optionally your own native SMC helper (Swift/C), bound via P/Invoke.
@@ -95,7 +95,7 @@ Installation & operation: [docs/INSTALL.md](INSTALL.md).
 6. Then propose default curves (e.g. silent / balanced / performance).
 
 Every step is also available per fan afterwards, under Settings → Fans: calibration, identification
-(pulse the fan to see which one it is), and coupling a speed sensor — the last one drives the fan up
+(pulse the fan to see which one it is), and coupling a speed sensor - the last one drives the fan up
 while throttling the others and assigns the tachometer that responds.
 
 ![Fan settings: one card per fan with its hardware path, live speed, position, PWM min/max sliders, and buttons for calibration, identification, and coupling a speed sensor](images/settings.jpg)

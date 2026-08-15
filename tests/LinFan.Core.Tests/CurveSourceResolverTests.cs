@@ -92,7 +92,7 @@ public class CurveSourceResolverTests
     [Fact]
     public void ParseEnum_NumericString999_UndefinedValue_ReturnsFallback()
     {
-        // Enum.TryParse akzeptiert "999" ohne IsDefined-Guard — der Guard muss greifen.
+        // Enum.TryParse akzeptiert "999" ohne IsDefined-Guard - der Guard muss greifen.
         var result = CurveSourceResolver.ParseEnum<SensorAggregation>("999", SensorAggregation.Max);
         Assert.Equal(SensorAggregation.Max, result);
     }

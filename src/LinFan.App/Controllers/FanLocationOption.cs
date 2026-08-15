@@ -45,7 +45,7 @@ public sealed record FanLocationOption(FanLocation Value, string Key)
         value == FanLocation.Unspecified ? "" : For(value).Display;
 
     /// <summary>
-    /// Luftstrom-Richtung einer Position — App-seitige Brücke zur Domänen-Abbildung
+    /// Luftstrom-Richtung einer Position - App-seitige Brücke zur Domänen-Abbildung
     /// (<see cref="AirflowTuneService.DirectionOf"/>), damit die View (Diagramm/Dialog) die Richtung über die
     /// Controller-Schicht bezieht, statt LinFan.Core.Services direkt zu referenzieren.
     /// </summary>

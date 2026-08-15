@@ -123,7 +123,7 @@ public class ConfigSanitizerTests
     [Fact]
     public void Sanitize_DuplicateFanIds_KeepsFirst_WithWarning()
     {
-        // Kann durch die hwmon-Id-Migration (Id-Kollaps) oder eine Hand-Edit-Datei entstehen —
+        // Kann durch die hwmon-Id-Migration (Id-Kollaps) oder eine Hand-Edit-Datei entstehen -
         // ohne Bereinigung würde der Snapshot-Bau/die GUI am ToDictionary werfen und abstürzen.
         var config = new AppConfig
         {
@@ -204,5 +204,54 @@ public class ConfigSanitizerTests
         CurvePoint p = Assert.Single(Assert.Single(clean.Curves).Points);
         Assert.Equal(30, p.TemperatureC);
         Assert.NotEmpty(warnings);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(-1.0)]
+    public void Sanitize_InvalidSmoothing_FallsBackToDefault_WithWarning(double bad)
+    {
+        var config = new AppConfig
+        {
+            FailSafeTempC = 85,
+            Curves = new[] { new CurveConfig { Id = "c", Name = "c", SmoothingSeconds = bad } },
+        };
+
+        AppConfig clean = ConfigSanitizer.Sanitize(config, out IReadOnlyList<string> warnings);
+
+        Assert.Equal(CurveConfig.DefaultSmoothingSeconds, Assert.Single(clean.Curves).SmoothingSeconds);
+        Assert.NotEmpty(warnings);
+    }
+
+    [Fact]
+    public void Sanitize_OverlongSmoothing_IsClamped()
+    {
+        // Ein Fenster weit jenseits der Zeitkonstante des Kühlkörpers ließe die Kurve kaputt wirken.
+        var config = new AppConfig
+        {
+            FailSafeTempC = 85,
+            Curves = new[] { new CurveConfig { Id = "c", Name = "c", SmoothingSeconds = 600 } },
+        };
+
+        AppConfig clean = ConfigSanitizer.Sanitize(config, out IReadOnlyList<string> warnings);
+
+        Assert.Equal(ConfigSanitizer.MaxSmoothingSeconds, Assert.Single(clean.Curves).SmoothingSeconds);
+        Assert.NotEmpty(warnings);
+    }
+
+    [Fact]
+    public void Sanitize_SmoothingOff_IsKept()
+    {
+        // 0 ist eine gültige Nutzer-Entscheidung (Glättung aus), keine zu korrigierende Eingabe.
+        var config = new AppConfig
+        {
+            FailSafeTempC = 85,
+            Curves = new[] { new CurveConfig { Id = "c", Name = "c", SmoothingSeconds = 0 } },
+        };
+
+        AppConfig clean = ConfigSanitizer.Sanitize(config, out IReadOnlyList<string> warnings);
+
+        Assert.Same(config, clean);
+        Assert.Empty(warnings);
     }
 }

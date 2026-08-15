@@ -8,7 +8,7 @@ namespace LinFan.Core.Models;
 /// </summary>
 public enum PressureBalance
 {
-    /// <summary>Keine Gehäuselüfter mit Position erkannt – Bilanz nicht bestimmbar.</summary>
+    /// <summary>Keine Gehäuselüfter mit Position erkannt - Bilanz nicht bestimmbar.</summary>
     Unknown = 0,
 
     /// <summary>Unterdruck: deutlich mehr Auslass als Einlass (zieht Staub durch Ritzen).</summary>

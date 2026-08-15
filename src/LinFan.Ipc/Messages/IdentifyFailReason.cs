@@ -22,7 +22,7 @@ public enum IdentifyFailReason
 
     /// <summary>
     /// Abbruch (OperationCanceledException). Aktuell meldet der Producer einen Abbruch als
-    /// <c>Identify=null</c> (stille Beendigung) — dieser Code ist für eine künftige explizite
+    /// <c>Identify=null</c> (stille Beendigung) - dieser Code ist für eine künftige explizite
     /// Abbruch-Meldung reserviert und parallel zu <see cref="CalibrationFailReason.Canceled"/>.
     /// </summary>
     Canceled,

@@ -12,7 +12,7 @@ namespace LinFan.App.Services;
 /// <summary>
 /// <see cref="ILiveMonitor"/> auf Basis des IPC-Clients: verbindet sich (mit Wiederverbinden) zum
 /// Daemon-Socket, cached den zuletzt empfangenen Snapshot und kann <c>reload</c> senden. Damit
-/// liest die GUI keine Hardware mehr selbst — alles kommt über den Daemon (kein Root nötig).
+/// liest die GUI keine Hardware mehr selbst - alles kommt über den Daemon (kein Root nötig).
 /// </summary>
 public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposable
 {
@@ -52,7 +52,7 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
         }
     }
 
-    /// <summary>Setzt einen Lüfter manuell auf einen festen PWM-Wert (0–255).</summary>
+    /// <summary>Setzt einen Lüfter manuell auf einen festen PWM-Wert (0-255).</summary>
     public Task SendManualPwmAsync(string fanId, byte pwm) =>
         SendAsync(new IpcCommand(IpcCommand.SetManualPwm, Target: fanId, Value: pwm));
 
@@ -94,8 +94,8 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
 
     /// <summary>
     /// Replaces the daemon config wholesale (import/restore). Unlike <see cref="SendConfigAsync"/> the
-    /// daemon-owned fields ride along (<c>withDaemonOwned: true</c>) — calibration and tachometer assignment
-    /// — so a backup can actually restore them.
+    /// daemon-owned fields ride along (<c>withDaemonOwned: true</c>) - calibration and tachometer assignment
+    /// - so a backup can actually restore them.
     /// </summary>
     public async Task<bool> SendReplaceConfigAsync(AppConfig config)
     {
@@ -168,7 +168,7 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
             }
             catch (Exception ex)
             {
-                failure = ex; // Verbindung verloren oder Daemon nicht da — unten Wiederverbinden
+                failure = ex; // Verbindung verloren oder Daemon nicht da - unten Wiederverbinden
             }
             finally
             {
@@ -178,7 +178,7 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
             }
 
             // „Zugriff verweigert" (Socket existiert, aber Berechtigung fehlt) getrennt vom generischen
-            // „nicht erreichbar" melden — sonst rät der Nutzer bei laufendem Dienst falsch (Linux: linfan-Gruppe).
+            // „nicht erreichbar" melden - sonst rät der Nutzer bei laufendem Dienst falsch (Linux: linfan-Gruppe).
             SetLatest(MonitorSnapshot.Unavailable(IsAccessDenied(failure)
                 ? Localizer.Instance["IpcLiveMonitor.AccessDenied"]
                 : Localizer.Instance.Format("IpcLiveMonitor.Unreachable", string.Join(", ", IpcEndpoint.ClientCandidates()))));
@@ -225,7 +225,7 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
                                     c.FailReason, c.OverTempC, c.OverLimitC,
                                     // From the live list, not from the config: the daemon has already resolved
                                     // the display name there (own name, else hardware label). The config
-                                    // carries no name for a fan that was never saved — the message would
+                                    // carries no name for a fan that was never saved - the message would
                                     // otherwise fall back to the raw hardware id.
                                     FanName: s.Fans.FirstOrDefault(f => f.Id == c.FanId)?.Name)
             : null;
@@ -278,10 +278,10 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
         };
     }
 
-    // withDaemonOwned: normally false — the daemon owns the calibration and the tachometer assignment, and a
+    // withDaemonOwned: normally false - the daemon owns the calibration and the tachometer assignment, and a
     // merge (SaveConfig) must not overwrite them. A full replace (ReplaceConfig/import) carries them along,
     // otherwise restoring a backup would silently drop what the backup holds.
-    // internal so a test can cover the mapping — this is the seam where a missing field goes unnoticed.
+    // internal so a test can cover the mapping - this is the seam where a missing field goes unnoticed.
     internal static IpcConfig ToIpcConfig(AppConfig config, bool withDaemonOwned = false) => new(
         config.Curves.Select(ToIpcCurve).ToList(),
         config.Fans.Select(f => ToIpcFan(f, withDaemonOwned)).ToList(),
@@ -306,6 +306,8 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
             SourceSensorIds = sources,
             Aggregation = CurveSourceResolver.ParseAggregation(x.Aggregation),
             HysteresisC = x.HysteresisC,
+            // Älterer Daemon ohne das Feld → Core-Default (siehe IpcCurve.SmoothingSeconds).
+            SmoothingSeconds = x.SmoothingSeconds ?? CurveConfig.DefaultSmoothingSeconds,
             InterpolationMode = CurveSourceResolver.ParseEnum(x.InterpolationMode, InterpolationMode.Linear),
             Points = x.Points.Select(p => new CurvePoint(p.TemperatureC, p.Percent)).ToList(),
         };
@@ -323,7 +325,8 @@ public sealed class IpcLiveMonitor : ILiveMonitor, ICommandSink, IAsyncDisposabl
             sources,
             c.Aggregation.ToString(),
             c.InterpolationMode.ToString(),
-            c.Enabled);
+            c.Enabled,
+            c.SmoothingSeconds);
     }
 
     private static FanConfig ToCoreFan(IpcFanAssignment x) => new()

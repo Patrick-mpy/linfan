@@ -17,7 +17,7 @@ public sealed record TachMappingOptions
     /// Wait before the <b>baseline</b> reading (every fan at PWM 0). Deliberately longer than
     /// <see cref="SettleTime"/>: coasting down takes far longer than spinning up, and an inert fan (a large
     /// CPU cooler coming from full speed) is barely slower after 3 s. Its baseline would then sit near the
-    /// final speed and the measured rise near 0 — the fan would be misreported as having no tachometer.
+    /// final speed and the measured rise near 0 - the fan would be misreported as having no tachometer.
     /// </summary>
     public TimeSpan BaselineSettleTime { get; init; } = TimeSpan.FromSeconds(6);
 
@@ -38,7 +38,7 @@ public sealed record TachMappingOptions
 
     /// <summary>
     /// Safety margin below <see cref="FailSafeTempC"/> required to <b>start</b> at all. The run parks every
-    /// controllable fan near PWM 0 for the whole measurement — the longest near-zero-airflow window in the
+    /// controllable fan near PWM 0 for the whole measurement - the longest near-zero-airflow window in the
     /// product. Starting at just under the limit would spend it climbing straight into the watchdog, so the
     /// entry check is stricter than the abort check. Once running, the abort still uses the full limit.
     /// </summary>

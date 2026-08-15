@@ -24,7 +24,7 @@ public sealed record CalibrationStatus(
     double? OverLimitC = null,
     string? FanName = null)
 {
-    /// <summary>Anzeigename des Lüfters, falls aufgelöst (sonst die Hardware-Id) — für lesbare Meldungen.</summary>
+    /// <summary>Anzeigename des Lüfters, falls aufgelöst (sonst die Hardware-Id) - für lesbare Meldungen.</summary>
     public string DisplayName => string.IsNullOrEmpty(FanName) ? FanId : FanName;
 
     /// <summary>

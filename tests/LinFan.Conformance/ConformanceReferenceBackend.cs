@@ -65,7 +65,7 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
 
     /// <summary>
     /// Fügt einen steuerbaren Lüfter <b>ohne Hardware-Auto-Modus</b> hinzu (real: ein PWM-Knoten ohne
-    /// <c>pwmN_enable</c>). Sein kühlungs-sicherer Zustand ist Volllast 255, nicht Auto — er startet daher
+    /// <c>pwmN_enable</c>). Sein kühlungs-sicherer Zustand ist Volllast 255, nicht Auto - er startet daher
     /// in Manual/255 und kehrt bei <see cref="RestoreDefaults"/> dorthin zurück. Modelliert den 255-Zweig
     /// von INV-1 (<c>mode==Auto || pwm==255</c>).
     /// </summary>
@@ -92,7 +92,7 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
         {
             if (!_values.TryGetValue(id, out double v))
                 throw new KeyNotFoundException($"Unbekannter Sensor: {id}");
-            return v; // kann NaN sein — das ist „kein Wert", kein Fehler
+            return v; // kann NaN sein - das ist „kein Wert", kein Fehler
         }
     }
 
@@ -143,7 +143,7 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
     {
         lock (_gate)
         {
-            // Best-effort über ALLE Kanäle in den kühlungs-sicheren Zustand — unabhängig vom Discovery-Zustand,
+            // Best-effort über ALLE Kanäle in den kühlungs-sicheren Zustand - unabhängig vom Discovery-Zustand,
             // wirft nicht, idempotent. Steuerbare Kanäle mit Auto → Auto; ein Kanal ohne Auto-Modus fällt
             // ersatzweise auf Volllast 255 (genau der reale Linux-Fallback für Knoten ohne pwmN_enable).
             foreach (var fan in _fans.Values)

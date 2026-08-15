@@ -4,7 +4,7 @@ namespace LinFan.Core.Services;
 
 /// <summary>
 /// Eine Kalibrierung ist nicht möglich, weil der Lüfter kein Tachosignal liefert (Drehzahl nicht
-/// messbar) — ein Normalzustand, kein Defekt. Typisiert (statt generischer <see cref="NotSupportedException"/>
+/// messbar) - ein Normalzustand, kein Defekt. Typisiert (statt generischer <see cref="NotSupportedException"/>
 /// mit deutschem Text), damit der Daemon die Ursache codifiziert über IPC überträgt und die GUI sie
 /// lokalisiert.
 /// </summary>

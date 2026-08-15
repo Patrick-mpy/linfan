@@ -5,7 +5,7 @@ namespace LinFan.Hardware.Mac.Smc;
 /// <summary>
 /// Rohwert eines SMC-Keys: der 4-Zeichen-Datentyp-Code (<c>flt </c>, <c>sp78</c>, <c>ui8 </c>, …) plus
 /// die rohen Bytes. Die Interpretation (→ <see cref="double"/>) und die Rückkodierung übernimmt
-/// <see cref="SmcCodec"/> — bewusst getrennt von der I/O-Naht (<see cref="ISmc"/>), damit das Dekodieren
+/// <see cref="SmcCodec"/> - bewusst getrennt von der I/O-Naht (<see cref="ISmc"/>), damit das Dekodieren
 /// hardwarefrei testbar bleibt.
 /// </summary>
 /// <param name="Type">SMC-Datentyp als 4-Zeichen-Code (mit evtl. nachlaufendem Leerzeichen).</param>

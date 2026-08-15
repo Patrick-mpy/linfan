@@ -8,13 +8,13 @@ namespace LinFan.Core.Services;
 /// <summary>
 /// Automatische Sensor-Kopplung: treibt <b>einen</b> Lüfter hoch (alle anderen steuerbaren auf 0),
 /// misst den Drehzahl-Anstieg aller Tacho-Sensoren und ordnet den dominant reagierenden Sensor zu.
-/// So wird empirisch bestimmt, welcher Tacho zu welchem Lüfter gehört — robuster als die namensbasierte
+/// So wird empirisch bestimmt, welcher Tacho zu welchem Lüfter gehört - robuster als die namensbasierte
 /// Backend-Heuristik.
 /// <para>
 /// Fail-Safe: Das Drosseln der anderen Lüfter reduziert die Kühlung (gefährliche Richtung), daher läuft
 /// während des kurzen Antreibens ein Temperatur-Watchdog (Übertemp ODER keine lesbare Temperatur →
 /// sofortiger Abbruch), und der <c>finally</c>-Pfad ruft IMMER <see cref="IFanController.RestoreDefaults"/>
-/// (alle Lüfter zurück auf Firmware-Auto) — auch bei Abbruch/Exception. Spiegelt das Watchdog-/Restore-
+/// (alle Lüfter zurück auf Firmware-Auto) - auch bei Abbruch/Exception. Spiegelt das Watchdog-/Restore-
 /// Muster des <see cref="CalibrationService"/>; die Suspend/Resume-Kopplung an den Regel-Loop liegt beim
 /// aufrufenden Coordinator.
 /// </para>
@@ -72,7 +72,7 @@ public sealed class TachometerMappingService
             // Watchdog BEFORE any intervention: on over-temperature, do not throttle the other fans at all.
             // With a safety margin (StartMarginC): starting just below the limit would spend the whole
             // measurement window without airflow on its way into the watchdog. The abort during the run
-            // keeps using the full limit — an already running attempt must not fail on the margin.
+            // keeps using the full limit - an already running attempt must not fail on the margin.
             blind = Guard(Math.Max(0, options.FailSafeTempC - options.StartMarginC), blind);
             ct.ThrowIfCancellationRequested();
 
@@ -83,14 +83,14 @@ public sealed class TachometerMappingService
                 _fans.SetPwm(o, 0);
             }
 
-            // Baseline: Ziel niedrig, andere niedrig — engmaschig überwacht einpendeln, dann alle Drehzahlen lesen.
+            // Baseline: Ziel niedrig, andere niedrig - engmaschig überwacht einpendeln, dann alle Drehzahlen lesen.
             // Dies ist der kühlungsärmste Zustand (alles nahe 0), daher slice-weiser Watchdog wie beim Identify-Hold.
             // Coasting down needs more time than spinning up (see BaselineSettleTime), else the baseline is too high.
             _fans.SetPwm(fanId, 0);
             blind = await SettleAsync(options.BaselineSettleTime, options.FailSafeTempC, blind, ct).ConfigureAwait(false);
             var baseline = rpmSensors.ToDictionary(id => id, ReadRpm);
 
-            // Ziel hochtreiben (andere bleiben niedrig) — einpendeln, dann erneut lesen.
+            // Ziel hochtreiben (andere bleiben niedrig) - einpendeln, dann erneut lesen.
             _fans.SetPwm(fanId, options.DrivePwm);
             blind = await SettleAsync(options.SettleTime, options.FailSafeTempC, blind, ct).ConfigureAwait(false);
 
@@ -108,7 +108,7 @@ public sealed class TachometerMappingService
 
     /// <summary>
     /// Wertet die Drehzahl-Anstiege aus: stärkster Sensor gewinnt, muss aber (1) über <c>MinRiseRpm</c> und
-    /// (2) um <c>DominanceFactor</c> über dem zweitstärksten liegen — sonst keine Reaktion bzw. mehrdeutig.
+    /// (2) um <c>DominanceFactor</c> über dem zweitstärksten liegen - sonst keine Reaktion bzw. mehrdeutig.
     /// </summary>
     private static TachMappingResult Evaluate(
         FanId fanId, IReadOnlyList<(SensorId Id, int Rise)> rises, TachMappingOptions options)
@@ -129,7 +129,7 @@ public sealed class TachometerMappingService
 
     /// <summary>
     /// Wartet <paramref name="total"/> in kleinen Slices und prüft in jedem den Temperatur-Watchdog und den
-    /// Abbruch — damit ein Temperaturspike während des (kühlungsreduzierten) Einpendelns sofort greift, nicht
+    /// Abbruch - damit ein Temperaturspike während des (kühlungsreduzierten) Einpendelns sofort greift, nicht
     /// erst am Fensterende. Ein finaler Guard läuft direkt vor dem Messen. Gibt den Blind-Zähler fort.
     /// </summary>
     private async Task<int> SettleAsync(TimeSpan total, double limitC, int blind, CancellationToken ct)
@@ -164,7 +164,7 @@ public sealed class TachometerMappingService
         {
             if (blindGuards + 1 >= MaxBlindGuards)
                 throw new NoTemperatureReadingException(
-                    "Keine lesbare Temperatur während der Sensor-Kopplung — abgebrochen (kein Watchdog).");
+                    "Keine lesbare Temperatur während der Sensor-Kopplung - abgebrochen (kein Watchdog).");
             return blindGuards + 1;
         }
         return 0;

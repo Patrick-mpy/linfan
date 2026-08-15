@@ -48,7 +48,7 @@ internal sealed class ControlLoopService : BackgroundService
     private CalibrationCoordinator? _calibration;
     private IdentifyCoordinator? _identify;
     private TachMappingCoordinator? _tachMapping;
-    private volatile AppConfig? _config;  // Live-Config (Referenz-Swap atomar) — u. a. für den Kalibrier-Watchdog
+    private volatile AppConfig? _config;  // Live-Config (Referenz-Swap atomar) - u. a. für den Kalibrier-Watchdog
 
     private readonly object _calLock = new();
     private (string FanId, FanCalibration Cal)? _pendingCalibration;
@@ -57,7 +57,7 @@ internal sealed class ControlLoopService : BackgroundService
     // OnCommand kann pro IPC-Client nebenläufig laufen, daher muss „prüfen-dann-starten" atomar sein.
     private readonly object _controlLock = new();
 
-    // Bereits gemeldete unbekannte Kurven-Quellen — dedup, damit je ID nur einmal pro Daemon-Lauf gewarnt wird.
+    // Bereits gemeldete unbekannte Kurven-Quellen - dedup, damit je ID nur einmal pro Daemon-Lauf gewarnt wird.
     private readonly HashSet<string> _warnedUnknownSensors = new();
 
     // Test-Seam: überschreibt das aus der Config abgeleitete Tick-Intervall (Default: aus der Config).
@@ -71,7 +71,7 @@ internal sealed class ControlLoopService : BackgroundService
     private readonly Func<TimeSpan, CancellationToken, Task>? _identifyDelay;
 
     // Test-Seam: injizierbare TachometerMappingService-Factory (Default: echte Delays), analog zur
-    // CalibrationService-Factory — lässt einen Test die Auto-Kopplung ohne echte Settle-Wartezeit prüfen.
+    // CalibrationService-Factory - lässt einen Test die Auto-Kopplung ohne echte Settle-Wartezeit prüfen.
     private readonly Func<ISensorBackend, IFanController, TachometerMappingService>? _tachMappingFactory;
 
     // Test-Seam: Obergrenze je Coordinator-Stop im Shutdown (Default: DefaultCoordinatorStopTimeout).
@@ -79,7 +79,7 @@ internal sealed class ControlLoopService : BackgroundService
     private readonly TimeSpan _coordinatorStopTimeout;
 
     // Test-Seam: erzwingt den Dry-Run-Zustand (Default: aus den Prozessrechten via Privileges.IsElevated()).
-    // Nötig, weil Unit-Tests je nach Runner mit ODER ohne Root laufen (der CI-Container läuft als Root) —
+    // Nötig, weil Unit-Tests je nach Runner mit ODER ohne Root laufen (der CI-Container läuft als Root) -
     // ohne Seam hinge der berichtete DaemonStatus (DryRun/Active) an der euid des Test-Runners. Produktiv
     // bleibt der Parameter null → die echte Rechte-Erkennung entscheidet.
     private readonly bool? _dryRunOverride;
@@ -127,8 +127,8 @@ internal sealed class ControlLoopService : BackgroundService
             failSafeTempC: () => _config?.FailSafeTempC ?? CalibrationOptions.DefaultFailSafeTempC);
         _tachMapping = tachMapping;
 
-        // Setup (Config laden, IPC starten) liegt INNERHALB des try, damit das finally — und damit
-        // RestoreDefaults — auch bei einem Setup-Fehler garantiert läuft (Fail-Safe, M1).
+        // Setup (Config laden, IPC starten) liegt INNERHALB des try, damit das finally - und damit
+        // RestoreDefaults - auch bei einem Setup-Fehler garantiert läuft (Fail-Safe, M1).
         try
         {
             AppConfig config = LoadAndMigrate();
@@ -157,7 +157,7 @@ internal sealed class ControlLoopService : BackgroundService
                     {
                         config = updated;
                         _config = updated; // Live-Config aktuell halten (Kalibrier-Watchdog liest sie)
-                        loop.ResetHysteresis(); // neue Kurven sofort anwenden, nicht erst bei Temp-Drift
+                        loop.ResetFilters(); // neue Kurven sofort anwenden, nicht erst bei Temp-Drift
                         WarnAboutUnknownSources(updated); // z. B. nach Profilwechsel auf Kurven mit toter Quelle
                     }
 
@@ -181,7 +181,7 @@ internal sealed class ControlLoopService : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _log.LogWarning(ex, "Tick fehlgeschlagen — übersprungen.");
+                    _log.LogWarning(ex, "Tick fehlgeschlagen - übersprungen.");
                 }
             }
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false));
@@ -193,19 +193,19 @@ internal sealed class ControlLoopService : BackgroundService
         finally
         {
             _fans.RestoreDefaults();
-            _log.LogInformation("ControlLoop gestoppt — Fail-Safe RestoreDefaults ausgeführt.");
+            _log.LogInformation("ControlLoop gestoppt - Fail-Safe RestoreDefaults ausgeführt.");
         }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         // Laufende Kalibrierung erst sauber beenden (Rampe stoppt, Lüfter zurück auf Auto), BEVOR
-        // der ExecuteAsync-finally das abschließende RestoreDefaults ausführt — sonst könnte die
+        // der ExecuteAsync-finally das abschließende RestoreDefaults ausführt - sonst könnte die
         // weiterlaufende Rampe den sicheren Zustand wieder übertrampeln.
         //
         // Fail-Safe: je Stop nur BEGRENZT warten. Hängt ein Coordinator-Stop (z. B. hinter einem im
         // EC/Treiber festhängenden Hardware-Write), käme sonst weder base.StopAsync (cancelt das
-        // Stopp-Token) noch das finally-RestoreDefaults in ExecuteAsync je dran — systemd SIGKILLt
+        // Stopp-Token) noch das finally-RestoreDefaults in ExecuteAsync je dran - systemd SIGKILLt
         // nach TimeoutStopSec und überspränge damit jedes Fail-Safe-Restore. Nach dem (ggf. abge-
         // brochenen) Warten cancelt base.StopAsync das Token; der abgebrochene Coordinator-Lauf
         // bricht dann selbst ab und das finally stellt den sicheren Zustand her.
@@ -221,7 +221,7 @@ internal sealed class ControlLoopService : BackgroundService
         // verwaister Coordinator-Write könnte das finally-RestoreDefaults noch mit einem Rampenwert
         // überschreiben. Ein idempotenter Abschluss-Restore als ALLERLETZTER Schritt stellt sicher,
         // dass der zuletzt wirksame Write Hardware-Auto ist. RestoreDefaults ist gate-begrenzt (hängt
-        // nicht) und wirft laut Vertrag nicht — der Catch ist reine Vorsicht am äußersten Rand.
+        // nicht) und wirft laut Vertrag nicht - der Catch ist reine Vorsicht am äußersten Rand.
         try { _fans.RestoreDefaults(); }
         catch (Exception ex) { _log.LogWarning(ex, "Abschluss-RestoreDefaults beim Shutdown fehlgeschlagen."); }
     }
@@ -240,13 +240,13 @@ internal sealed class ControlLoopService : BackgroundService
         catch (TimeoutException)
         {
             _log.LogWarning(
-                "{Coordinator}-Stop nach {Ms} ms nicht abgeschlossen — Shutdown fährt fort; das "
+                "{Coordinator}-Stop nach {Ms} ms nicht abgeschlossen - Shutdown fährt fort; das "
                 + "finally-RestoreDefaults stellt den sicheren Zustand her.",
                 label, _coordinatorStopTimeout.TotalMilliseconds);
         }
         catch (Exception ex)
         {
-            _log.LogWarning(ex, "{Coordinator}-Stop beim Shutdown fehlgeschlagen — Shutdown fährt fort.", label);
+            _log.LogWarning(ex, "{Coordinator}-Stop beim Shutdown fehlgeschlagen - Shutdown fährt fort.", label);
         }
     }
 
@@ -255,7 +255,7 @@ internal sealed class ControlLoopService : BackgroundService
     /// Kalibrierung/Identifikation abbrechen (ihr Ergebnis ist danach gegenstandslos, und die Rampe würde
     /// sonst gegen <see cref="IFanController.RestoreDefaults"/> schreiben), GUI-Manual-Overrides fallen lassen
     /// und Hardware-Auto wiederherstellen. Ohne das bliebe ein zuvor kurvengeregelter Lüfter, der in der
-    /// neuen Config fehlt, im Manual-Zustand hängen — ohne Kurve, ohne Firmware-Regelung (Fail-Safe-Lücke).
+    /// neuen Config fehlt, im Manual-Zustand hängen - ohne Kurve, ohne Firmware-Regelung (Fail-Safe-Lücke).
     /// Läuft auf dem Loop-Thread, wie alle anderen Hardware-Writes (dasselbe Cancel-Muster wie der Übertemp-
     /// Fail-Safe in <see cref="ExecuteAsync"/>).
     /// </summary>
@@ -297,7 +297,7 @@ internal sealed class ControlLoopService : BackgroundService
 
         // Kurve an/aus (Dashboard-Quick-Command) → Enabled-Flag setzen, persistieren. Deaktivierte
         // Kurven stellen ihre Lüfter im nächsten Tick auf Hardware-Auto (ControlLoop), Re-Enable wirkt
-        // sofort (ResetHysteresis nach dem Config-Swap in ExecuteAsync).
+        // sofort (ResetFilters nach dem Config-Swap in ExecuteAsync).
         if (!_pendingCurveToggles.IsEmpty)
         {
             var toggles = new List<(string CurveId, bool Enabled)>();
@@ -355,7 +355,7 @@ internal sealed class ControlLoopService : BackgroundService
 
         // GUI hat einen Reset ausgelöst → auf Werkszustand zurück (alles leer). Die Hardware bleibt entdeckt
         // (Backends sind config-unabhängig); ohne Overrides zeigt der Snapshot rohe Hardware-Namen. Onboarding
-        // wird bewusst NICHT erzwungen (OnboardingCompleted=true) — dafür gibt es den eigenen Menüpunkt.
+        // wird bewusst NICHT erzwungen (OnboardingCompleted=true) - dafür gibt es den eigenen Menüpunkt.
         if (_pendingReset)
         {
             _pendingReset = false;
@@ -382,7 +382,7 @@ internal sealed class ControlLoopService : BackgroundService
     }
 
     /// <summary>
-    /// Setzt das <see cref="CurveConfig.Enabled"/>-Flag der genannten Kurven — sowohl in den aktiven
+    /// Setzt das <see cref="CurveConfig.Enabled"/>-Flag der genannten Kurven - sowohl in den aktiven
     /// <c>config.Curves</c> als auch in den Kurven des aktiven Profils, damit ein späterer Profilwechsel
     /// (<see cref="ProfileService.Apply"/>) den Stand nicht wieder überschreibt. Reine Funktion (testbar).
     /// </summary>
@@ -464,7 +464,7 @@ internal sealed class ControlLoopService : BackgroundService
         AppConfig migrated = HwmonIdMigration.Apply(config, map.LegacyToStableIds(), out changed);
         if (changed)
             _log.LogInformation(
-                "hwmon-Ids auf stabiles Schema migriert (chip/channel) — übersteht künftige hwmonN-Umnummerierung.");
+                "hwmon-Ids auf stabiles Schema migriert (chip/channel) - übersteht künftige hwmonN-Umnummerierung.");
         return migrated;
     }
 
@@ -488,7 +488,7 @@ internal sealed class ControlLoopService : BackgroundService
                 if (CanControl(fan))
                 {
                     _loop?.SetManualOverride(fan, (byte)Math.Clamp(pwm, 0, 255));
-                    // Debug, nicht Info: ein Slider-Zug feuert (trotz GUI-Throttle) viele Befehle —
+                    // Debug, nicht Info: ein Slider-Zug feuert (trotz GUI-Throttle) viele Befehle -
                     // auf Info würde das die Logs fluten. Der Endzustand ist im Snapshot sichtbar.
                     _log.LogDebug("Manuell: {Fan} → pwm {Pwm}", fan, Math.Clamp(pwm, 0, 255));
                 }
@@ -516,7 +516,7 @@ internal sealed class ControlLoopService : BackgroundService
                 }
                 break;
             case IpcCommand.Identify when command.Target is { } fan:
-                // IsRunning (echter Lauf-Zustand) statt Status.Running prüfen — Status flippt schon auf
+                // IsRunning (echter Lauf-Zustand) statt Status.Running prüfen - Status flippt schon auf
                 // false, während der kalibrierte Lüfter im finally noch resumed wird.
                 lock (_controlLock)
                 {
@@ -564,9 +564,9 @@ internal sealed class ControlLoopService : BackgroundService
                 break;
             default:
                 // Kein Zweig hat gegriffen: unbekanntes Kommando (z. B. Tippfehler) ODER ein bekanntes mit
-                // fehlendem/ungültigem Target/Value/Config (die when-Guards). Früher fiel das still durch —
+                // fehlendem/ungültigem Target/Value/Config (die when-Guards). Früher fiel das still durch -
                 // jetzt sichtbar melden statt es zur Laufzeit stumm zu verschlucken (AGENTS.md: Fehler/
-                // Unsicherheiten melden). Keine Nutzdaten (Config) loggen — nur, ob eine mitkam.
+                // Unsicherheiten melden). Keine Nutzdaten (Config) loggen - nur, ob eine mitkam.
                 _log.LogWarning(
                     "IPC-Kommando ignoriert (unbekannt oder unvollständig): {Command} "
                     + "(Target={Target}, Value={Value}, HatConfig={HasConfig}).",
@@ -585,7 +585,7 @@ internal sealed class ControlLoopService : BackgroundService
     /// <summary>
     /// Effektiver Drehzahl-Sensor eines Lüfters für die Kalibrierung: das konfigurierte
     /// <see cref="FanConfig.RpmSource"/>-Override, aber nur wenn es einen aktuell vorhandenen RPM-Sensor
-    /// benennt — ein veraltetes Override darf die Rampe nicht auf einen unbekannten Sensor messen lassen
+    /// benennt - ein veraltetes Override darf die Rampe nicht auf einen unbekannten Sensor messen lassen
     /// (<c>ReadValue</c> würfe sonst). Sonst <c>null</c> ⇒ der Coordinator nimmt den Backend-Tacho.
     /// </summary>
     private SensorId? ResolveTachOverride(FanId fanId)
@@ -597,10 +597,10 @@ internal sealed class ControlLoopService : BackgroundService
     }
 
     /// <summary>
-    /// Diagnose-Dump beim Start: was das Backend entdeckt (Temp-/Drehzahl-Sensoren mit Momentanwert) und —
-    /// am wichtigsten — welcher Tacho je Lüfter-Kanal wirkt (zugeordnetes <see cref="FanConfig.RpmSource"/>
+    /// Diagnose-Dump beim Start: was das Backend entdeckt (Temp-/Drehzahl-Sensoren mit Momentanwert) und -
+    /// am wichtigsten - welcher Tacho je Lüfter-Kanal wirkt (zugeordnetes <see cref="FanConfig.RpmSource"/>
     /// vor der Backend-Heuristik, sonst deren Paarung, sonst keiner). Genau das, was zum Ferndiagnostizieren
-    /// von „kein Tachosignal" fehlte. Best-effort — ein Fehler hier ist rein diagnostisch, nie kritisch.
+    /// von „kein Tachosignal" fehlte. Best-effort - ein Fehler hier ist rein diagnostisch, nie kritisch.
     /// </summary>
     private void LogDiscovery(AppConfig config)
     {
@@ -624,7 +624,7 @@ internal sealed class ControlLoopService : BackgroundService
                 string? overrideId = config.Fans.FirstOrDefault(c => c.FanId == f.Id.Value)?.RpmSource;
                 string tach = !string.IsNullOrEmpty(overrideId) && rpmIds.Contains(overrideId)
                     ? $"{overrideId} (zugeordnet)"
-                    : f.Tachometer is { } t ? $"{t.Value} (Heuristik)" : "— kein Tacho";
+                    : f.Tachometer is { } t ? $"{t.Value} (Heuristik)" : "- kein Tacho";
                 _log.LogInformation("  Fan  [{Id}] '{Name}' steuerbar={Ctl} · Tacho={Tach}",
                     f.Id.Value, f.Name, f.CanControl, tach);
             }
@@ -657,7 +657,7 @@ internal sealed class ControlLoopService : BackgroundService
     {
         if (tick.FailSafeTriggered)
         {
-            _log.LogWarning("FAIL-SAFE ({Reason}) — Lüfter auf Hardware-Auto.",
+            _log.LogWarning("FAIL-SAFE ({Reason}) - Lüfter auf Hardware-Auto.",
                 tick.FailSafeReason ?? $"{tick.HottestTempC:0.0} °C");
             return;
         }
@@ -688,7 +688,7 @@ internal sealed class ControlLoopService : BackgroundService
     }
 
     /// <summary>
-    /// Warnt (einmalig je ID) über Kurven-Quellen, die das Backend nicht (mehr) kennt — typisch nach
+    /// Warnt (einmalig je ID) über Kurven-Quellen, die das Backend nicht (mehr) kennt - typisch nach
     /// hwmon-Neunummerierung (Reboot/Kernel-Update). Die Regelung läuft dann ohne diese Quelle weiter
     /// (<see cref="SensorAggregator"/> → NaN, kein Crash); ohne diese Meldung bliebe der Grund unsichtbar.
     /// </summary>
@@ -699,7 +699,7 @@ internal sealed class ControlLoopService : BackgroundService
             if (!_warnedUnknownSensors.Add(id))
                 continue; // diese ID wurde in diesem Daemon-Lauf bereits gemeldet
             _log.LogWarning(
-                "Kurven-Quelle {Sensor} ist dem Backend nicht bekannt (hwmon-Nummerierung geändert?) — "
+                "Kurven-Quelle {Sensor} ist dem Backend nicht bekannt (hwmon-Nummerierung geändert?) - "
                 + "betroffene Kurve(n) regeln ohne diese Quelle. Bitte im Kurven-Tab neu zuordnen.",
                 id);
         }
@@ -707,7 +707,7 @@ internal sealed class ControlLoopService : BackgroundService
 
     /// <summary>
     /// Liefert die in den aktiven Kurven als Quelle referenzierten Sensor-IDs, die nicht in der Discovery
-    /// vorkommen (dedupliziert). Reine Funktion — testbar ohne laufenden Dienst.
+    /// vorkommen (dedupliziert). Reine Funktion - testbar ohne laufenden Dienst.
     /// </summary>
     internal static IReadOnlyList<string> UnknownSourceIds(AppConfig config, IEnumerable<SensorDescriptor> discovered)
     {

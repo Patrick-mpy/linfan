@@ -6,17 +6,7 @@
         Width="420" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" CanResize="False"
         Background="{DynamicResource BgWindow}">
-    <Window.Styles>
-        <!-- Destruktiver Bestätigungs-Button (Löschen/Verwerfen): dezent rot, beim Hover voll. -->
-        <Style Selector="Button.danger">
-            <Setter Property="Background" Value="{DynamicResource DangerBg}" />
-            <Setter Property="Foreground" Value="{DynamicResource DangerText}" />
-        </Style>
-        <Style Selector="Button.danger:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource DangerAccent}" />
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-        </Style>
-    </Window.Styles>
+    <!-- „danger" für den Bestätigungs-Button kommt aus Theme/Layout.axaml (app-weit, siehe ConfirmDialog-ctor). -->
     <StackPanel Margin="24" Spacing="{StaticResource SpacingXl}">
         <TextBlock x:Name="HeadingText" FontSize="15" FontWeight="SemiBold"
                    Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" />

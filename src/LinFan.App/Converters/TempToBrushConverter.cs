@@ -10,7 +10,7 @@ namespace LinFan.App.Converters;
 /// Temperatur (°C, <c>double</c>) → <see cref="IBrush"/> nach Schwere: kühl = grün, warm = orange,
 /// heiß = rot, kein Messwert (<c>NaN</c>/kein <c>double</c>) = gedämpft. Treibt Wert-Farbe und
 /// Sparkline-Stroke im Dashboard, damit ein heißer Sensor auf einen Blick auffällt.
-/// Schwellen bewusst fix (passend zu üblichen CPU/GPU-Bereichen) — später ggf. konfigurierbar.
+/// Schwellen bewusst fix (passend zu üblichen CPU/GPU-Bereichen) - später ggf. konfigurierbar.
 /// </summary>
 public sealed class TempToBrushConverter : IValueConverter
 {

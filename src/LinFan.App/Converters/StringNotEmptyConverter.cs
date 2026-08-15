@@ -8,7 +8,7 @@ namespace LinFan.App.Converters;
 /// <summary>
 /// One-Way-Converter für Sichtbarkeits-Bindings an einen String: liefert <c>true</c>, wenn der Wert ein
 /// nicht-leerer (auch nicht nur Whitespace) String ist. Bewusst als eigener, unit-testbarer Converter statt
-/// eines <c>ObjectConverters.IsNotNull</c>-Notnagels — leere Strings sollen <c>false</c> ergeben, nicht nur null.
+/// eines <c>ObjectConverters.IsNotNull</c>-Notnagels - leere Strings sollen <c>false</c> ergeben, nicht nur null.
 /// </summary>
 public sealed class StringNotEmptyConverter : IValueConverter
 {

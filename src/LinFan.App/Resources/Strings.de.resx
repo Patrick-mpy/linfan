@@ -66,7 +66,7 @@
     <value>Theme</value>
   </data>
   <data name="Header.ThemeTooltip" xml:space="preserve">
-    <value>Farbschema — System folgt dem Betriebssystem.</value>
+    <value>Farbschema - System folgt dem Betriebssystem.</value>
   </data>
   <data name="Header.Language" xml:space="preserve">
     <value>Sprache</value>
@@ -78,25 +78,19 @@
     <value>Im Hintergrund weiterlaufen</value>
   </data>
   <data name="Header.RunInBackgroundTooltip" xml:space="preserve">
-    <value>Beim Schließen ins Benachrichtigungsfeld minimieren statt zu beenden — die Lüftersteuerung läuft im Hintergrund weiter.</value>
-  </data>
-  <data name="MainWindow.UnsavedChanges" xml:space="preserve">
-    <value>● Nicht gespeicherte Änderungen</value>
+    <value>Beim Schließen ins Benachrichtigungsfeld minimieren statt zu beenden - die Lüftersteuerung läuft im Hintergrund weiter.</value>
   </data>
   <data name="MainWindow.ApplyChangesTooltip" xml:space="preserve">
-    <value>Übernimmt die ungespeicherten Änderungen — speichert über den Hintergrunddienst.</value>
-  </data>
-  <data name="MainWindow.Apply" xml:space="preserve">
-    <value>Übernehmen</value>
+    <value>Übernehmen - wendet die ungespeicherten Änderungen an, gespeichert über den Hintergrunddienst.</value>
   </data>
   <data name="MainWindow.RevertTooltip" xml:space="preserve">
-    <value>Verwirft alle Änderungen seit dem letzten Speichern.</value>
+    <value>Verwerfen - verwirft alle Änderungen seit dem letzten Speichern.</value>
   </data>
   <data name="MainWindow.Revert" xml:space="preserve">
     <value>Verwerfen</value>
   </data>
   <data name="MainWindow.DaemonUnreachable" xml:space="preserve">
-    <value>⚠ Hintergrunddienst nicht erreichbar — läuft der Dienst? Prüfen mit: systemctl status linfan-daemon</value>
+    <value>Hintergrunddienst nicht erreichbar - läuft der Dienst? Prüfen mit: systemctl status linfan-daemon</value>
   </data>
   <data name="MainWindow.Close" xml:space="preserve">
     <value>Schließen</value>
@@ -106,6 +100,33 @@
   </data>
   <data name="MainWindow.Profile" xml:space="preserve">
     <value>Profil</value>
+  </data>
+  <data name="MainWindow.Profiles" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="MainWindow.EditProfile" xml:space="preserve">
+    <value>Profil bearbeiten</value>
+  </data>
+  <data name="MainWindow.ProfileActive" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="MainWindow.ProfileActiveTooltip" xml:space="preserve">
+    <value>Übergibt die Lüfter an dieses Profil. Offene Änderungen vorher übernehmen - der Dienst würde sonst den gespeicherten Stand des Profils aktivieren, nicht den auf dem Bildschirm.</value>
+  </data>
+  <data name="MainWindow.ProfileSwitchLocked" xml:space="preserve">
+    <value>Gesperrt, solange Änderungen nicht gespeichert sind - erst übernehmen oder verwerfen.</value>
+  </data>
+  <data name="MainWindow.ProfileCurves" xml:space="preserve">
+    <value>Kurven dieses Profils</value>
+  </data>
+  <data name="MainWindow.OpenCurveTooltip" xml:space="preserve">
+    <value>Öffnet diese Kurve im Editor.</value>
+  </data>
+  <data name="MainWindow.ProfileCurvesSubtitle" xml:space="preserve">
+    <value>Zum Bearbeiten eine Kurve anklicken; sie stehen auch im Seitenmenü</value>
+  </data>
+  <data name="MainWindow.ProfileNotActiveNote" xml:space="preserve">
+    <value>Dieses Profil regelt gerade nicht - es lässt sich bearbeiten, ohne die Lüfter zu berühren.</value>
   </data>
   <data name="MainWindow.ActiveCurvesToggleTooltip" xml:space="preserve">
     <value>Aktive Kurven ein-/ausklappen.</value>
@@ -120,7 +141,7 @@
     <value>Aus</value>
   </data>
   <data name="MainWindow.CurveToggleTooltip" xml:space="preserve">
-    <value>Kurve an/aus — „aus“ stellt die zugeordneten Lüfter auf Hardware-Auto.</value>
+    <value>Kurve an/aus - „aus“ stellt die zugeordneten Lüfter auf Hardware-Auto.</value>
   </data>
   <data name="MainWindow.CurveOffHardwareAuto" xml:space="preserve">
     <value>aus → Hardware-Auto</value>
@@ -162,7 +183,7 @@
     <value>Auto</value>
   </data>
   <data name="MainWindow.ManualPowerTooltip" xml:space="preserve">
-    <value>Manuelle Lüfterleistung in % — nur im Manuell-Modus aktiv.</value>
+    <value>Manuelle Lüfterleistung in % - nur im Manuell-Modus aktiv.</value>
   </data>
   <data name="MainWindow.CalibrateTooltip" xml:space="preserve">
     <value>Ermittelt den minimalen PWM-Wert, bei dem dieser Lüfter sicher anläuft.</value>
@@ -198,13 +219,13 @@
     <value>Überall außer in den Einstellungen ein-/ausblenden (gemessen wird weiterhin).</value>
   </data>
   <data name="MainWindow.GroupSensorTooltip" xml:space="preserve">
-    <value>Fasst Sensoren zu einem Block zusammen — gleicher Name = ein Block, im Dashboard und in der Sensor-Auswahl der Kurven. Leer → „Ungruppiert“.</value>
+    <value>Fasst Sensoren zu einem Block zusammen - gleicher Name = ein Block, im Dashboard und in der Sensor-Auswahl der Kurven. Leer → „Ungruppiert“.</value>
   </data>
   <data name="MainWindow.Optional" xml:space="preserve">
     <value>optional</value>
   </data>
   <data name="MainWindow.AddGroup" xml:space="preserve">
-    <value>＋ Gruppe</value>
+    <value>+ Gruppe</value>
   </data>
   <data name="MainWindow.HardwareAddressTooltip" xml:space="preserve">
     <value>Hardware-Adresse (Kernel-/hwmon-Pfad).</value>
@@ -225,7 +246,7 @@
     <value>Position</value>
   </data>
   <data name="MainWindow.PositionLabelTooltip" xml:space="preserve">
-    <value>Einbau-Position / Luftrichtung — Grundlage für den geplanten Airflow-Abgleich.</value>
+    <value>Einbau-Position / Luftrichtung - Grundlage für den geplanten Airflow-Abgleich.</value>
   </data>
   <data name="MainWindow.PickLocationTooltip" xml:space="preserve">
     <value>Einbau-Position im Gehäuse wählen (interaktive Vorschau).</value>
@@ -264,13 +285,19 @@
     <value>PWM</value>
   </data>
   <data name="MainWindow.ManualPwmFloorHint" xml:space="preserve">
-    <value>0 % ist die Hardware-Untergrenze — manche Lüfter halten dort eine Mindestdrehzahl und lassen sich nicht ganz abschalten. Zum sicheren Identifizieren stattdessen den Puls-Knopf (Identifizieren) nutzen.</value>
+    <value>0 % ist die Hardware-Untergrenze - manche Lüfter halten dort eine Mindestdrehzahl und lassen sich nicht ganz abschalten. Zum sicheren Identifizieren stattdessen den Puls-Knopf (Identifizieren) nutzen.</value>
   </data>
   <data name="MainWindow.AirflowAutoTune" xml:space="preserve">
     <value>Airflow-Auto-Tune</value>
   </data>
   <data name="MainWindow.AirflowAutoTuneSubtitle" xml:space="preserve">
     <value>Leitet aus den Einbau-Positionen eine Druckbilanz und passende Kurven ab. Vorschlag prüfen, übernehmen und dann speichern.</value>
+  </data>
+  <data name="MainWindow.AirflowStatusTitle" xml:space="preserve">
+    <value>Bereits angewendet</value>
+  </data>
+  <data name="MainWindow.AirflowStatusSubtitle" xml:space="preserve">
+    <value>Diese Lüfter folgen im bearbeiteten Profil den Rollen-Kurven der Airflow-Analyse.</value>
   </data>
   <data name="MainWindow.AnalyzeAirflowTooltip" xml:space="preserve">
     <value>Berechnet aus den Lüfter-Positionen die Druckbilanz und passende Kurven-Vorschläge.</value>
@@ -282,19 +309,10 @@
     <value>Vorschlag übernehmen</value>
   </data>
   <data name="MainWindow.ApplySuggestionTooltip" xml:space="preserve">
-    <value>Lädt die angekreuzten Kurven/Zuordnungen in den Editor — danach per Speichern übernehmen.</value>
+    <value>Lädt die angekreuzten Kurven/Zuordnungen in den Editor - danach per Speichern übernehmen.</value>
   </data>
   <data name="MainWindow.TabCurves" xml:space="preserve">
     <value>Kurven &amp; Zuordnung</value>
-  </data>
-  <data name="MainWindow.ProfileNamePlaceholder" xml:space="preserve">
-    <value>Profilname</value>
-  </data>
-  <data name="MainWindow.Done" xml:space="preserve">
-    <value>Fertig</value>
-  </data>
-  <data name="MainWindow.CloseNameFieldTooltip" xml:space="preserve">
-    <value>Namensfeld schließen.</value>
   </data>
   <data name="MainWindow.AddProfileTooltip" xml:space="preserve">
     <value>Legt ein leeres Profil mit einer Standard-Kurve an.</value>
@@ -304,9 +322,6 @@
   </data>
   <data name="MainWindow.Duplicate" xml:space="preserve">
     <value>Duplizieren</value>
-  </data>
-  <data name="MainWindow.RenameProfileTooltip" xml:space="preserve">
-    <value>Aktuelles Profil umbenennen.</value>
   </data>
   <data name="MainWindow.Rename" xml:space="preserve">
     <value>Umbenennen</value>
@@ -318,16 +333,13 @@
     <value>Löschen</value>
   </data>
   <data name="MainWindow.NoDevicesForCurves" xml:space="preserve">
-    <value>Keine Geräte erkannt — ohne Sensoren und Lüfter lassen sich keine Kurven anlegen.</value>
+    <value>Keine Geräte erkannt - ohne Sensoren und Lüfter lassen sich keine Kurven anlegen.</value>
   </data>
   <data name="MainWindow.Curves" xml:space="preserve">
     <value>Kurven</value>
   </data>
   <data name="MainWindow.AddCurveTooltip" xml:space="preserve">
     <value>Legt eine neue Lüfterkurve an.</value>
-  </data>
-  <data name="MainWindow.Curve" xml:space="preserve">
-    <value>Kurve</value>
   </data>
   <data name="MainWindow.DuplicateCurveTooltip" xml:space="preserve">
     <value>Dupliziert die ausgewählte Kurve.</value>
@@ -339,7 +351,7 @@
     <value>(aus)</value>
   </data>
   <data name="MainWindow.CurveDisabledTooltip" xml:space="preserve">
-    <value>Kurve deaktiviert — Lüfter auf Hardware-Auto.</value>
+    <value>Kurve deaktiviert - Lüfter auf Hardware-Auto.</value>
   </data>
   <data name="MainWindow.Name" xml:space="preserve">
     <value>Name</value>
@@ -348,7 +360,7 @@
     <value>Kurve (Temperatur → Leistung) · Punkte ziehen</value>
   </data>
   <data name="MainWindow.NoSourceSensor" xml:space="preserve">
-    <value>Kein Quell-Sensor gewählt — kein Live-Arbeitspunkt.</value>
+    <value>Kein Quell-Sensor gewählt - kein Live-Arbeitspunkt.</value>
   </data>
   <data name="MainWindow.Sensors" xml:space="preserve">
     <value>Sensoren</value>
@@ -374,11 +386,17 @@
   <data name="MainWindow.HysteresisTooltip" xml:space="preserve">
     <value>Totband in °C: verhindert ständiges Nachregeln bei kleinen Temperaturschwankungen.</value>
   </data>
+  <data name="MainWindow.Smoothing" xml:space="preserve">
+    <value>Glättung</value>
+  </data>
+  <data name="MainWindow.SmoothingTooltip" xml:space="preserve">
+    <value>Mittelt die Temperatur über so viele Sekunden, bevor die Kurve greift. Fängt die kurzen Ausschläge ab, bei denen die Lüfter aufheulen und gleich wieder abfallen (typisch für AMD-CPUs). 0 schaltet sie aus. Der Übertemperatur-Schutz bleibt davon unberührt und reagiert weiterhin sofort.</value>
+  </data>
   <data name="MainWindow.PointsToggleTooltip" xml:space="preserve">
     <value>Stützpunkt-Liste ein-/ausklappen.</value>
   </data>
   <data name="MainWindow.DecreasingPercentWarning" xml:space="preserve">
-    <value>⚠ Leistung sinkt bei steigender Temperatur — der Lüfter kühlt dann weniger, je heißer es wird.</value>
+    <value>Leistung sinkt bei steigender Temperatur - der Lüfter kühlt dann weniger, je heißer es wird.</value>
   </data>
   <data name="MainWindow.TempToPercentHeader" xml:space="preserve">
     <value>°C → %</value>
@@ -405,7 +423,7 @@
     <value>Ankreuzen, welche Lüfter die ausgewählte Kurve nutzen</value>
   </data>
   <data name="Onboarding.WindowTitle" xml:space="preserve">
-    <value>LinFan – Einrichtungsassistent</value>
+    <value>LinFan - Einrichtungsassistent</value>
   </data>
   <data name="Onboarding.WelcomeTitle" xml:space="preserve">
     <value>Willkommen bei LinFan</value>
@@ -471,7 +489,7 @@
     <value>Profil wählen</value>
   </data>
   <data name="Onboarding.AirflowProfilesIntro" xml:space="preserve">
-    <value>Lüfter-Positionen erkannt: Alle drei Profile entstehen aus der Airflow-Analyse — jeder Lüfter folgt einer Kurve für seine Rolle (CPU, GPU, Einlass, Auslass).</value>
+    <value>Lüfter-Positionen erkannt: Alle drei Profile entstehen aus der Airflow-Analyse - jeder Lüfter folgt einer Kurve für seine Rolle (CPU, GPU, Einlass, Auslass).</value>
   </data>
   <data name="Onboarding.AirflowFansLabel" xml:space="preserve">
     <value>Rolle und Kurve je Lüfter</value>
@@ -492,13 +510,13 @@
     <value>LinFan ist jetzt eingerichtet. So findest du dich im Hauptfenster zurecht:</value>
   </data>
   <data name="Onboarding.DoneOverview" xml:space="preserve">
-    <value>• Übersicht — Live-Temperaturen, Drehzahlen und die aktiven Kurven im Blick.</value>
+    <value>• Übersicht - Live-Temperaturen, Drehzahlen und die aktiven Kurven im Blick.</value>
   </data>
   <data name="Onboarding.DoneCurves" xml:space="preserve">
-    <value>• Kurven &amp; Zuordnung — Lüfterkurven anpassen, Lüfter zuordnen und Profile wechseln.</value>
+    <value>• Kurven &amp; Zuordnung - Lüfterkurven anpassen, Lüfter zuordnen und Profile wechseln.</value>
   </data>
   <data name="Onboarding.DoneSettings" xml:space="preserve">
-    <value>• Einstellungen — Geräte umbenennen, Positionen und Sichtbarkeit anpassen, Airflow-Analyse oder diesen Assistenten erneut starten.</value>
+    <value>• Einstellungen - Geräte umbenennen, Positionen und Sichtbarkeit anpassen, Airflow-Analyse oder diesen Assistenten erneut starten.</value>
   </data>
   <data name="Onboarding.Close" xml:space="preserve">
     <value>Schließen</value>
@@ -510,10 +528,10 @@
     <value>Positionen zugeordnet: {0} von {1}</value>
   </data>
   <data name="OnboardingCtrl.DoneProfileAirflow" xml:space="preserve">
-    <value>Aktives Profil: {0} — rollenbasierte Airflow-Kurven</value>
+    <value>Aktives Profil: {0} - rollenbasierte Airflow-Kurven</value>
   </data>
   <data name="OnboardingCtrl.DoneProfileFallback" xml:space="preserve">
-    <value>Aktives Profil: {0} — gesteuert vom Primärsensor {1}</value>
+    <value>Aktives Profil: {0} - gesteuert vom Primärsensor {1}</value>
   </data>
   <data name="Onboarding.Back" xml:space="preserve">
     <value>Zurück</value>
@@ -546,7 +564,7 @@
     <value>PWM</value>
   </data>
   <data name="FanLocationDialog.HardwareFloorHint" xml:space="preserve">
-    <value>0 % ist die Hardware-Untergrenze — manche Lüfter halten dort eine Mindestdrehzahl und lassen sich nicht ganz abschalten.</value>
+    <value>0 % ist die Hardware-Untergrenze - manche Lüfter halten dort eine Mindestdrehzahl und lassen sich nicht ganz abschalten.</value>
   </data>
   <data name="FanLocationDialog.Cancel" xml:space="preserve">
     <value>Abbrechen</value>
@@ -600,16 +618,16 @@
     <value>Lüfter {0} von {1}: {2}</value>
   </data>
   <data name="OnboardingCtrl.CouplingStarting" xml:space="preserve">
-    <value>Drehzahl-Sensor koppeln – Lüfter {0} von {1} …</value>
+    <value>Drehzahl-Sensor koppeln - Lüfter {0} von {1} …</value>
   </data>
   <data name="OnboardingCtrl.CouplingNoTacho" xml:space="preserve">
-    <value>{0}: kein Drehzahlsignal gefunden — Kalibrierung übersprungen</value>
+    <value>{0}: kein Drehzahlsignal gefunden - Kalibrierung übersprungen</value>
   </data>
   <data name="OnboardingCtrl.CouplingAmbiguous" xml:space="preserve">
-    <value>{0}: nicht eindeutig — den Sensor später in den Einstellungen manuell zuordnen; Kalibrierung übersprungen</value>
+    <value>{0}: nicht eindeutig - den Sensor später in den Einstellungen manuell zuordnen; Kalibrierung übersprungen</value>
   </data>
   <data name="OnboardingCtrl.CouplingFailed" xml:space="preserve">
-    <value>{0}: Kopplung fehlgeschlagen — {1}</value>
+    <value>{0}: Kopplung fehlgeschlagen - {1}</value>
   </data>
   <data name="OnboardingCtrl.CouplingTimeout" xml:space="preserve">
     <value>Kopplung Lüfter {0} von {1}: Zeitüberschreitung</value>
@@ -657,13 +675,13 @@
     <value>Lüfter {0} kalibriert (Anlauf-PWM: {1})</value>
   </data>
   <data name="OnboardingCtrl.CalibrationPhase" xml:space="preserve">
-    <value>{0} – pwm {1}, {2} rpm</value>
+    <value>{0} - pwm {1}, {2} rpm</value>
   </data>
   <data name="OnboardingCtrl.CalibrationStarting" xml:space="preserve">
-    <value>Lüfter {0}/{1} – starte …</value>
+    <value>Lüfter {0}/{1} - starte …</value>
   </data>
   <data name="OnboardingCtrl.CalibrationTimeout" xml:space="preserve">
-    <value>Lüfter {0}/{1}: Zeitüberschreitung — abgebrochen.</value>
+    <value>Lüfter {0}/{1}: Zeitüberschreitung - abgebrochen.</value>
   </data>
   <data name="OnboardingCtrl.CalibrationInterrupted" xml:space="preserve">
     <value>Kalibrierung unterbrochen: {0}</value>
@@ -678,7 +696,7 @@
     <value>Lüfter {0}</value>
   </data>
   <data name="OnboardingCtrl.SaveFailed" xml:space="preserve">
-    <value>Hintergrunddienst nicht erreichbar — Einstellungen konnten nicht gespeichert werden.</value>
+    <value>Hintergrunddienst nicht erreichbar - Einstellungen konnten nicht gespeichert werden.</value>
   </data>
   <data name="CurveEditorCtrl.NewCurveName" xml:space="preserve">
     <value>Neue Kurve</value>
@@ -693,13 +711,13 @@
     <value>Hardware-Auto (keine Kurve)</value>
   </data>
   <data name="CurveEditorCtrl.AirflowApplied" xml:space="preserve">
-    <value>Airflow-Vorschlag übernommen — jetzt speichern.</value>
+    <value>Airflow-Vorschlag übernommen - jetzt speichern.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowWeights" xml:space="preserve">
     <value> (Gewichtung Einlass {0} : Auslass {1})</value>
   </data>
   <data name="CurveEditorCtrl.PressurePositive" xml:space="preserve">
-    <value>Druckbilanz: Überdruck — günstig gegen Staub.</value>
+    <value>Druckbilanz: Überdruck - günstig gegen Staub.</value>
   </data>
   <data name="CurveEditorCtrl.PressureNegative" xml:space="preserve">
     <value>Druckbilanz: Unterdruck.</value>
@@ -720,10 +738,10 @@
     <value>Kein Speicherziel verfügbar.</value>
   </data>
   <data name="CurveEditorCtrl.Saved" xml:space="preserve">
-    <value>Gespeichert — Änderungen werden übernommen</value>
+    <value>Gespeichert - Änderungen werden übernommen</value>
   </data>
   <data name="CurveEditorCtrl.SaveFailed" xml:space="preserve">
-    <value>Nicht gespeichert — der Hintergrunddienst ist gerade nicht erreichbar.</value>
+    <value>Nicht gespeichert - der Hintergrunddienst ist gerade nicht erreichbar.</value>
   </data>
   <data name="InterpolationOption.Linear" xml:space="preserve">
     <value>Linear (sicher, vorhersagbar)</value>
@@ -741,7 +759,7 @@
     <value>Mittelwert</value>
   </data>
   <data name="FanLocationOption.Unspecified" xml:space="preserve">
-    <value>— nicht zugeordnet —</value>
+    <value>- nicht zugeordnet -</value>
   </data>
   <data name="FanLocationOption.CpuCooler" xml:space="preserve">
     <value>CPU-Kühler</value>
@@ -915,7 +933,7 @@
     <value>Sonstige</value>
   </data>
   <data name="FanDiagram.Unspecified" xml:space="preserve">
-    <value>— nicht zugeordnet —</value>
+    <value>- nicht zugeordnet -</value>
   </data>
   <data name="CurveChart.NoPoints" xml:space="preserve">
     <value>Keine Stützpunkte</value>
@@ -944,6 +962,15 @@
   <data name="CurveEditRow.InactiveNoFan" xml:space="preserve">
     <value>Inaktiv: kein Lüfter zugeordnet.</value>
   </data>
+  <data name="CurveEditRow.InactiveProfile" xml:space="preserve">
+    <value>Inaktiv: diese Kurve gehört zu einem Profil, das gerade nicht läuft.</value>
+  </data>
+  <data name="ProfileRow.ActiveHint" xml:space="preserve">
+    <value>Der Dienst regelt mit diesem Profil.</value>
+  </data>
+  <data name="ProfileRow.InactiveHint" xml:space="preserve">
+    <value>Läuft nicht - öffnen und einschalten, um die Lüfter zu übergeben.</value>
+  </data>
   <data name="FanAssignRow.Error" xml:space="preserve">
     <value>Fehler: {0}</value>
   </data>
@@ -951,7 +978,7 @@
     <value>Abgebrochen: {0}</value>
   </data>
   <data name="FanAssignRow.CalibDone" xml:space="preserve">
-    <value>Fertig — Anlauf bei pwm {0}</value>
+    <value>Fertig - Anlauf bei pwm {0}</value>
   </data>
   <data name="FanAssignRow.Identifying" xml:space="preserve">
     <value>Identifiziere … (100 %, andere gedrosselt)</value>
@@ -966,7 +993,7 @@
     <value>Kalibrierung abgebrochen: {0}</value>
   </data>
   <data name="CalibrationStatus.Done" xml:space="preserve">
-    <value>Kalibrierung fertig — Anlaufpunkt bei pwm {0}</value>
+    <value>Kalibrierung fertig - Anlaufpunkt bei pwm {0}</value>
   </data>
   <data name="CalibrationStatus.Calibrating" xml:space="preserve">
     <value>Kalibriere {0}</value>
@@ -978,10 +1005,10 @@
     <value>Bereits kalibriert · Anlauf bei {0} %</value>
   </data>
   <data name="IpcLiveMonitor.Unreachable" xml:space="preserve">
-    <value>Hintergrunddienst nicht erreichbar ({0}) — Wiederverbinden …</value>
+    <value>Hintergrunddienst nicht erreichbar ({0}) - Wiederverbinden …</value>
   </data>
   <data name="IpcLiveMonitor.AccessDenied" xml:space="preserve">
-    <value>Der Hintergrunddienst läuft, aber der Zugriff wurde verweigert. Prüfe, ob dein Benutzer in der IPC-Zugriffsgruppe ist — „linfan“ unter Linux, „LinFan Users“ unter Windows — und melde dich danach ab und wieder an.</value>
+    <value>Der Hintergrunddienst läuft, aber der Zugriff wurde verweigert. Prüfe, ob dein Benutzer in der IPC-Zugriffsgruppe ist - „linfan“ unter Linux, „LinFan Users“ unter Windows - und melde dich danach ab und wieder an.</value>
   </data>
   <data name="Ipc.Status.Active" xml:space="preserve">
     <value>Aktiv</value>
@@ -999,19 +1026,19 @@
     <value>Abgebrochen</value>
   </data>
   <data name="Ipc.Fail.OverTemperature" xml:space="preserve">
-    <value>Übertemperatur {0:0.0} °C ≥ {1:0.0} °C — Fail-Safe ausgelöst.</value>
+    <value>Übertemperatur {0:0.0} °C ≥ {1:0.0} °C - Fail-Safe ausgelöst.</value>
   </data>
   <data name="Ipc.Fail.NotControllable" xml:space="preserve">
     <value>Nicht steuerbar (Root nötig).</value>
   </data>
   <data name="Ipc.Fail.Busy" xml:space="preserve">
-    <value>Eine andere Lüfter-Aktion läuft noch — bitte erneut versuchen.</value>
+    <value>Eine andere Lüfter-Aktion läuft noch - bitte erneut versuchen.</value>
   </data>
   <data name="Ipc.Fail.NoTacho" xml:space="preserve">
-    <value>Kein Tachosignal — Kalibrierung nicht möglich.</value>
+    <value>Kein Tachosignal - Kalibrierung nicht möglich.</value>
   </data>
   <data name="Ipc.Fail.NoTemperatureReading" xml:space="preserve">
-    <value>Keine lesbare Temperatur — kein Watchdog.</value>
+    <value>Keine lesbare Temperatur - kein Watchdog.</value>
   </data>
   <data name="Ipc.Fail.Unknown" xml:space="preserve">
     <value>Unbekannter Fehler.</value>
@@ -1023,10 +1050,10 @@
     <value>Kein Drehzahlsignal gefunden (Lüfter ohne Tacho).</value>
   </data>
   <data name="Ipc.Tach.Ambiguous" xml:space="preserve">
-    <value>Nicht eindeutig — bitte manuell zuordnen.</value>
+    <value>Nicht eindeutig - bitte manuell zuordnen.</value>
   </data>
   <data name="FanAssignRow.NoTachometer" xml:space="preserve">
-    <value>— (keiner) —</value>
+    <value>- (keiner) -</value>
   </data>
   <data name="FanAssignRow.Coupling" xml:space="preserve">
     <value>Koppeln … (treibt an, misst Drehzahlen)</value>
@@ -1050,7 +1077,7 @@
     <value>Drehzahl-Sensor</value>
   </data>
   <data name="MainWindow.TachometerTooltip" xml:space="preserve">
-    <value>Ordnet dem Lüfter manuell den passenden Drehzahl-Sensor (Tacho) zu. „— (keiner) —“ löscht die Zuordnung.</value>
+    <value>Ordnet dem Lüfter manuell den passenden Drehzahl-Sensor (Tacho) zu. „- (keiner) -“ löscht die Zuordnung.</value>
   </data>
   <data name="MainWindow.TabSettings" xml:space="preserve">
     <value>Einstellungen</value>
@@ -1131,7 +1158,7 @@
     <value>Backup importieren…</value>
   </data>
   <data name="Settings.ImportTooltip" xml:space="preserve">
-    <value>Einstellungen aus einer Backup-Datei wiederherstellen — ersetzt die aktuelle Konfiguration.</value>
+    <value>Einstellungen aus einer Backup-Datei wiederherstellen - ersetzt die aktuelle Konfiguration.</value>
   </data>
   <data name="Settings.DangerZone" xml:space="preserve">
     <value>Gefahrenzone</value>
@@ -1173,13 +1200,13 @@
     <value>Nicht unterstützte Backup-Version {0}.</value>
   </data>
   <data name="Settings.ImportFailedDaemon" xml:space="preserve">
-    <value>Dienst nicht erreichbar — Import fehlgeschlagen.</value>
+    <value>Dienst nicht erreichbar - Import fehlgeschlagen.</value>
   </data>
   <data name="Settings.ConfigReset" xml:space="preserve">
     <value>Auf Werkszustand zurückgesetzt.</value>
   </data>
   <data name="Settings.ResetFailedDaemon" xml:space="preserve">
-    <value>Dienst nicht erreichbar — Reset fehlgeschlagen.</value>
+    <value>Dienst nicht erreichbar - Reset fehlgeschlagen.</value>
   </data>
   <data name="MainWindow.UpdateAvailable" xml:space="preserve">
     <value>Neue Version verfügbar:</value>
@@ -1215,30 +1242,30 @@
     <value>Bleibt auf Hardware-Auto (keine Software-Kurve).</value>
   </data>
   <data name="CurveEditorCtrl.AirflowReasonNoPosition" xml:space="preserve">
-    <value>Keine Position angegeben – neutrale Standardkurve; für besseren Vorschlag Position setzen.</value>
+    <value>Keine Position angegeben - neutrale Standardkurve; für besseren Vorschlag Position setzen.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowReasonLocationCurve" xml:space="preserve">
     <value>{0} → Kurve: {1}</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoSensors" xml:space="preserve">
-    <value>Keine Sensoren konfiguriert – Quell-Sensor der vorgeschlagenen Kurven bitte manuell wählen.</value>
+    <value>Keine Sensoren konfiguriert - Quell-Sensor der vorgeschlagenen Kurven bitte manuell wählen.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoCaseFans" xml:space="preserve">
-    <value>Keine Gehäuselüfter mit Ein-/Auslass-Position – Druckbilanz nicht bestimmbar.</value>
+    <value>Keine Gehäuselüfter mit Ein-/Auslass-Position - Druckbilanz nicht bestimmbar.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintCountEstimate" xml:space="preserve">
     <value>Ohne vollständige Kalibrierung nur nach Lüfter-Anzahl geschätzt (kein Drehzahl-Proxy).</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoIntake" xml:space="preserve">
-    <value>Kein Einlasslüfter erkannt – Frischluftzufuhr prüfen.</value>
+    <value>Kein Einlasslüfter erkannt - Frischluftzufuhr prüfen.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoExhaust" xml:space="preserve">
-    <value>Kein Auslasslüfter erkannt – Wärmeabfuhr prüfen.</value>
+    <value>Kein Auslasslüfter erkannt - Wärmeabfuhr prüfen.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNegativePressure" xml:space="preserve">
-    <value>Unterdruck: mehr Auslass als Einlass – mehr Einlass erwägen oder Auslass drosseln (zieht sonst Staub durch Ritzen).</value>
+    <value>Unterdruck: mehr Auslass als Einlass - mehr Einlass erwägen oder Auslass drosseln (zieht sonst Staub durch Ritzen).</value>
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoCpuSensor" xml:space="preserve">
-    <value>Kein CPU-Sensor per Name erkannt – Quelle der CPU-Kurve bitte prüfen.</value>
+    <value>Kein CPU-Sensor per Name erkannt - Quelle der CPU-Kurve bitte prüfen.</value>
   </data>
 </root>

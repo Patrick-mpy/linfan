@@ -5,7 +5,7 @@ using LinFan.Hardware.Mac.Smc;
 namespace LinFan.Hardware.Mac.Tests;
 
 /// <summary>
-/// Deckt den <see cref="SmcCodec"/> für jeden von LinFan genutzten SMC-Datentyp ab — die
+/// Deckt den <see cref="SmcCodec"/> für jeden von LinFan genutzten SMC-Datentyp ab - die
 /// (auf echter Hardware verifizierte) Interpretation der Rohbytes. Decode ist wurf-frei (unbekannt/zu
 /// kurz ⇒ NaN); Encode liefert für nicht-schreibbare Typen <c>null</c>.
 /// </summary>

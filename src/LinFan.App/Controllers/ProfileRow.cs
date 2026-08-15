@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using LinFan.App.Localization;
 using LinFan.Core.Models;
 
 namespace LinFan.App.Controllers;
@@ -13,6 +14,20 @@ public partial class ProfileRow : ObservableObject
     public string Id { get; }
 
     [ObservableProperty] private string _name;
+
+    /// <summary>
+    /// True for the one profile the daemon regulates with. Selecting a profile in the side menu only loads
+    /// it into the editor - this flag follows the explicit activation, and the controller keeps exactly one
+    /// row carrying it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActivityHint))]
+    private bool _isActive;
+
+    /// <summary>Tooltip zum Aktiv-Punkt in der Profil-Liste.</summary>
+    public string ActivityHint => IsActive
+        ? Localizer.Instance["ProfileRow.ActiveHint"]
+        : Localizer.Instance["ProfileRow.InactiveHint"];
 
     /// <summary>Die Kurven dieses Profils (Snapshot; beim Speichern/Wechsel des aktiven Profils aktualisiert).</summary>
     public IReadOnlyList<CurveConfig> Curves { get; set; }

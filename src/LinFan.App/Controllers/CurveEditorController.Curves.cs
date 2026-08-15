@@ -25,6 +25,7 @@ public partial class CurveEditorController
             row.AddPointRow(temp, percent);
         Curves.Add(row);
         SelectedCurve = row;
+        Pane = CurveTabPane.Curve; // eine neu angelegte Kurve will bearbeitet werden
         Status.Set("");
     }
 
@@ -42,12 +43,26 @@ public partial class CurveEditorController
         var row = CurveEditRow.From(copy, Sensors, Fans);
         Curves.Add(row);
         SelectedCurve = row;
+        Pane = CurveTabPane.Curve;
+    }
+
+    /// <summary>
+    /// Öffnet eine Kurve im Editor - aus der Kurven-Übersicht des Profil-Editors heraus. Nur Auswahl und
+    /// Seitenwechsel; die Kurve gehört bereits zum gezeigten Profil.
+    /// </summary>
+    [RelayCommand]
+    private void EditCurve(CurveEditRow? curve)
+    {
+        if (curve is null)
+            return;
+        SelectedCurve = curve;
+        Pane = CurveTabPane.Curve;
     }
 
     /// <summary>
     /// Löscht die ausgewählte Kurve. War der Editor vorher sauber, wird die Löschung sofort persistiert
     /// (sie ist dann die einzige offene Änderung). Lagen schon Änderungen vor, bleibt sie als ungespeicherte
-    /// Änderung stehen — so committet die bestätigte Löschung keine fremden, unfertigen Edits mit.
+    /// Änderung stehen - so committet die bestätigte Löschung keine fremden, unfertigen Edits mit.
     /// </summary>
     [RelayCommand]
     private async Task DeleteCurve()
@@ -73,7 +88,7 @@ public partial class CurveEditorController
     }
 
     /// <summary>
-    /// An/Aus der aktuell ausgewählten Kurve — Bindungsziel des Toggles im Kurven-Tab. Setzen läuft über
+    /// An/Aus der aktuell ausgewählten Kurve - Bindungsziel des Toggles im Kurven-Tab. Setzen läuft über
     /// denselben Live-Pfad wie das Dashboard (<see cref="SetCurveEnabled"/>): sofort persistiert, kein Dirty-Banner.
     /// </summary>
     public bool SelectedCurveEnabled
@@ -90,17 +105,17 @@ public partial class CurveEditorController
     {
         SelectedCurveFans.Clear();
         if (SelectedCurve is { } curve)
-            // Global ausgeblendete Lüfter nicht anbieten — außer sie sind dieser Kurve bereits zugeordnet:
+            // Global ausgeblendete Lüfter nicht anbieten - außer sie sind dieser Kurve bereits zugeordnet:
             // Hidden ist reine Anzeige (die Regelung läuft weiter), also muss eine aktive Zuordnung sichtbar
             // und lösbar bleiben. Ein abgewählter versteckter Lüfter bleibt bewusst bis zum nächsten Aufbau
-            // stehen — die Abwahl kommt aus der Checkbox dieser Liste, ein sofortiger Neuaufbau risse das
+            // stehen - die Abwahl kommt aus der Checkbox dieser Liste, ein sofortiger Neuaufbau risse das
             // Element mitten im Binding-Write weg.
             foreach (FanAssignRow fan in Fans.Where(f => f.Visible || ReferenceEquals(f.Selected, curve)))
                 SelectedCurveFans.Add(new FanCurveCheck(fan, curve));
         RebuildSelectedCurveFanGroups();
     }
 
-    /// <summary>Bündelt die Lüfter-Checkboxen nach <see cref="FanAssignRow.GroupKey"/> (Ungruppiert zuletzt) — wie die Dashboard-Gruppen.</summary>
+    /// <summary>Bündelt die Lüfter-Checkboxen nach <see cref="FanAssignRow.GroupKey"/> (Ungruppiert zuletzt) - wie die Dashboard-Gruppen.</summary>
     private void RebuildSelectedCurveFanGroups()
     {
         SelectedCurveFanGroups.Clear();
@@ -138,6 +153,12 @@ public partial class CurveEditorController
         // Position ändert die Bündelung der Kurven-Zuordnung → Gruppen-Header nachziehen.
         if (e.PropertyName == nameof(FanAssignRow.Location))
             RebuildSelectedCurveFanGroups();
+
+        // Zuordnung entscheidet über den Airflow-Ergebnis-Block, Position über die Druckbilanz darin,
+        // Sichtbarkeit über beides (Ausgeblendete bleiben außen vor).
+        if (e.PropertyName is nameof(FanAssignRow.Selected) or nameof(FanAssignRow.Location)
+            or nameof(FanAssignRow.Visible))
+            RefreshAirflowStatus();
     }
 
     private void RefreshCurveActivity()
@@ -148,7 +169,7 @@ public partial class CurveEditorController
 
     /// <summary>
     /// Schaltet eine Kurve live an/aus (vom Dashboard): sendet das Quick-Command an den Daemon (sofort
-    /// persistiert; „aus" ⇒ zugeordnete Lüfter auf Hardware-Auto) und zieht die Dirty-Baseline mit — so
+    /// persistiert; „aus" ⇒ zugeordnete Lüfter auf Hardware-Auto) und zieht die Dirty-Baseline mit - so
     /// zündet der Toggle weder den „Nicht gespeichert"-Banner noch nimmt „Verwerfen" ihn zurück.
     /// </summary>
     public void SetCurveEnabled(CurveEditRow curve, bool enabled)
@@ -156,12 +177,41 @@ public partial class CurveEditorController
         if (curve.Enabled == enabled)
             return;
         curve.Enabled = enabled;
-        _ = _setCurveEnabled?.Invoke(curve.Id, enabled);
-        RebaselineCurveEnabled(curve.Id, enabled);
-        RefreshDirty();
-        if (ReferenceEquals(curve, SelectedCurve))
+
+        // A curve can be present twice: as the row being edited and as the row mirroring the daemon's live
+        // set. Carry the flag to the twin, otherwise dashboard and editor disagree until the next rebuild.
+        foreach (CurveEditRow twin in Curves.Concat(LiveCurves))
+        {
+            if (!ReferenceEquals(twin, curve) && twin.Id == curve.Id)
+                twin.Enabled = enabled;
+        }
+
+        if (IsLiveCurve(curve))
+        {
+            _ = _setCurveEnabled?.Invoke(curve.Id, enabled);
+            RebaselineCurveEnabled(curve.Id, enabled);
+            RefreshDirty();
+        }
+        else
+        {
+            // Kurve eines nicht laufenden (oder noch nicht gespeicherten) Profils: im Daemon gibt es nichts
+            // zu schalten - das ist eine gewöhnliche Konfigurationsänderung und wartet auf „Übernehmen".
+            MarkDirty();
+        }
+
+        if (curve.Id == SelectedCurve?.Id)
             OnPropertyChanged(nameof(SelectedCurveEnabled)); // Editor-Toggle synchron halten (z. B. wenn das Dashboard schaltet)
     }
+
+    /// <summary>
+    /// Whether this row stands for a curve the daemon is actually regulating with: a row from
+    /// <see cref="LiveCurves"/> always is; an edited row only while its profile is the active one and the
+    /// curve already exists in the saved set (a freshly added one does not, however active the profile is).
+    /// Ids alone would not do - duplicating a profile copies the curve ids along.
+    /// </summary>
+    private bool IsLiveCurve(CurveEditRow curve) =>
+        LiveCurves.Contains(curve)
+        || (SelectedProfileIsActive && Curves.Contains(curve) && LiveCurves.Any(c => c.Id == curve.Id));
 
     /// <summary>Zieht das Enabled-Flag einer Kurve in der gespeicherten Baseline nach (aktive Kurven + aktives Profil).</summary>
     private void RebaselineCurveEnabled(string curveId, bool enabled)
@@ -182,7 +232,7 @@ public partial class CurveEditorController
 
     /// <summary>
     /// Aktualisiert die Gruppen-Vorschläge (distinkte, nicht-leere Sensor-Gruppen).
-    /// Speist nur die Auto-Vervollständigung — frei getippte neue Namen bleiben erhalten.
+    /// Speist nur die Auto-Vervollständigung - frei getippte neue Namen bleiben erhalten.
     /// </summary>
     private void RefreshAvailableGroups()
     {

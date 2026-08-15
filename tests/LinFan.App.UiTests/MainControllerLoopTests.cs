@@ -26,10 +26,10 @@ public class MainControllerLoopTests
         UiTestHelpers.PumpUntil(() => false, timeoutMs: 60);   // in-flight Read abklingen lassen
         int afterDispose = fake.ReadCount;
 
-        // Ohne Abbruch kämen bei 10 ms-Intervall in 250 ms ~25 weitere Reads — nach Dispose darf es keiner sein.
+        // Ohne Abbruch kämen bei 10 ms-Intervall in 250 ms ~25 weitere Reads - nach Dispose darf es keiner sein.
         UiTestHelpers.PumpUntil(() => false, timeoutMs: 250);
         Assert.Equal(afterDispose, fake.ReadCount);
 
-        ctrl.Dispose(); // idempotent — darf nicht werfen
+        ctrl.Dispose(); // idempotent - darf nicht werfen
     }
 }

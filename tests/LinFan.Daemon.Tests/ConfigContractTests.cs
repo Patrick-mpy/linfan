@@ -11,13 +11,13 @@ namespace LinFan.Daemon.Tests;
 /// <summary>
 /// Schutznetz für den GUI⇄Daemon-Konfigurationsvertrag (Finding F2). Die Core-Modelle und die IPC-DTOs
 /// werden über die Prozessgrenze von zwei getrennten Mappern übersetzt (<see cref="ConfigMapper"/> im
-/// Daemon, <c>IpcLiveMonitor</c> in der App) — bewusste Duplizierung, weil die Grenze keine geteilte
+/// Daemon, <c>IpcLiveMonitor</c> in der App) - bewusste Duplizierung, weil die Grenze keine geteilte
 /// Mapper-Klasse erlaubt. Genau deshalb ist „Feld ergänzt, ein Mapper/Typ vergessen" die reale
 /// Fehlerquelle. Diese Tests fangen beide Spielarten:
 /// <list type="bullet">
-/// <item>strukturell — jedes editierbare Feld hat in beiden Typen ein Gegenstück (oder steht bewusst
+/// <item>strukturell - jedes editierbare Feld hat in beiden Typen ein Gegenstück (oder steht bewusst
 ///   auf einer Allowlist);</item>
-/// <item>werthaltig — ein voll besetzter Round-Trip durch die echten Daemon-Mapper darf kein
+/// <item>werthaltig - ein voll besetzter Round-Trip durch die echten Daemon-Mapper darf kein
 ///   editierbares Feld verlieren.</item>
 /// </list>
 /// </summary>
@@ -38,14 +38,14 @@ public class ConfigContractTests
             IpcOnly: new()),
         new(typeof(FanConfig), typeof(IpcFanAssignment), new(),
             // Calibration wird read-only an die GUI gespiegelt (Badge nach Neustart), bleibt aber
-            // daemon-autoritativ & nicht über IPC editierbar — die rohe Messreihe bleibt ganz im Daemon.
+            // daemon-autoritativ & nicht über IPC editierbar - die rohe Messreihe bleibt ganz im Daemon.
             CoreOnly: new() { nameof(FanConfig.Calibration) },
             IpcOnly: new()),
         new(typeof(SensorConfig), typeof(IpcSensorName),
             Rename: new() { [nameof(SensorConfig.SensorId)] = nameof(IpcSensorName.Id) },
             CoreOnly: new(), IpcOnly: new()),
         new(typeof(CurveConfig), typeof(IpcCurve), new(),
-            // SourceSensorId (Legacy/Migration) lebt in beiden Typen — keine Ausnahme nötig.
+            // SourceSensorId (Legacy/Migration) lebt in beiden Typen - keine Ausnahme nötig.
             CoreOnly: new(), IpcOnly: new()),
         new(typeof(Profile), typeof(IpcProfile), new(), new(), new()),
         new(typeof(ProfileAssignment), typeof(IpcProfileAssignment), new(), new(), new()),
@@ -105,7 +105,7 @@ public class ConfigContractTests
 
         // „Veralteter" Daemon-Stand: gleiche Ids (Lüfter werden per Id gematcht), aber jedes editierbare
         // Feld anders besetzt. Die daemon-autoritativen Felder (SchemaVersion/Poll/FailSafe/Calibration)
-        // bleiben identisch — sie stammen beim Merge aus `current` und dürfen keinen Diff erzeugen.
+        // bleiben identisch - sie stammen beim Merge aus `current` und dürfen keinen Diff erzeugen.
         AppConfig stale = desired with
         {
             Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "ALT", Group = "ALTG", Hidden = false } },

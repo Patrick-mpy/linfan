@@ -97,7 +97,7 @@ public class TachMappingCoordinatorTests
 
     /// <summary>
     /// Below the fail-safe limit but inside the start margin: the run would spend its whole measurement
-    /// window (every fan near PWM 0) on its way into the watchdog — so do not start at all. The point is
+    /// window (every fan near PWM 0) on its way into the watchdog - so do not start at all. The point is
     /// that no fan may have been throttled in the process.
     /// </summary>
     [Fact]

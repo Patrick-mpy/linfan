@@ -14,7 +14,7 @@ public enum DaemonStatus
     /// <summary>
     /// Ohne erhöhte Rechte: es wird gerechnet/angezeigt, aber nichts geschrieben. Früher:
     /// „Dry-Run (kein &lt;Elevation-Term&gt;)". Der plattformspezifische Elevation-Term wird NICHT
-    /// mitgesendet — die App formuliert die Meldung generisch. Das <c>DryRun</c>-Flag des
+    /// mitgesendet - die App formuliert die Meldung generisch. Das <c>DryRun</c>-Flag des
     /// <see cref="IpcSnapshot"/> bleibt zusätzlich erhalten.
     /// </summary>
     DryRun,

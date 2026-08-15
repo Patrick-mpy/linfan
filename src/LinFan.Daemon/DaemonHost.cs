@@ -37,7 +37,7 @@ internal static class DaemonHost
             builder.Logging.AddProvider(new FileLoggerProvider(logPath));
 
         // Als Dienst integrieren: Windows-Service- bzw. systemd-Lebenszyklus. Beide sind No-op, wenn der
-        // Prozess nicht unter dem jeweiligen Dienstmanager läuft (z. B. interaktiv per `run`) — also unbedingt
+        // Prozess nicht unter dem jeweiligen Dienstmanager läuft (z. B. interaktiv per `run`) - also unbedingt
         // aufrufbar, der Konsolenbetrieb bleibt unverändert.
         builder.Services.AddWindowsService(options => options.ServiceName = "LinFan");
         builder.Services.AddSystemd();
@@ -51,7 +51,7 @@ internal static class DaemonHost
     }
 
     /// <summary>
-    /// Meldet eine etwaige Backend-Start-Diagnose (z. B. „nur GPU-Sensoren" → Treiber-Konflikt) ins Log —
+    /// Meldet eine etwaige Backend-Start-Diagnose (z. B. „nur GPU-Sensoren" → Treiber-Konflikt) ins Log -
     /// über <see cref="AddWindowsService"/> landet das im Windows-Event-Log, sonst auf journald/stderr.
     /// Opt-in per Pattern-Match, damit keine Plattform-Logik in den neutralen Daemon leckt.
     /// </summary>
@@ -66,7 +66,7 @@ internal static class DaemonHost
     /// <summary>
     /// Registriert Backend, ConfigStore, IPC-Server und den <see cref="ControlLoopService"/>.
     /// Eigene Methode, damit ein Test die DI-Verdrahtung prüfen kann (insbesondere, dass
-    /// <see cref="IIpcServer"/> auflösbar ist) — ohne den Host tatsächlich zu starten.
+    /// <see cref="IIpcServer"/> auflösbar ist) - ohne den Host tatsächlich zu starten.
     /// </summary>
     internal static void ConfigureServices(IServiceCollection services, ISensorBackend sensors, IFanController fans)
     {
@@ -74,7 +74,7 @@ internal static class DaemonHost
 
         // Backend (Steuern) thread-sicher kapseln: Regel-Loop und Kalibrierung laufen auf verschiedenen
         // Threads. Über die DI-Factory, damit der Wrapper einen ILogger für die Write-Latenz-Messung bekommt
-        // (fehlt die Bindung — z. B. im Verdrahtungs-Test — fällt er auf NullLogger zurück).
+        // (fehlt die Bindung - z. B. im Verdrahtungs-Test - fällt er auf NullLogger zurück).
         services.AddSingleton<IFanController>(sp =>
             new SynchronizedFanController(fans, sp.GetService<ILogger<SynchronizedFanController>>()));
         services.AddSingleton<IConfigStore>(new JsonConfigStore());

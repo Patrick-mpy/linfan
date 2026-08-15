@@ -9,7 +9,7 @@ namespace LinFan.Hardware.Windows.Lhm;
 /// Realer Adapter der <see cref="ILhmComputer"/>-Naht über <see cref="Computer"/> aus
 /// LibreHardwareMonitorLib. Kapselt Computer-Setup, das Treiber-Laden (<see cref="Computer.Open"/>),
 /// den rekursiven Update-Sweep und das Aufflachen von Hardware + SubHardware (SuperIO sitzt als
-/// SubHardware am Mainboard — verifiziert im Stage-0-Spike). Nur dieser Typ berührt LHM-Typen direkt;
+/// SubHardware am Mainboard - verifiziert im Stage-0-Spike). Nur dieser Typ berührt LHM-Typen direkt;
 /// er läuft ausschließlich auf Windows (Kernel-Treiber).
 /// </summary>
 [SupportedOSPlatform("windows")]
@@ -18,7 +18,7 @@ internal sealed class LhmComputerAdapter : ILhmComputer
     private readonly Computer _computer = new()
     {
         // Genau die Klassen mit Lüftern/PWM: SuperIO am Mainboard (Motherboard/Controller),
-        // CPU/GPU für Temperaturen und GPU-Lüfter. Rest aus — nur Latenz/Rauschen.
+        // CPU/GPU für Temperaturen und GPU-Lüfter. Rest aus - nur Latenz/Rauschen.
         IsMotherboardEnabled = true,
         IsControllerEnabled = true,
         IsCpuEnabled = true,

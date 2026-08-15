@@ -6,7 +6,7 @@ using LinFan.App.Controllers;
 namespace LinFan.App.UiTests;
 
 /// <summary>
-/// Tier 4 — Live-Update über den echten Poll-Loop: ein austauschbarer Fake-Snapshot wird über mehrere
+/// Tier 4 - Live-Update über den echten Poll-Loop: ein austauschbarer Fake-Snapshot wird über mehrere
 /// Ticks fortgeschrieben (injiziertes Kurz-Intervall), und es wird geprüft, dass die wechselnden Messwerte
 /// den vollen Pfad <c>Read → Dispatcher → MainController.Apply → Dashboard/Editor</c> durchlaufen.
 /// Ergänzt die Unit-Tests von <c>UpdateLive</c> um die reale Loop-/Marshaling-Verdrahtung.
@@ -36,7 +36,7 @@ public class Tier4SmokeTests
             UiTestHelpers.PumpUntil(() => cpu.Display == "55.0 °C");
 
             Assert.Equal("55.0 °C", cpu.Display);
-            // Verlauf akkumuliert (kein exakter Count — der 10-ms-Loop läuft frei weiter).
+            // Verlauf akkumuliert (kein exakter Count - der 10-ms-Loop läuft frei weiter).
             Assert.True(cpu.History.Count > historyBefore);
             Assert.Contains(55.0, cpu.History);
         }

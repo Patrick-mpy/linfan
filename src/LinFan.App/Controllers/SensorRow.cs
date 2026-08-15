@@ -14,16 +14,16 @@ public partial class SensorRow : ObservableObject
 
     private readonly string _unit;
 
-    /// <summary>Stabile Sensor-Id (Hardware) — dient als Unterscheidungs-Zusatz bei doppelten Namen.</summary>
+    /// <summary>Stabile Sensor-Id (Hardware) - dient als Unterscheidungs-Zusatz bei doppelten Namen.</summary>
     public string Id { get; }
 
     [ObservableProperty] private string _name;
-    [ObservableProperty] private string _display = "—";
+    [ObservableProperty] private string _display = "-";
 
-    /// <summary>Letzter numerischer Messwert (°C) oder <c>NaN</c> — treibt die Schwere-Farbe (Sparkline/Wert).</summary>
+    /// <summary>Letzter numerischer Messwert (°C) oder <c>NaN</c> - treibt die Schwere-Farbe (Sparkline/Wert).</summary>
     [ObservableProperty] private double _value = double.NaN;
 
-    /// <summary>Dezenter Zusatz (Hardware-Id) — nur gesetzt, wenn der Anzeigename im Dashboard mehrfach vorkommt.</summary>
+    /// <summary>Dezenter Zusatz (Hardware-Id) - nur gesetzt, wenn der Anzeigename im Dashboard mehrfach vorkommt.</summary>
     [ObservableProperty] private string _disambiguator = "";
 
     /// <summary>Gruppenschlüssel fürs Dashboard (Gruppe, sonst „Ungruppiert").</summary>

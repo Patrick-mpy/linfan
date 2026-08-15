@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- Icon of the .exe itself — what Explorer and the Start-menu shortcut (packaging/windows) show.
+    <!-- Icon of the .exe itself - what Explorer and the Start-menu shortcut (packaging/windows) show.
          Generated from the same geometry as Controls/BrandMark.cs and Assets/linfan-icon.svg. -->
     <ApplicationIcon>Assets/linfan.ico</ApplicationIcon>
   </PropertyGroup>
@@ -17,13 +17,14 @@
   <ItemGroup>
     <!-- The .ico is linked into the executable by ApplicationIcon; embedding it a second time as an
          Avalonia resource would only bloat the build (window/tray use icon.png). The SVGs are source
-         assets for the README and the Linux packages — Avalonia cannot render them, so nothing loads
+         assets for the README and the Linux packages - Avalonia cannot render them, so nothing loads
          them at runtime either. -->
     <AvaloniaResource Include="Assets/**" Exclude="Assets/linfan.ico;Assets/*.svg" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="LinFan.App.Tests" />
+    <InternalsVisibleTo Include="LinFan.App.UiTests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,7 +37,7 @@
 
   <ItemGroup>
     <!-- Teil 3b: die GUI spricht das Model ausschließlich über den IPC-Client an (LinFan.Ipc).
-         Kein Verweis auf LinFan.Hardware.* mehr (Architektur §8) — die GUI läuft ohne Root. -->
+         Kein Verweis auf LinFan.Hardware.* mehr (Architektur §8) - die GUI läuft ohne Root. -->
     <ProjectReference Include="..\LinFan.Core\LinFan.Core.csproj" />
     <ProjectReference Include="..\LinFan.Ipc\LinFan.Ipc.csproj" />
   </ItemGroup>

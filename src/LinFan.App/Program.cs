@@ -13,7 +13,7 @@ namespace LinFan.App;
 internal static class Program
 {
     /// <summary>
-    /// The activation endpoint this process owns, handed to <see cref="App"/> — the lifetime lives here
+    /// The activation endpoint this process owns, handed to <see cref="App"/> - the lifetime lives here
     /// because the guard has to be settled before Avalonia exists. Null in the headless test apps, which
     /// construct <see cref="App"/> without going through <see cref="Main"/>.
     /// </summary>

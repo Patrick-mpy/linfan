@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace LinFan.Ipc;
 
 /// <summary>
-/// Ermittelt den IPC-Endpunkt, über den GUI und Daemon kommunizieren — OS-abhängig ein
+/// Ermittelt den IPC-Endpunkt, über den GUI und Daemon kommunizieren - OS-abhängig ein
 /// Unix-Domain-Socket-<b>Pfad</b> (Linux/macOS) bzw. ein Named-<b>Pipe</b>-Name (Windows).
 /// <para>
 /// <see cref="SocketPath"/> ist der Endpunkt, auf dem der <b>Server</b> bindet (und der Default):
@@ -16,7 +16,7 @@ namespace LinFan.Ipc;
 /// </para>
 /// <para>
 /// Der <b>Client</b> kennt die Privilegien des Daemons nicht und probiert deshalb über
-/// <see cref="ClientCandidates"/> mehrere Endpunkte der Reihe nach durch — sonst landet z. B. eine als
+/// <see cref="ClientCandidates"/> mehrere Endpunkte der Reihe nach durch - sonst landet z. B. eine als
 /// User laufende GUI auf dem User-Pfad, während ein per <c>sudo</c> gestarteter Daemon auf dem
 /// maschinenweiten Pfad bindet.
 /// </para>

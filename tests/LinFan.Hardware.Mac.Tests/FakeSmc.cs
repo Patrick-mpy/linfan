@@ -6,7 +6,7 @@ using LinFan.Hardware.Mac.Smc;
 namespace LinFan.Hardware.Mac.Tests;
 
 /// <summary>
-/// Plattformneutraler Fake der SMC-Naht (<see cref="ISmc"/>) — ein zustandsbehafteter Key→Wert-Speicher
+/// Plattformneutraler Fake der SMC-Naht (<see cref="ISmc"/>) - ein zustandsbehafteter Key→Wert-Speicher
 /// statt echtem IOKit. Damit laufen die Backend-Tests (inkl. Conformance) auf JEDEM OS ohne IOKit/Root.
 /// <para>
 /// Verhält sich wie der reale <see cref="AppleSmc"/> gegenüber dem Vertrag: unbekannte Keys sind nicht

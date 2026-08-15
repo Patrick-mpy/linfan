@@ -332,7 +332,7 @@ public class IpcTransportTests
     public async Task Client_FallsBackToReachableCandidate()
     {
         string good = TempSocket();
-        string bogus = TempSocket(); // kein Server hier — muss übersprungen werden
+        string bogus = TempSocket(); // kein Server hier - muss übersprungen werden
         await using var server = new IpcServer(good);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         await server.StartAsync(cts.Token);
@@ -347,7 +347,7 @@ public class IpcTransportTests
     public async Task Server_SocketIsNotWorldAccessible()
     {
         // Zugriffskontrolle: der Socket darf nicht mehr world-rw sein (früher 0666). Egal ob der System-
-        // (0660, Gruppe linfan) oder der User-Zweig (0600) greift — die Other-Bits müssen aus sein, sonst
+        // (0660, Gruppe linfan) oder der User-Zweig (0600) greift - die Other-Bits müssen aus sein, sonst
         // könnte jeder lokale Account Steuerbefehle an den privilegierten Daemon senden.
         if (!OperatingSystem.IsLinux())
             return; // Unix-Dateirechte nur auf Linux geprüft (Named Pipe hat eine eigene DACL)
@@ -412,7 +412,7 @@ public class IpcTransportTests
         await client.ConnectAsync(cts.Token);
 
         // Viele gleichzeitige Sends: ohne Schreib-Serialisierung verschränken sich die NDJSON-Zeilen
-        // (ungültige Zeilen werden still verworfen) bzw. NetworkStream wirft — dann käme nicht alles an.
+        // (ungültige Zeilen werden still verworfen) bzw. NetworkStream wirft - dann käme nicht alles an.
         var sends = Enumerable.Range(0, n).Select(i =>
             client.SendCommandAsync(new IpcCommand(IpcCommand.SetManualPwm, Target: $"fan{i}", Value: i), cts.Token));
         await Task.WhenAll(sends);

@@ -40,7 +40,7 @@ public interface IFanController : IDisposable
     bool CanControl(FanId id);
 
     /// <summary>
-    /// Aktueller Steuermodus. Für eine bekannte id wirft dieser Aufruf nie — ein nicht ermittelbarer Modus
+    /// Aktueller Steuermodus. Für eine bekannte id wirft dieser Aufruf nie - ein nicht ermittelbarer Modus
     /// fällt auf <see cref="FanMode.Auto"/> (sicherer Default) zurück. Für eine unbekannte id darf geworfen werden.
     /// </summary>
     FanMode GetMode(FanId id);
@@ -48,25 +48,25 @@ public interface IFanController : IDisposable
     void SetMode(FanId id, FanMode mode);
 
     /// <summary>
-    /// Aktueller Rohwert 0..255. Für eine bekannte id wirft dieser Aufruf nie — ein nicht lesbarer Wert
+    /// Aktueller Rohwert 0..255. Für eine bekannte id wirft dieser Aufruf nie - ein nicht lesbarer Wert
     /// fällt auf einen Default (z. B. 0) zurück. Für eine unbekannte id darf geworfen werden.
     /// </summary>
     byte GetPwm(FanId id);
 
     /// <summary>
-    /// Setzt den Rohwert 0..255. Schaltet selbsttätig auf <see cref="FanMode.Manual"/> — der Aufrufer muss
+    /// Setzt den Rohwert 0..255. Schaltet selbsttätig auf <see cref="FanMode.Manual"/> - der Aufrufer muss
     /// <b>nicht</b> vorher <see cref="SetMode"/> rufen (sonst überschriebe die Firmware den Wert). Prozent-
     /// basierte Backends mappen den Rohwert intern (siehe Typ-Doc).
     /// </summary>
     void SetPwm(FanId id, byte value);
 
     /// <summary>
-    /// Fail-Safe: bringt <b>jeden</b> steuerbaren Kanal in einen kühlungs-sicheren Zustand — Hardware-Auto
+    /// Fail-Safe: bringt <b>jeden</b> steuerbaren Kanal in einen kühlungs-sicheren Zustand - Hardware-Auto
     /// (Firmware regelt selbst), ersatzweise Volllast (255), wenn der Kanal keinen Auto-Modus kennt.
     /// <para>
     /// Bewusst <b>unabhängig</b> vom bei Discovery gelesenen Zustand: der kann Manual/niedrig gewesen sein
     /// (z. B. weil ein früherer Lauf abgestürzt ist) und würde den Lüfter ohne aktiven Watchdog dort
-    /// festhalten — genau der gefährliche Fall.
+    /// festhalten - genau der gefährliche Fall.
     /// </para>
     /// <para>
     /// Garantien: <b>best-effort über alle Kanäle</b> (ein fehlschlagender Kanal überspringt die übrigen

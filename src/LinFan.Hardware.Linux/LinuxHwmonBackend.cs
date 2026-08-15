@@ -15,7 +15,7 @@ namespace LinFan.Hardware.Linux;
 /// <para>
 /// Lesen funktioniert ohne Root; PWM-Schreiben braucht Root. <see cref="RestoreDefaults"/> /
 /// <see cref="Dispose"/> fahren jeden Kanal in den <em>sicheren</em> Zustand (Hardware-Auto, sonst
-/// Volllast) — bewusst NICHT in den bei Discovery gelesenen Zustand (Fail-Safe, siehe dort).
+/// Volllast) - bewusst NICHT in den bei Discovery gelesenen Zustand (Fail-Safe, siehe dort).
 /// </para>
 /// </summary>
 [SupportedOSPlatform("linux")]
@@ -53,14 +53,14 @@ public sealed class LinuxHwmonBackend : ISensorBackend, IFanController, ILegacyI
             throw new KeyNotFoundException($"Unbekannter Sensor: {id}");
 
         if (!TryReadRaw(ch.InputPath, out long raw))
-            return double.NaN; // Kanal momentan nicht lesbar (z. B. EIO) — defensiv, kein Fehler
+            return double.NaN; // Kanal momentan nicht lesbar (z. B. EIO) - defensiv, kein Fehler
 
         return InterpretRaw(ch.Kind, raw);
     }
 
     /// <summary>
     /// Wandelt einen rohen hwmon-Wert in die Zielgröße: Temperatur m°C → °C; Drehzahl unverändert,
-    /// aber der EC-Sentinel <c>0xFFFF</c> (65535 — „ungültig", z. B. beim Moduswechsel) wird zu NaN.
+    /// aber der EC-Sentinel <c>0xFFFF</c> (65535 - „ungültig", z. B. beim Moduswechsel) wird zu NaN.
     /// </summary>
     public static double InterpretRaw(SensorKind kind, long raw) => kind switch
     {
@@ -107,7 +107,7 @@ public sealed class LinuxHwmonBackend : ISensorBackend, IFanController, ILegacyI
         var fan = Fan(id);
         if (!fan.CanControl)
             throw new NotSupportedException(
-                $"Lüfter {id} ist nicht steuerbar (kein Schreibzugriff — als Root ausführen).");
+                $"Lüfter {id} ist nicht steuerbar (kein Schreibzugriff - als Root ausführen).");
 
         // Vor dem Schreiben Manual erzwingen, sonst überschreibt die Firmware den Wert.
         if (fan.EnablePath is not null)
@@ -120,7 +120,7 @@ public sealed class LinuxHwmonBackend : ISensorBackend, IFanController, ILegacyI
         // Der sichere Zustand ist IMMER Hardware-Auto (die Firmware übernimmt die thermische Regelung).
         // Bewusst NICHT der bei Discovery gelesene Zustand: der kann Manual/niedrig gewesen sein (z. B.
         // weil ein früherer Lauf abgestürzt ist) und würde den Lüfter ohne aktiven Watchdog dort
-        // festhalten — genau der gefährliche Fall. Kennt ein Kanal keinen Auto-Modus (kein pwmN_enable),
+        // festhalten - genau der gefährliche Fall. Kennt ein Kanal keinen Auto-Modus (kein pwmN_enable),
         // fällt er ersatzweise auf Volllast (255). Best-effort: Try* schluckt Fehler je Kanal.
         foreach (var fan in _fans.Values)
         {
@@ -152,7 +152,7 @@ public sealed class LinuxHwmonBackend : ISensorBackend, IFanController, ILegacyI
         var dirs = new List<ChipDir>();
         foreach (string dir in Directory.EnumerateDirectories(HwmonRoot))
         {
-            string hwmonName = Path.GetFileName(dir);          // z. B. "hwmon7" — INSTABIL über Reboots
+            string hwmonName = Path.GetFileName(dir);          // z. B. "hwmon7" - INSTABIL über Reboots
             string chip = ReadText(Path.Combine(dir, "name")) ?? hwmonName;
             dirs.Add(new ChipDir(dir, hwmonName, chip, ReadBusAddr(dir)));
         }
@@ -177,7 +177,7 @@ public sealed class LinuxHwmonBackend : ISensorBackend, IFanController, ILegacyI
             }
         }
 
-        // Deskriptoren einmal sortiert materialisieren (siehe Feld-Kommentar) — danach sind die Kanäle fix.
+        // Deskriptoren einmal sortiert materialisieren (siehe Feld-Kommentar) - danach sind die Kanäle fix.
         _sensorDescriptors = _sensors.Values
             .Select(c => new SensorDescriptor(c.Id, c.Name, c.Kind, c.Unit, c.InputPath))
             .OrderBy(d => d.Kind)
@@ -192,8 +192,8 @@ public sealed class LinuxHwmonBackend : ISensorBackend, IFanController, ILegacyI
     /// <summary>
     /// Bestimmt je hwmon-Verzeichnis einen stabilen, eindeutigen Chip-Schlüssel: den Chip-<c>name</c>;
     /// bei Namensgleichheit (z. B. zwei <c>coretemp</c>) per stabiler Bus-/Plattform-Adresse
-    /// disambiguiert (<c>coretemp@0000:…</c>). Fehlt dann noch die Adresse, bleibt als letzter — und
-    /// einziger instabiler — Ausweg der hwmon-Name. Rein (kein I/O) und damit testbar.
+    /// disambiguiert (<c>coretemp@0000:…</c>). Fehlt dann noch die Adresse, bleibt als letzter - und
+    /// einziger instabiler - Ausweg der hwmon-Name. Rein (kein I/O) und damit testbar.
     /// </summary>
     internal static IReadOnlyDictionary<string, string> ResolveChipKeys(IReadOnlyList<ChipDir> dirs)
     {

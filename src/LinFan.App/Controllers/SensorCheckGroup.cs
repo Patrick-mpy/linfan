@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 
 namespace LinFan.App.Controllers;
 
-/// <summary>Eine benannte Sensor-Gruppe für die Quell-Auswahl einer Kurve — gebündelt wie die Dashboard-Sensorgruppen.</summary>
+/// <summary>Eine benannte Sensor-Gruppe für die Quell-Auswahl einer Kurve - gebündelt wie die Dashboard-Sensorgruppen.</summary>
 public sealed class SensorCheckGroup
 {
     public string Name { get; }

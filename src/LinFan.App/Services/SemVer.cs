@@ -6,7 +6,7 @@ namespace LinFan.App.Services;
 
 /// <summary>
 /// Minimaler SemVer-Vergleich für den Update-Check: Core-Version X.Y.Z plus optionales Prerelease-Suffix
-/// (Build-Metadaten nach '+' werden verworfen, ein führendes 'v' ebenso). Bewusst kein NuGet — nur so viel,
+/// (Build-Metadaten nach '+' werden verworfen, ein führendes 'v' ebenso). Bewusst kein NuGet - nur so viel,
 /// wie „ist Release Y neuer als die laufende Version?" braucht. Präzedenz nach semver.org: höhere Core-Zahl
 /// gewinnt; bei gleichem Core zählt eine Version OHNE Prerelease als höher (<c>0.1.0 &gt; 0.1.0-dev</c>).
 /// </summary>
@@ -58,7 +58,7 @@ public readonly record struct SemVer(int Major, int Minor, int Patch, string? Pr
         if (c != 0) return c;
 
         // Gleicher Core: eine Release-Version (kein Prerelease) rangiert über einer Prerelease; sonst grob
-        // ordinal (reicht für „dev"/„rc1" — der Update-Check braucht keine volle Identifier-Sortierung).
+        // ordinal (reicht für „dev"/„rc1" - der Update-Check braucht keine volle Identifier-Sortierung).
         if (PreRelease is null && other.PreRelease is null) return 0;
         if (PreRelease is null) return 1;
         if (other.PreRelease is null) return -1;

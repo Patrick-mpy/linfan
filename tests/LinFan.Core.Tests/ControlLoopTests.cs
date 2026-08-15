@@ -9,6 +9,9 @@ namespace LinFan.Core.Tests;
 
 public class ControlLoopTests
 {
+    // Smoothing is off here on purpose: these cases isolate the curve/hysteresis/fail-safe behaviour and
+    // must not depend on a time source. The smoothing itself is covered further down and in
+    // TemperatureSmootherTests.
     private static AppConfig ConfigWith(double hysteresis = 2.0, byte min = 0, byte max = 255) => new()
     {
         FailSafeTempC = 90,
@@ -17,6 +20,7 @@ public class ControlLoopTests
             new CurveConfig
             {
                 Id = "c", Name = "c", SourceSensorIds = new[] { "t" }, HysteresisC = hysteresis,
+                SmoothingSeconds = 0,
                 Points = new[] { new CurvePoint(30, 0), new CurvePoint(80, 100) },
             },
         },
@@ -121,7 +125,7 @@ public class ControlLoopTests
     }
 
     [Fact]
-    public void ResetHysteresis_AppliesNewCurve_EvenWhenTemperatureUnchanged()
+    public void ResetFilters_AppliesNewCurve_EvenWhenTemperatureUnchanged()
     {
         var hw = Hw(55);                                   // konstante Temperatur
         var loop = new ControlLoop(hw, hw, dryRun: false);
@@ -143,7 +147,7 @@ public class ControlLoopTests
             },
         };
 
-        loop.ResetHysteresis();
+        loop.ResetFilters();
         var tick = loop.Tick(steeper);
 
         Assert.Equal(FanActionKind.Applied, Assert.Single(tick.Actions).Kind);
@@ -424,7 +428,7 @@ public class ControlLoopTests
     [Fact]
     public void Tick_DanglingCurveId_SetsModeAuto_NoPwmWrite()
     {
-        // A dangling id must behave like "no curve" — a plain skip would freeze the fan at its
+        // A dangling id must behave like "no curve" - a plain skip would freeze the fan at its
         // last written PWM while it stays invisible (e.g. a hidden fan after onboarding re-run).
         var hw = Hw(55);
         var tick = new ControlLoop(hw, hw, dryRun: false).Tick(DanglingAssignment());
@@ -496,7 +500,7 @@ public class ControlLoopTests
     public void Tick_ThrowingTemperatureSensor_DoesNotThrow_AndWatchdogStillRuns()
     {
         // Fail-Safe: ein Sensor, dessen ReadValue WIRFT (EIO als Exception statt NaN), darf den Watchdog-Tick
-        // nicht abreißen — sonst überspränge der Daemon den ganzen Tick (er fängt Tick-Würfe) und die Übertemp-/
+        // nicht abreißen - sonst überspränge der Daemon den ganzen Tick (er fängt Tick-Würfe) und die Übertemp-/
         // Blind-Erkennung liefe nie. Erwartet: kein Wurf; nach den Blind-Ticks greift der Fail-Safe (Restore).
         var hw = new ThrowingSensorRig();
         var loop = new ControlLoop(hw, hw, dryRun: false);
@@ -509,7 +513,136 @@ public class ControlLoopTests
         Assert.Equal(1, hw.RestoreCount);
     }
 
-    /// <summary>Backend, dessen <c>ReadValue</c> immer wirft (kein KeyNotFound) — für die Watchdog-Resilienz.</summary>
+    /// <summary>Wie <see cref="ConfigWith"/>, aber mit aktiver Glättung und ohne Hysterese (isoliert den Filter).</summary>
+    private static AppConfig SmoothedConfig(double seconds = 3.0, double failSafe = 120) => new()
+    {
+        FailSafeTempC = failSafe,
+        Curves = new[]
+        {
+            new CurveConfig
+            {
+                Id = "c", Name = "c", SourceSensorIds = new[] { "t" }, HysteresisC = 0,
+                SmoothingSeconds = seconds,
+                Points = new[] { new CurvePoint(30, 0), new CurvePoint(80, 100) },
+            },
+        },
+        Fans = new[] { new FanConfig { FanId = "f", Name = "f", AssignedCurveId = "c" } },
+    };
+
+    [Fact]
+    public void Tick_SmoothedCurveInput_AttenuatesSpike()
+    {
+        var hw = Hw(45);
+        var time = new FakeTimeProvider();
+        var loop = new ControlLoop(hw, hw, dryRun: true, time);
+        AppConfig config = SmoothedConfig();
+
+        for (int i = 0; i < 3; i++)                          // 45 °C Grundlast, ein Sample pro Sekunde
+        {
+            loop.Tick(config);
+            time.Advance(1.0);
+        }
+
+        hw.Values["t"] = 75;                                 // AMD-typischer Ausschlag für einen Tick
+        FanAction a = Assert.Single(loop.Tick(config).Actions);
+
+        // Ungeglättet wären 75 °C → 90 % → pwm 230. Gemittelt sind es 52.5 °C → 45 % → pwm 115.
+        Assert.Equal(52.5, a.TemperatureC, 6);
+        Assert.Equal((byte)115, a.Pwm);
+    }
+
+    [Fact]
+    public void Tick_OverTemperature_TripsInSameTick_DespiteSmoothing()
+    {
+        // Die wichtigste Zusicherung der Glättung: der Watchdog liest ROH. Ein echter Übertemp-Wert löst
+        // sofort aus, obwohl der geglättete Kurven-Eingang noch weit darunter liegt.
+        var hw = Hw(45);
+        var time = new FakeTimeProvider();
+        var loop = new ControlLoop(hw, hw, dryRun: false, time);
+        AppConfig config = SmoothedConfig(seconds: 30, failSafe: 90);
+
+        for (int i = 0; i < 3; i++)
+        {
+            Assert.False(loop.Tick(config).FailSafeTriggered);
+            time.Advance(1.0);
+        }
+
+        hw.Values["t"] = 95;                                 // roh ≥ 90 °C, gemittelt nur ~57,5 °C
+        ControlTick tick = loop.Tick(config);
+
+        Assert.True(tick.FailSafeTriggered);
+        Assert.Equal(1, hw.RestoreCount);
+    }
+
+    [Fact]
+    public void Tick_SharedCurve_FeedsSmootherOncePerTick()
+    {
+        // Zwei Lüfter an einer Kurve: der Filter darf pro Tick nur EIN Sample bekommen, und beide Lüfter
+        // müssen denselben Wert sehen. Würde je Lüfter gefüttert, sähe der zweite (40+85+85)/3 = 70 °C.
+        var hw = new FakeHardware();
+        hw.AddTempSensor("t", 40);
+        hw.AddFan("f1", canControl: true);
+        hw.AddFan("f2", canControl: true);
+
+        var time = new FakeTimeProvider();
+        var loop = new ControlLoop(hw, hw, dryRun: true, time);
+        AppConfig config = SmoothedConfig() with
+        {
+            Fans = new[]
+            {
+                new FanConfig { FanId = "f1", Name = "f1", AssignedCurveId = "c" },
+                new FanConfig { FanId = "f2", Name = "f2", AssignedCurveId = "c" },
+            },
+        };
+
+        loop.Tick(config);
+        time.Advance(1.0);
+        hw.Values["t"] = 85;
+
+        IReadOnlyList<FanAction> actions = loop.Tick(config).Actions;
+        Assert.Equal(2, actions.Count);
+        Assert.All(actions, a => Assert.Equal(62.5, a.TemperatureC, 6)); // (40+85)/2
+        Assert.Equal(actions[0].Pwm, actions[1].Pwm);
+    }
+
+    [Fact]
+    public void FailSafe_DiscardsSmoothingBuffers()
+    {
+        var hw = Hw(45);
+        var time = new FakeTimeProvider();
+        var loop = new ControlLoop(hw, hw, dryRun: false, time);
+        AppConfig config = SmoothedConfig(failSafe: 90);
+
+        loop.Tick(config);                                   // 45 °C in den Puffer
+        time.Advance(1.0);
+        hw.Values["t"] = 95;
+        Assert.True(loop.Tick(config).FailSafeTriggered);     // Übertemp - der Fail-Safe räumt den Filter mit
+
+        time.Advance(1.0);
+        hw.Values["t"] = 60;
+
+        // Ohne Reset wäre der Eingang (45+60)/2 = 52,5 °C, also aus der Zeit vor dem Ereignis.
+        Assert.Equal(60, Assert.Single(loop.Tick(config).Actions).TemperatureC, 6);
+    }
+
+    [Fact]
+    public void ResetFilters_DiscardsSmoothingBuffers()
+    {
+        var hw = Hw(90);
+        var time = new FakeTimeProvider();
+        var loop = new ControlLoop(hw, hw, dryRun: true, time);
+        AppConfig config = SmoothedConfig();
+
+        loop.Tick(config);                                   // 90 °C in den Puffer
+        time.Advance(1.0);
+        loop.ResetFilters();
+        hw.Values["t"] = 50;
+
+        // Ohne Reset wäre der Eingang (90+50)/2 = 70 °C; nach dem Reset zählt nur der neue Wert.
+        Assert.Equal(50, Assert.Single(loop.Tick(config).Actions).TemperatureC, 6);
+    }
+
+    /// <summary>Backend, dessen <c>ReadValue</c> immer wirft (kein KeyNotFound) - für die Watchdog-Resilienz.</summary>
     private sealed class ThrowingSensorRig : ISensorBackend, IFanController
     {
         public int RestoreCount { get; private set; }

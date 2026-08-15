@@ -12,7 +12,7 @@ namespace LinFan.Ipc;
 /// IPC-Client (läuft im GUI-/CLI-Prozess, ohne Root). Verbindet sich über einen
 /// <see cref="IIpcClientTransport"/> mit dem Daemon-Endpunkt, liest den Strom von
 /// <see cref="IpcSnapshot"/>s (NDJSON) und sendet <see cref="IpcCommand"/>s. Die Protokoll-Schicht
-/// hier ist transport-neutral — Unix-Socket vs. Named Pipe entscheidet der Transport.
+/// hier ist transport-neutral - Unix-Socket vs. Named Pipe entscheidet der Transport.
 /// </summary>
 public sealed class IpcClient : IIpcClient
 {
@@ -52,12 +52,12 @@ public sealed class IpcClient : IIpcClient
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                last = ex; // dieser Endpunkt nicht erreichbar — nächsten Kandidaten probieren
+                last = ex; // dieser Endpunkt nicht erreichbar - nächsten Kandidaten probieren
                 continue;
             }
 
             _stream = stream;
-            // leaveOpen: _stream ist der alleinige Besitzer (Dispose schließt die Verbindung) —
+            // leaveOpen: _stream ist der alleinige Besitzer (Dispose schließt die Verbindung) -
             // sonst würde DisposeAsync den Stream doppelt entsorgen.
             _reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
             ConnectedPath = candidate;
@@ -71,7 +71,7 @@ public sealed class IpcClient : IIpcClient
     public async IAsyncEnumerable<IpcSnapshot> ReadSnapshotsAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
         if (_reader is null)
-            throw new InvalidOperationException("Nicht verbunden — zuerst ConnectAsync aufrufen.");
+            throw new InvalidOperationException("Nicht verbunden - zuerst ConnectAsync aufrufen.");
 
         while (!ct.IsCancellationRequested)
         {
@@ -91,12 +91,12 @@ public sealed class IpcClient : IIpcClient
     public async Task SendCommandAsync(IpcCommand command, CancellationToken ct = default)
     {
         if (_stream is null)
-            throw new InvalidOperationException("Nicht verbunden — zuerst ConnectAsync aufrufen.");
+            throw new InvalidOperationException("Nicht verbunden - zuerst ConnectAsync aufrufen.");
 
         byte[] payload = IpcJson.SerializeLine(command);
 
         // Mehrere Aufrufer (GUI-Befehle aus IpcLiveMonitor) dürfen sich nicht auf dem Stream
-        // überlappen — sonst verschränken sich die NDJSON-Zeilen bzw. NetworkStream wirft.
+        // überlappen - sonst verschränken sich die NDJSON-Zeilen bzw. NetworkStream wirft.
         await _writeLock.WaitAsync(ct);
         try
         {

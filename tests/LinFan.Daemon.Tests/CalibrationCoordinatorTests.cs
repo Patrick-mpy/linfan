@@ -129,7 +129,7 @@ public class CalibrationCoordinatorTests
         coordinator.Start(new FanId("hwmon7/pwm1"));
         await coordinator.StopAsync(); // muss blockieren, bis die laufende Task wirklich endet
 
-        // Egal ob abgeschlossen oder abgebrochen — nach StopAsync läuft nichts mehr und der
+        // Egal ob abgeschlossen oder abgebrochen - nach StopAsync läuft nichts mehr und der
         // Lüfter ist wieder freigegeben (kein Status mit Running == true).
         Assert.True(coordinator.Status is null || !coordinator.Status.Running);
         Assert.True(resultDelivered || coordinator.Status is { Running: false });
@@ -169,7 +169,7 @@ public class CalibrationCoordinatorTests
         coordinator.Start(new FanId("hwmon7/pwm1"));
         await coordinator.StopAsync();
 
-        Assert.Null(delivered);                       // kein Ergebnis — Rampe wurde gestoppt
+        Assert.Null(delivered);                       // kein Ergebnis - Rampe wurde gestoppt
         Assert.NotNull(coordinator.Status);
         Assert.False(coordinator.Status!.Running);
         Assert.Equal(CalibrationFailReason.OverTemperature, coordinator.Status.FailReason); // Über-Temperatur als Grund

@@ -42,7 +42,7 @@ public class SemVerTests
     [Fact]
     public void Compare_ReleaseOutranksPrerelease()
     {
-        // 0.1.0 (Release) ist neuer als 0.1.0-dev (Prerelease) — ein Dev-Build wird über die Release informiert.
+        // 0.1.0 (Release) ist neuer als 0.1.0-dev (Prerelease) - ein Dev-Build wird über die Release informiert.
         Assert.True(V("0.1.0").CompareTo(V("0.1.0-dev")) > 0);
         Assert.True(V("0.1.0-dev").CompareTo(V("0.1.0")) < 0);
         // Höherer Core schlägt Prerelease-Status trotzdem.

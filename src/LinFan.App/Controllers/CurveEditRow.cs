@@ -11,15 +11,15 @@ using LinFan.Core.Services;
 
 namespace LinFan.App.Controllers;
 
-/// <summary>Editierbare Kurve: Name, Quell-Sensor-Mix (mehrere Sensoren + Aggregation), Hysterese und Stützpunkte.</summary>
+/// <summary>Editierbare Kurve: Name, Quell-Sensor-Mix (mehrere Sensoren + Aggregation), Hysterese, Glättung und Stützpunkte.</summary>
 public partial class CurveEditRow : ObservableObject
 {
     public string Id { get; }
 
-    /// <summary>Alle Sensoren (zum Auflösen der Quellen) — Referenz auf die Liste des Controllers.</summary>
+    /// <summary>Alle Sensoren (zum Auflösen der Quellen) - Referenz auf die Liste des Controllers.</summary>
     public ObservableCollection<SensorOption> Sensors { get; }
 
-    /// <summary>Alle Lüfter (gemeinsame Liste des Controllers) — für das Aktiv-Badge (ist dieser Kurve ein Lüfter zugeordnet?).</summary>
+    /// <summary>Alle Lüfter (gemeinsame Liste des Controllers) - für das Aktiv-Badge (ist dieser Kurve ein Lüfter zugeordnet?).</summary>
     public ObservableCollection<FanAssignRow> Fans { get; }
 
     /// <summary>Quell-Auswahl: pro sichtbarem Sensor eine Checkbox (mehrere Sensoren mischbar).</summary>
@@ -32,7 +32,7 @@ public partial class CurveEditRow : ObservableObject
     /// </summary>
     public ObservableCollection<SensorCheck> DisplayedSensorChecks { get; } = new();
 
-    /// <summary>Die angezeigten Quell-Sensoren (<see cref="DisplayedSensorChecks"/>) nach Gruppe gebündelt —
+    /// <summary>Die angezeigten Quell-Sensoren (<see cref="DisplayedSensorChecks"/>) nach Gruppe gebündelt -
     /// wie die Dashboard-Sensorgruppen; Container für die gruppierte Anzeige im Kurven-Tab.</summary>
     public ObservableCollection<SensorCheckGroup> DisplayedSensorGroups { get; } = new();
 
@@ -58,7 +58,7 @@ public partial class CurveEditRow : ObservableObject
     /// </summary>
     public Func<Curve, double, double> CurveEvaluator => CurveEngine.Evaluate;
 
-    /// <summary>Ob die Stützpunkt-Liste aufgeklappt ist — reiner View-Zustand pro Zeile, analog
+    /// <summary>Ob die Stützpunkt-Liste aufgeklappt ist - reiner View-Zustand pro Zeile, analog
     /// <see cref="FanAssignRow"/>.ShowAdvanced. Default eingeklappt: der Graph bleibt die primäre
     /// Editierfläche, die Zahlenliste ist sekundäres Detail.</summary>
     [ObservableProperty] private bool _showPoints;
@@ -75,9 +75,15 @@ public partial class CurveEditRow : ObservableObject
     [ObservableProperty] private decimal _hysteresis;
 
     /// <summary>
+    /// Averaging window (seconds) for the curve's input temperature, <c>0</c> = off. Initialized to the Core
+    /// default so a newly created curve carries it without every call site having to pass it.
+    /// </summary>
+    [ObservableProperty] private decimal _smoothingSeconds = (decimal)CurveConfig.DefaultSmoothingSeconds;
+
+    /// <summary>
     /// Ob die Kurve aktiv regelt. <c>false</c> = stillgelegt (zugeordnete Lüfter → Hardware-Auto im Daemon).
     /// Am Dashboard live umschaltbar; persistiert. Bewusst <b>aus dem Dirty-Vergleich ausgeklammert</b>
-    /// (siehe <see cref="CurveEditorController.SetCurveEnabled"/>) — der Toggle ist sofort persistiert.
+    /// (siehe <see cref="CurveEditorController.SetCurveEnabled"/>) - der Toggle ist sofort persistiert.
     /// </summary>
     [ObservableProperty] private bool _enabled = true;
 
@@ -111,18 +117,18 @@ public partial class CurveEditRow : ObservableObject
         set => InterpolationMode = value?.Value ?? InterpolationMode.Linear;
     }
 
-    /// <summary>Aggregierte Live-Temperatur der Quell-Sensoren (live), oder NaN — für den Arbeitspunkt im Graph.</summary>
+    /// <summary>Aggregierte Live-Temperatur der Quell-Sensoren (live), oder NaN - für den Arbeitspunkt im Graph.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LiveTemperatureDisplay))]
     private double _liveTemperature = double.NaN;
 
-    /// <summary>Formatierte Live-Temperatur fürs Dashboard-Panel (z. B. „48 °C"); „—" ohne lesbare Quelle.</summary>
+    /// <summary>Formatierte Live-Temperatur fürs Dashboard-Panel (z. B. „48 °C"); „-" ohne lesbare Quelle.</summary>
     public string LiveTemperatureDisplay =>
-        double.IsNaN(LiveTemperature) ? "—" : $"{LiveTemperature:0} °C";
+        double.IsNaN(LiveTemperature) ? "-" : $"{LiveTemperature:0} °C";
 
     /// <summary>
     /// True, wenn die nach Temperatur sortierten Stützpunkte irgendwo eine <b>sinkende</b> Leistung haben
-    /// (percent[i] &lt; percent[i-1]) — d. h. der Lüfter kühlt bei höherer Temperatur weniger. Flache Abschnitte
+    /// (percent[i] &lt; percent[i-1]) - d. h. der Lüfter kühlt bei höherer Temperatur weniger. Flache Abschnitte
     /// (gleiche Prozente) sind ok. Sicherheitsrelevanter Hinweis; treibt die Warnung im Kurven-Tab.
     /// </summary>
     [ObservableProperty] private bool _hasDecreasingPercent;
@@ -133,7 +139,7 @@ public partial class CurveEditRow : ObservableObject
 
     /// <summary>
     /// True, wenn kein Quell-Sensor ausgewählt ist. Dann bleibt <see cref="LiveTemperature"/> NaN und der
-    /// Live-Arbeitspunkt im Graph fehlt — der Kurven-Tab blendet dazu einen Hinweis ein. Change-notifiziert
+    /// Live-Arbeitspunkt im Graph fehlt - der Kurven-Tab blendet dazu einen Hinweis ein. Change-notifiziert
     /// über <see cref="OnSourceSelectionChanged"/> bei Quell-Auswahländerungen.
     /// </summary>
     public bool HasNoSource => Sources.Count == 0;
@@ -143,23 +149,55 @@ public partial class CurveEditRow : ObservableObject
     /// Treibt das grün/grau-Badge im Seitenmenü. Quelländerung notifiziert über <see cref="OnSourceSelectionChanged"/>;
     /// Zuordnungswechsel notifiziert der Controller über <see cref="NotifyActiveChanged"/>.
     /// </summary>
-    public bool IsActive => Sources.Count > 0 && Fans.Any(f => ReferenceEquals(f.Selected, this));
+    public bool IsActive => ProfileIsActive && Sources.Count > 0 && Fans.Any(f => ReferenceEquals(f.Selected, this));
 
-    /// <summary>Tooltip-Text zum Aktiv-Badge — erklärt, warum die Kurve aktiv/inaktiv ist.</summary>
+    /// <summary>
+    /// Whether the profile this curve belongs to is the one the daemon regulates with. Curves of a profile
+    /// that is merely being edited never drive a fan, however complete they look - the badge has to say so.
+    /// Set by the controller when a profile is loaded into the editor; true by default, because the curves
+    /// mirroring the daemon's live set are active by definition.
+    /// </summary>
+    public bool ProfileIsActive { get; private set; } = true;
+
+    /// <summary>Setzt <see cref="ProfileIsActive"/> (Controller beim Laden eines Profils in den Editor).</summary>
+    public void SetProfileActive(bool active)
+    {
+        if (ProfileIsActive == active)
+            return;
+        ProfileIsActive = active;
+        NotifyActiveChanged();
+    }
+
+    /// <summary>Tooltip-Text zum Aktiv-Badge - erklärt, warum die Kurve aktiv/inaktiv ist.</summary>
     public string ActivityHint => IsActive
         ? Localizer.Instance["CurveEditRow.ActiveHint"]
-        : Sources.Count == 0
-            ? Localizer.Instance["CurveEditRow.InactiveNoSource"]
-            : Localizer.Instance["CurveEditRow.InactiveNoFan"];
+        : !ProfileIsActive
+            ? Localizer.Instance["CurveEditRow.InactiveProfile"]
+            : Sources.Count == 0
+                ? Localizer.Instance["CurveEditRow.InactiveNoSource"]
+                : Localizer.Instance["CurveEditRow.InactiveNoFan"];
 
     /// <summary>Re-evaluiert das Aktiv-Badge (vom Controller bei Zuordnungswechsel aufgerufen).</summary>
     public void NotifyActiveChanged()
     {
         OnPropertyChanged(nameof(IsActive));
         OnPropertyChanged(nameof(ActivityHint));
+        OnPropertyChanged(nameof(AssignedFans));
     }
 
-    /// <summary>Anzeige im Seitenmenü: „Name – Quelle(n)".</summary>
+    /// <summary>Die dieser Kurve zugeordneten Lüfter - für die Kurven-Übersicht im Profil-Editor.</summary>
+    public IReadOnlyList<FanAssignRow> AssignedFans =>
+        Fans.Where(f => ReferenceEquals(f.Selected, this)).ToList();
+
+    /// <summary>Kurz-Beschreibung der Quell-Sensoren (Name bzw. „n Sensoren"); „-" ohne Quelle.</summary>
+    public string SourceSummary => Sources.Count switch
+    {
+        0 => "-",
+        1 => Sources[0].Name,
+        int n => Localizer.Instance.Format("CurveEditRow.SourceCount", n),
+    };
+
+    /// <summary>Anzeige im Seitenmenü: „Name - Quelle(n)".</summary>
     public string Label
     {
         get
@@ -168,8 +206,8 @@ public partial class CurveEditRow : ObservableObject
             return srcs.Count switch
             {
                 0 => Name,
-                1 => $"{Name} – {srcs[0].Name}",
-                _ => $"{Name} – {Localizer.Instance.Format("CurveEditRow.SourceCount", srcs.Count)}",
+                1 => $"{Name} - {srcs[0].Name}",
+                _ => $"{Name} - {Localizer.Instance.Format("CurveEditRow.SourceCount", srcs.Count)}",
             };
         }
     }
@@ -187,6 +225,7 @@ public partial class CurveEditRow : ObservableObject
     // Persistenz-relevante Felder → ConfigChanged. (Enabled bewusst ausgeklammert: rebaselined sich selbst.)
     partial void OnNameChanged(string value) => RaiseConfigChanged();
     partial void OnHysteresisChanged(decimal value) => RaiseConfigChanged();
+    partial void OnSmoothingSecondsChanged(decimal value) => RaiseConfigChanged();
     partial void OnAggregationChanged(SensorAggregation value) => RaiseConfigChanged();
     partial void OnInterpolationModeChanged(InterpolationMode value) => RaiseConfigChanged();
 
@@ -214,7 +253,7 @@ public partial class CurveEditRow : ObservableObject
     /// </summary>
     public void RebuildSensorChecks()
     {
-        // Collect the selection BEFORE clearing — Sources reads SensorChecks.
+        // Collect the selection BEFORE clearing - Sources reads SensorChecks.
         BuildSensorChecks(new HashSet<string>(Sources.Select(s => s.Id)));
         // Both are plain getters over SensorChecks.Count; the count is no longer constant.
         OnPropertyChanged(nameof(HasCollapsibleSensors));
@@ -222,7 +261,7 @@ public partial class CurveEditRow : ObservableObject
     }
 
     /// <summary>
-    /// Hidden sensors are not offered — unless they are a source of THIS curve: hidden is display-only
+    /// Hidden sensors are not offered - unless they are a source of THIS curve: hidden is display-only
     /// (regulation keeps running), so an active source stays visible and removable instead of being
     /// silently dropped on save. Iterates the full list to preserve discovery order.
     /// </summary>
@@ -237,6 +276,7 @@ public partial class CurveEditRow : ObservableObject
     private void OnSourceSelectionChanged()
     {
         OnPropertyChanged(nameof(Label));
+        OnPropertyChanged(nameof(SourceSummary));
         OnPropertyChanged(nameof(HasNoSource));
         NotifyActiveChanged(); // Quelländerung kann das Aktiv-Badge kippen
         RaiseConfigChanged();  // Quell-Sensor-Mix fließt in SourceSensorIds
@@ -261,7 +301,7 @@ public partial class CurveEditRow : ObservableObject
         RebuildDisplayedSensorGroups();
     }
 
-    /// <summary>Bündelt die angezeigten Quell-Sensoren nach Gruppe (Ungruppiert zuletzt) — wie die Dashboard-Sensorgruppen.</summary>
+    /// <summary>Bündelt die angezeigten Quell-Sensoren nach Gruppe (Ungruppiert zuletzt) - wie die Dashboard-Sensorgruppen.</summary>
     private void RebuildDisplayedSensorGroups()
     {
         static string Key(SensorCheck c) =>
@@ -346,6 +386,7 @@ public partial class CurveEditRow : ObservableObject
                                    sensors, c.InterpolationMode, fans)
         {
             Enabled = c.Enabled,
+            SmoothingSeconds = (decimal)c.SmoothingSeconds,
         };
         foreach (CurvePoint p in c.Points.OrderBy(p => p.TemperatureC))
             row.AddPointRow((decimal)p.TemperatureC, (decimal)p.Percent);
@@ -360,6 +401,7 @@ public partial class CurveEditRow : ObservableObject
         SourceSensorIds = Sources.Select(s => s.Id).ToList(),
         Aggregation = Aggregation,
         HysteresisC = (double)Hysteresis,
+        SmoothingSeconds = (double)SmoothingSeconds,
         InterpolationMode = InterpolationMode,
         Points = Points
             .OrderBy(p => p.Temperature)

@@ -273,7 +273,7 @@ public sealed class AirflowTuneServiceTests
     [Fact]
     public void Analyze_HiddenFan_GetsNoSuggestionNoPressureWeightNoRoleCurve()
     {
-        // Realer Fall: totes GPU-PWM-Interface, vom Nutzer ausgeblendet — darf in der Analyse
+        // Realer Fall: totes GPU-PWM-Interface, vom Nutzer ausgeblendet - darf in der Analyse
         // nirgends auftauchen (Liste, Druckbilanz, Rollen-Kurven).
         AppConfig config = ConfigWith(
             Fan("front", FanLocation.CaseFrontIntake),
@@ -338,7 +338,7 @@ public sealed class AirflowTuneServiceTests
     [Fact]
     public void Analyze_CpuCurve_AveragesAllCpuSensors_MatchedByNameOrGroup()
     {
-        // Realer 5800X: Tctl/Tdie liegen konstant ~20 °C über SoC — die CPU-Kurve nimmt alle
+        // Realer 5800X: Tctl/Tdie liegen konstant ~20 °C über SoC - die CPU-Kurve nimmt alle
         // CPU-Sensoren und mittelt. „SoC" matcht kein Namens-Schlüsselwort, wohl aber die Gruppe.
         AppConfig config = AppConfig.Empty with
         {
@@ -361,7 +361,7 @@ public sealed class AirflowTuneServiceTests
     [Fact]
     public void Analyze_GpuCoreSensor_IsNotClassifiedAsCpu()
     {
-        // „AMD Radeon RX 6600 XT GPU Core" enthält das CPU-Schlüsselwort „core" — GPU-Treffer
+        // „AMD Radeon RX 6600 XT GPU Core" enthält das CPU-Schlüsselwort „core" - GPU-Treffer
         // haben Vorrang und dürfen nicht zusätzlich in der CPU-Kurve landen.
         AppConfig config = AppConfig.Empty with
         {
@@ -644,7 +644,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult balanced = AirflowTuneService.Analyze(config, AirflowAggressiveness.Balanced);
 
         // Pins the default overload's forwarding target: the settings' airflow section (default
-        // overload) must keep getting the Balanced variant — a change of the default would fail here.
+        // overload) must keep getting the Balanced variant - a change of the default would fail here.
         Assert.Equal(balanced.SuggestedCurves.Count, byDefault.SuggestedCurves.Count);
         foreach ((CurveConfig d, CurveConfig b) in byDefault.SuggestedCurves.Zip(balanced.SuggestedCurves))
         {
@@ -813,5 +813,28 @@ public sealed class AirflowTuneServiceTests
     public void HasRoleSpecificCurve_Matrix(FanLocation location, bool expected)
     {
         Assert.Equal(expected, AirflowTuneService.HasRoleSpecificCurve(location));
+    }
+
+    // ── Erkennung angewandter Airflow-Kurven ────────────────────────────────────
+
+    /// <summary>Bindet die Erkennung an die tatsächlich erzeugten Ids - sonst driften Präfix und Vorlagen auseinander.</summary>
+    [Fact]
+    public void IsAirflowCurveId_MatchesEveryGeneratedCurve()
+    {
+        AirflowTuneResult result = AirflowTuneService.Analyze(AllRolesConfig());
+
+        Assert.NotEmpty(result.SuggestedCurves);
+        Assert.All(result.SuggestedCurves, c => Assert.True(AirflowTuneService.IsAirflowCurveId(c.Id)));
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("curve-1a2b3c", false)]
+    [InlineData("Airflow-cpu", false)] // Ordinal: Ids sind case-sensitiv
+    [InlineData("airflow-cpu", true)]
+    public void IsAirflowCurveId_ForeignIds(string? curveId, bool expected)
+    {
+        Assert.Equal(expected, AirflowTuneService.IsAirflowCurveId(curveId));
     }
 }

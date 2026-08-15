@@ -11,7 +11,7 @@ namespace LinFan.App.Controllers;
 /// <summary>
 /// Steuert den rein additiven Update-Hinweis: prüft beim Start einmal die neueste GitHub-Release und zeigt
 /// bei einer neueren Version ein dismissierbares Banner (Link zur Release-Seite). Respektiert den Opt-out
-/// und die zuletzt weggeklickte Version — eine spätere Release zeigt wieder an. Kein Auto-Download.
+/// und die zuletzt weggeklickte Version - eine spätere Release zeigt wieder an. Kein Auto-Download.
 /// </summary>
 public partial class UpdateController : ObservableObject
 {
@@ -38,15 +38,15 @@ public partial class UpdateController : ObservableObject
         _marshal = marshal ?? (a => Dispatcher.UIThread.Post(a));
     }
 
-    /// <summary>True, wenn eine neuere, nicht weggeklickte Version vorliegt — steuert die Banner-Sichtbarkeit.</summary>
+    /// <summary>True, wenn eine neuere, nicht weggeklickte Version vorliegt - steuert die Banner-Sichtbarkeit.</summary>
     [ObservableProperty] private bool _updateAvailable;
 
     /// <summary>Anzeigename der neueren Version (z. B. „0.2.0") für die Banner-Beschriftung.</summary>
     [ObservableProperty] private string _latestVersion = "";
 
     /// <summary>
-    /// Führt den Check aus: Opt-out ⇒ nichts; sonst die neueste Release abfragen und — falls neuer und nicht
-    /// die zuletzt weggeklickte Version — das Banner zeigen. Best-effort (der Service wirft nie).
+    /// Führt den Check aus: Opt-out ⇒ nichts; sonst die neueste Release abfragen und - falls neuer und nicht
+    /// die zuletzt weggeklickte Version - das Banner zeigen. Best-effort (der Service wirft nie).
     /// </summary>
     public async Task CheckAsync(CancellationToken ct = default)
     {
@@ -59,7 +59,7 @@ public partial class UpdateController : ObservableObject
             return;
 
         _info = info;
-        // Property-Sets explizit auf den UI-Thread marshalen (projektüblich, wie MainController für Snapshots) —
+        // Property-Sets explizit auf den UI-Thread marshalen (projektüblich, wie MainController für Snapshots) -
         // unabhängig davon, auf welchem Thread der Await zurückkommt.
         _marshal(() =>
         {

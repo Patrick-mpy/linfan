@@ -16,7 +16,7 @@ internal sealed class FakeHardware : ISensorBackend, IFanController, ILegacyIdMa
     public int RestoreCount { get; private set; }
 
     /// <summary>
-    /// Zuletzt gesetzter Hardware-Modus je Lüfter — modelliert <c>pwmN_enable</c>: ein PWM-Write bzw.
+    /// Zuletzt gesetzter Hardware-Modus je Lüfter - modelliert <c>pwmN_enable</c>: ein PWM-Write bzw.
     /// <see cref="SetMode"/>(Manual) ⇒ Manual (enable=1), <see cref="SetMode"/>(Auto)/<see cref="RestoreDefaults"/>
     /// ⇒ Auto (enable=2). Nur für Tests, die den Terminal-Zustand prüfen (z. B. Fail-Safe nach Reset/Import).
     /// </summary>
@@ -27,7 +27,7 @@ internal sealed class FakeHardware : ISensorBackend, IFanController, ILegacyIdMa
     public string? TachId { get; set; }
 
     /// <summary>
-    /// Sensor-IDs, deren <see cref="ReadValue"/> mit <see cref="IOException"/> (EIO) wirft — modelliert einen
+    /// Sensor-IDs, deren <see cref="ReadValue"/> mit <see cref="IOException"/> (EIO) wirft - modelliert einen
     /// intermittierend kaputten hwmon-Kanal. Der defensive Watchdog muss solche Kanäle überspringen.
     /// </summary>
     public HashSet<string> ThrowingReads { get; } = new();

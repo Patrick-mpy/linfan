@@ -6,7 +6,7 @@ using Xunit;
 namespace LinFan.Core.Tests;
 
 /// <summary>
-/// Reine Pfad-Auflösung von <see cref="JsonConfigStore.ResolveDefaultPath"/> — deterministisch auf jedem
+/// Reine Pfad-Auflösung von <see cref="JsonConfigStore.ResolveDefaultPath"/> - deterministisch auf jedem
 /// Host prüfbar (keine echten Umgebungsordner). Sichert insbesondere den Windows-Maschinenpfad
 /// (<c>%ProgramData%</c>) gegen den per-User-<c>%AppData%</c>, der für einen SYSTEM-Dienst unsichtbar wäre.
 /// </summary>

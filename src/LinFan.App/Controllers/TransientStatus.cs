@@ -55,7 +55,7 @@ public sealed partial class TransientStatus : ObservableObject
         }
         finally
         {
-            // Release the field only if it still points to exactly this (now disposed) CTS — otherwise the
+            // Release the field only if it still points to exactly this (now disposed) CTS - otherwise the
             // next Set would call Cancel() on a disposed CTS (ObjectDisposedException). Single-threaded UI
             // dispatch: no race, ReferenceEquals suffices.
             if (ReferenceEquals(_cts, cts))

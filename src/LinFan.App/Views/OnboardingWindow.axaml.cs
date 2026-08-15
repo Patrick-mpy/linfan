@@ -10,7 +10,7 @@ namespace LinFan.App.Views;
 /// <summary>
 /// Onboarding-Wizard. Code-Behind bleibt minimal (nur reine UI-Belange).
 /// Beim Schließen des Fensters wird der Skip-Pfad des Controllers angestoßen, falls das Onboarding
-/// noch nicht abgeschlossen wurde — so wird <c>OnboardingCompleted = true</c> immer gesetzt.
+/// noch nicht abgeschlossen wurde - so wird <c>OnboardingCompleted = true</c> immer gesetzt.
 /// </summary>
 public partial class OnboardingWindow : Window
 {
@@ -19,7 +19,7 @@ public partial class OnboardingWindow : Window
     public OnboardingWindow() => InitializeComponent();
 
     // Positions-Modal je Lüfterzeile: die Zeile kommt aus dem DataContext des Buttons; das Ergebnis wird zurück
-    // in die gebundene Location geschrieben (reine UI — wie im Geräte-Tab). Abbrechen lässt sie unberührt.
+    // in die gebundene Location geschrieben (reine UI - wie im Geräte-Tab). Abbrechen lässt sie unberührt.
     private async void OnPickLocation(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is not OnboardingFanRow row)
@@ -41,7 +41,7 @@ public partial class OnboardingWindow : Window
     {
         base.OnClosing(e);
 
-        // Schließen einmalig aufhalten, bis der Skip-Pfad (OnboardingCompleted = true) gesendet wurde —
+        // Schließen einmalig aufhalten, bis der Skip-Pfad (OnboardingCompleted = true) gesendet wurde -
         // sonst kann das Senden mit dem Fenster-Schließen wettrennen. Der Latch im Controller verhindert
         // ein Doppel-Senden, falls bereits per Finish/Skip geschlossen wurde.
         if (_closeConfirmed || DataContext is not OnboardingController controller)

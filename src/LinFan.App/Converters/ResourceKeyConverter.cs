@@ -8,7 +8,7 @@ using Avalonia.Data.Converters;
 namespace LinFan.App.Converters;
 
 /// <summary>
-/// Löst einen Ressourcen-Schlüssel (String) zur Laufzeit in die zugehörige App-Ressource auf — z. B. eine
+/// Löst einen Ressourcen-Schlüssel (String) zur Laufzeit in die zugehörige App-Ressource auf - z. B. eine
 /// Icon-Geometrie aus <c>Icons.axaml</c>. Hält die Ressourcen-/Rendering-Abhängigkeit in der View-Schicht,
 /// sodass Daten-Items (z. B. <c>SettingsSectionItem</c>) den Schlüssel nur als String führen und frei von
 /// Avalonia-Rendering-Typen bleiben. One-Way; <c>null</c>/leer/unbekannt/ohne laufende App → <c>null</c>.

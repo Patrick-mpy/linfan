@@ -10,7 +10,7 @@ using LinFan.Core.Models;
 namespace LinFan.App.UiTests;
 
 /// <summary>
-/// Tier — Empty-State: unterscheidet „lädt/verbinde" (vor dem ersten Snapshot) von „keine Geräte"
+/// Tier - Empty-State: unterscheidet „lädt/verbinde" (vor dem ersten Snapshot) von „keine Geräte"
 /// (Snapshot da, aber leer). Geprüft werden die change-notifizierten Controller-Properties, die die
 /// Dashboard-/Tab-Hinweise im XAML ein-/ausblenden. Läuft über den echten Poll-Loop + Dispatcher.
 /// </summary>

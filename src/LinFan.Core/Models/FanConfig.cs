@@ -19,12 +19,12 @@ public sealed record FanConfig
     /// <summary>Einbau-Position (für spätere Airflow-Optimierung).</summary>
     public FanLocation Location { get; init; } = FanLocation.Unspecified;
 
-    /// <summary>Hidden app-wide except in the settings' device lists (does not affect control — an assigned curve keeps running).</summary>
+    /// <summary>Hidden app-wide except in the settings' device lists (does not affect control - an assigned curve keeps running).</summary>
     public bool Hidden { get; init; }
 
     /// <summary>
     /// Explizit zugeordneter Drehzahl-Sensor (Sensor-Id), der die Backend-Discovery-Heuristik
-    /// <b>überschreibt</b> — gesetzt durch manuelles Zuordnen oder die automatische Sensor-Kopplung.
+    /// <b>überschreibt</b> - gesetzt durch manuelles Zuordnen oder die automatische Sensor-Kopplung.
     /// <c>null</c> = keine Übersteuerung, es gilt der vom Backend gepaarte Tacho (oder keiner).
     /// Daemon-verwaltet: bleibt bei einem GUI-<c>SaveConfig</c>/Merge erhalten.
     /// </summary>

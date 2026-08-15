@@ -7,7 +7,7 @@ namespace LinFan.Hardware.Windows.Tests;
 
 /// <summary>
 /// Wendet die geteilte Conformance-Suite (INV-1..INV-10) auf das echte <see cref="WindowsLhmBackend"/>
-/// an — über ein Fake-LHM injiziert, daher ohne Kernel-Treiber/Admin und auf jedem OS lauffähig. Das ist
+/// an - über ein Fake-LHM injiziert, daher ohne Kernel-Treiber/Admin und auf jedem OS lauffähig. Das ist
 /// der Vertragstreue-Beweis des Windows-Backends, parallel zur Referenz-/Linux-Verankerung.
 /// <para>
 /// Round-Trip-Toleranz 3: Das Backend mappt 0..255 verlustbehaftet auf LHM-Prozente (0..100) und zurück.
@@ -21,15 +21,15 @@ public sealed class WindowsLhmConformanceTests : BackendConformanceTests
     {
         var lhm = new FakeLhmComputer();
 
-        // Steuerbare Controls — starten in Default (= Auto), damit INV-4 die Ausgangsannahme erfüllt.
+        // Steuerbare Controls - starten in Default (= Auto), damit INV-4 die Ausgangsannahme erfüllt.
         // Gepaart mit RPM-Sensoren derselben Hardware über den Namens-Index (#1/#2).
         lhm.Add(FakeLhmSensor.Controllable("nct/control/1", "Fan Control #1", "Nuvoton NCT6797D", new FakeLhmControl()));
         lhm.Add(FakeLhmSensor.Controllable("nct/control/2", "Fan Control #2", "Nuvoton NCT6797D", new FakeLhmControl()));
 
-        // Read-only Fan-Kanal (Control == null) — der reguläre „nicht steuerbar"-Zustand.
+        // Read-only Fan-Kanal (Control == null) - der reguläre „nicht steuerbar"-Zustand.
         lhm.Add(FakeLhmSensor.ReadOnlyControl("nct/control/3", "Fan Control #3", "Nuvoton NCT6797D"));
 
-        // RPM-Sensoren (mit Wert) — #1/#2 paaren zu den Controls, #3 read-only.
+        // RPM-Sensoren (mit Wert) - #1/#2 paaren zu den Controls, #3 read-only.
         lhm.Add(FakeLhmSensor.Reading("nct/fan/1", "Fan #1", "Nuvoton NCT6797D", LhmSensorType.Fan, 1200f));
         lhm.Add(FakeLhmSensor.Reading("nct/fan/2", "Fan #2", "Nuvoton NCT6797D", LhmSensorType.Fan, 980f));
 

@@ -3,7 +3,7 @@
     <!--
         Semantische Farb-Tokens für hell/dunkel. Views referenzieren ausschließlich diese Keys per
         {DynamicResource …}; nie wieder Hex-Literale in der View. ThemeVariant.Default (System-Modus)
-        braucht kein eigenes Dictionary — Avalonia löst dann auf die OS-Variante (Light/Dark) auf.
+        braucht kein eigenes Dictionary - Avalonia löst dann auf die OS-Variante (Light/Dark) auf.
         Die *Color*-Keys am Ende sind für die selbstgezeichneten Controls (CurveChart baut daraus Pens).
     -->
     <ResourceDictionary.ThemeDictionaries>
@@ -31,11 +31,24 @@
             <SolidColorBrush x:Key="InfoText" Color="#BFDBFE" />
             <SolidColorBrush x:Key="InfoAccent" Color="#93C5FD" />
 
+            <!-- Gefüllte Aktions-Buttons (Button.primary/.danger). Eigene Füll-Töne statt Accent/DangerAccent:
+                 die sind im Dunkel-Theme hell (sie dienen als Schrift-/Streifenfarbe auf dunklem Grund) und
+                 trügen weiße Schrift mit ~2:1 - unlesbar. Die Füllung ist deshalb in beiden Themes derselbe
+                 satte Ton mit weißer Schrift; Hover/Pressed dunkeln nach. -->
+            <SolidColorBrush x:Key="AccentFill" Color="#0284C7" />
+            <SolidColorBrush x:Key="AccentHover" Color="#0369A1" />
+            <SolidColorBrush x:Key="AccentPressed" Color="#075985" />
+            <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="DangerFill" Color="#DC2626" />
+            <SolidColorBrush x:Key="DangerHover" Color="#B91C1C" />
+            <SolidColorBrush x:Key="DangerPressed" Color="#991B1B" />
+            <SolidColorBrush x:Key="OnDanger" Color="#FFFFFF" />
+
             <Color x:Key="GridColor">#26262E</Color>
             <Color x:Key="AxisColor">#71717A</Color>
             <Color x:Key="HandleColor">#FAFAFA</Color>
             <Color x:Key="AccentColor">#38BDF8</Color>
-            <!-- One step darker than the accent — the blade shading of the brand mark (BrandMark). -->
+            <!-- One step darker than the accent - the blade shading of the brand mark (BrandMark). -->
             <Color x:Key="AccentShadeColor">#0EA5E9</Color>
             <Color x:Key="ClampColor">#356C82</Color>
             <Color x:Key="LiveColor">#F59E0B</Color>
@@ -69,11 +82,22 @@
             <SolidColorBrush x:Key="InfoText" Color="#1E40AF" />
             <SolidColorBrush x:Key="InfoAccent" Color="#2563EB" />
 
+            <!-- Siehe Dunkel-Variante: identische Füll-Töne, damit eine Aktion in beiden Themes gleich
+                 aussieht (hier fallen sie ohnehin mit Accent/DangerAccent zusammen). -->
+            <SolidColorBrush x:Key="AccentFill" Color="#0284C7" />
+            <SolidColorBrush x:Key="AccentHover" Color="#0369A1" />
+            <SolidColorBrush x:Key="AccentPressed" Color="#075985" />
+            <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="DangerFill" Color="#DC2626" />
+            <SolidColorBrush x:Key="DangerHover" Color="#B91C1C" />
+            <SolidColorBrush x:Key="DangerPressed" Color="#991B1B" />
+            <SolidColorBrush x:Key="OnDanger" Color="#FFFFFF" />
+
             <Color x:Key="GridColor">#D4D4D8</Color>
             <Color x:Key="AxisColor">#71717A</Color>
             <Color x:Key="HandleColor">#18181B</Color>
             <Color x:Key="AccentColor">#0284C7</Color>
-            <!-- One step darker than the accent — the blade shading of the brand mark (BrandMark). -->
+            <!-- One step darker than the accent - the blade shading of the brand mark (BrandMark). -->
             <Color x:Key="AccentShadeColor">#0369A1</Color>
             <Color x:Key="ClampColor">#7DD3FC</Color>
             <Color x:Key="LiveColor">#D97706</Color>

@@ -35,6 +35,14 @@ public class SemanticColorTokenTests
     [InlineData("InfoBg")]
     [InlineData("InfoText")]
     [InlineData("InfoAccent")]
+    [InlineData("AccentFill")]
+    [InlineData("AccentHover")]
+    [InlineData("AccentPressed")]
+    [InlineData("OnAccent")]
+    [InlineData("DangerFill")]
+    [InlineData("DangerHover")]
+    [InlineData("DangerPressed")]
+    [InlineData("OnDanger")]
     public void Brush_token_resolves_in_both_variants(string key)
     {
         foreach (ThemeVariant variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })

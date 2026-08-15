@@ -21,7 +21,7 @@ namespace LinFan.Daemon.Tests;
 /// Delays). Jeder Test stoppt den Dienst sauber (StopAsync), damit kein Hintergrund-Loop leckt.
 /// <para>Hinweis Test-Seams (verhaltensneutral, Default unverändert; analog zu den schon vorhandenen
 /// Seams in <c>CalibrationCoordinator</c>): <c>ControlLoopService</c> hat zwei optionale Ctor-Parameter
-/// — <c>TimeSpan? tickInterval</c> (null = Config-Intervall; hier kurz für schnelle Ticks) und eine
+/// - <c>TimeSpan? tickInterval</c> (null = Config-Intervall; hier kurz für schnelle Ticks) und eine
 /// <c>CalibrationService</c>-Factory (null = echte Delays; hier Null-Delay für die Kalibrier-Tests).</para>
 /// <para>Tests laufen ohne Root → der ControlLoop arbeitet im Dry-Run und schreibt KEINE PWM auf die
 /// (Fake-)Hardware. Manuelle Steuerung wird daher über das <c>ManualOverride</c>-Flag des Snapshots
@@ -72,7 +72,7 @@ public class ControlLoopServiceTests
         Func<TimeSpan, CancellationToken, Task>? calibrationDelay = null,
         TimeSpan? coordinatorStopTimeout = null, ILogger<ControlLoopService>? log = null,
         bool fastTachMapping = false) =>
-        // dryRunOverride: true — die Tests laufen konzeptionell ohne Root (Dry-Run, keine echten PWM-Writes).
+        // dryRunOverride: true - die Tests laufen konzeptionell ohne Root (Dry-Run, keine echten PWM-Writes).
         // Explizit erzwungen, damit der Test unabhängig von der euid des Runners ist (CI-Container = Root).
         new(hw, hw, store, ipc, log ?? NullLogger<ControlLoopService>.Instance, FastTick,
             calibrationDelay is not null ? (s, f) => new CalibrationService(s, f, calibrationDelay)
@@ -182,7 +182,7 @@ public class ControlLoopServiceTests
         var store = new FakeConfigStore
         {
             // Vollständig migrierte Config: Profil + gültiges aktives Profil + Onboarding-Flag bereits gesetzt,
-            // und die Datei existiert bereits (Exists=true) — es gibt also nichts mehr zu initialisieren.
+            // und die Datei existiert bereits (Exists=true) - es gibt also nichts mehr zu initialisieren.
             Stored = AppConfig.Empty with
             {
                 Profiles = new[] { profile },
@@ -457,7 +457,7 @@ public class ControlLoopServiceTests
         var store = new FakeConfigStore();
         var ipc = new FakeIpcServer();
 
-        // Kalibrier-Delay, das den Start des ersten Rampenschritts meldet und dann hängt — bis der Coordinator
+        // Kalibrier-Delay, das den Start des ersten Rampenschritts meldet und dann hängt - bis der Coordinator
         // (via Reset → Cancel) das Token abbricht. So steht der Lüfter garantiert mitten in der Rampe in Manual.
         var rampStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Func<TimeSpan, CancellationToken, Task> gatingDelay = async (_, ct) =>
@@ -491,7 +491,7 @@ public class ControlLoopServiceTests
     public async Task StopAsync_DoesNotHang_WhenCoordinatorStopIsWedged()
     {
         // Fail-Safe: hängt ein Coordinator-Stop (z. B. hinter einem im Kernel festhängenden Write), darf
-        // der Shutdown nicht ewig darauf warten — sonst käme das abschließende finally-RestoreDefaults nie
+        // der Shutdown nicht ewig darauf warten - sonst käme das abschließende finally-RestoreDefaults nie
         // dran und systemd SIGKILLt ohne Fail-Safe. StopAsync wartet begrenzt und fährt fort.
         var hw = FanRig();
         var store = new FakeConfigStore();
@@ -916,7 +916,7 @@ public class ControlLoopServiceTests
 
         ipc.Emit(new IpcCommand(IpcCommand.SetCurveEnabled, Target: "ca", Value: 0));
 
-        // Im nächsten Tick angewandt & persistiert — in den aktiven Kurven UND im aktiven Profil.
+        // Im nächsten Tick angewandt & persistiert - in den aktiven Kurven UND im aktiven Profil.
         await WaitUntilAsync(() => store.Saves.Any(s => s.Curves.Any(c => c.Id == "ca" && !c.Enabled)));
         AppConfig saved = store.Saves.Last(s => s.Curves.Any(c => c.Id == "ca"));
         Assert.False(saved.Curves.Single(c => c.Id == "ca").Enabled);
@@ -1009,7 +1009,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
 
-        ipc.Emit(new IpcCommand("realod")); // Tippfehler von "reload" — trifft keinen Zweig (Emit ruft OnCommand synchron)
+        ipc.Emit(new IpcCommand("realod")); // Tippfehler von "reload" - trifft keinen Zweig (Emit ruft OnCommand synchron)
 
         // Nicht still verschluckt: eine Warnung nennt das ignorierte Kommando. Snapshot unter der Sperre,
         // da der Hintergrund-Tick-Loop parallel weiter loggt.
@@ -1022,7 +1022,7 @@ public class ControlLoopServiceTests
         await service.StopAsync(cts.Token);
     }
 
-    /// <summary>Sammelt Log-Einträge (Level + gerenderte Nachricht) thread-sicher — der Tick-Loop loggt parallel.</summary>
+    /// <summary>Sammelt Log-Einträge (Level + gerenderte Nachricht) thread-sicher - der Tick-Loop loggt parallel.</summary>
     private sealed class CapturingLogger<T> : ILogger<T>
     {
         private readonly object _gate = new();

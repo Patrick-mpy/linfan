@@ -13,7 +13,7 @@ namespace LinFan.Conformance;
 /// Doku in <c>Abstractions/</c> beschreibt. Ein vertragstreues-aber-verhaltensabweichendes Backend fällt hier durch.
 /// <para>
 /// Ein neues Backend leitet diese Basis in seinem <em>eigenen</em> Test-Projekt ab und liefert die Hooks.
-/// Beispiel (Linux — heute über <c>FakeHardware</c>/Referenz abgedeckt, ein echtes HW-Test-Projekt sähe so aus):
+/// Beispiel (Linux - heute über <c>FakeHardware</c>/Referenz abgedeckt, ein echtes HW-Test-Projekt sähe so aus):
 /// <code>
 /// public sealed class LinuxHwmonConformanceTests : BackendConformanceTests
 /// {
@@ -24,7 +24,7 @@ namespace LinFan.Conformance;
 ///     }
 /// }
 /// </code>
-/// Core.Tests referenziert <c>LinFan.Hardware.*</c> bewusst NICHT (Schichtgrenze) — der Linux/Windows-
+/// Core.Tests referenziert <c>LinFan.Hardware.*</c> bewusst NICHT (Schichtgrenze) - der Linux/Windows-
 /// Beweis lebt in <c>Hardware.Linux.Tests</c> bzw. später <c>Hardware.Windows.Tests</c>. Das hiesige
 /// <see cref="ConformanceReferenceBackend"/> hält die Spezifikation hardwarefrei in CI grün.
 /// </para>
@@ -50,7 +50,7 @@ public abstract class BackendConformanceTests
     /// Erlaubte Abweichung beim PWM-Round-Trip (<c>SetPwm(v)</c> → <c>GetPwm()</c>) in INV-4. <b>0</b> für
     /// exakte Backends (Linux sysfs, Referenz). Ein Backend, das intern verlustbehaftet auf Prozent mappt
     /// (Windows/LHM: 0..255 → % → 0..255), überschreibt das mit z. B. <b>3</b>. Betrifft nur den exakten
-    /// Round-Trip-Wert — die Sicherheits-Asserts (Auto bzw. exakt 255, das auch über Prozent verlustfrei
+    /// Round-Trip-Wert - die Sicherheits-Asserts (Auto bzw. exakt 255, das auch über Prozent verlustfrei
     /// zurückkommt) bleiben bewusst exakt.
     /// </summary>
     protected virtual int PwmRoundTripTolerance => 0;
@@ -108,7 +108,7 @@ public abstract class BackendConformanceTests
         Assert.True(fans.CanControl(broken)); // der kaputte Kanal bleibt sichtbar/bekannt
     }
 
-    // === INV-2b: Dispose stellt den sicheren Zustand best-effort her und WIRFT NIE — auch wenn ein =====
+    // === INV-2b: Dispose stellt den sicheren Zustand best-effort her und WIRFT NIE - auch wenn ein =====
     // Kanal beim Restore-Write fehlschlägt. Genau der Shutdown-Pfad (using/SIGTERM), der den Fail-Safe
     // garantiert erreichen muss; eine durchschlagende Exception aus Dispose würde ihn vereiteln.
 
@@ -119,7 +119,7 @@ public abstract class BackendConformanceTests
 
         var ok = new FanId("ok");
         var broken = new FanId("broken");
-        fans.SetPwm(ok, 1); // gesunder Kanal niedrig — Dispose muss ihn trotzdem sicher hinterlassen
+        fans.SetPwm(ok, 1); // gesunder Kanal niedrig - Dispose muss ihn trotzdem sicher hinterlassen
 
         var ex = Record.Exception(() => fans.Dispose());
         Assert.Null(ex); // Dispose wirft nicht, obwohl der kaputte Kanal beim Restore-Write scheitert
@@ -145,7 +145,7 @@ public abstract class BackendConformanceTests
             b.Fans.RestoreDefaults();
             b.Disposable.Dispose();
             b.Disposable.Dispose();
-            // Vertrag: RestoreDefaults ist „nach Dispose wiederholbar" — NACH Dispose erneut aufrufen
+            // Vertrag: RestoreDefaults ist „nach Dispose wiederholbar" - NACH Dispose erneut aufrufen
             // darf NICHT werfen (ein Shutdown-Pfad kann den Fail-Safe nach dem Dispose noch anstoßen).
             b.Fans.RestoreDefaults();
         });
@@ -276,7 +276,7 @@ public abstract class BackendConformanceTests
         call();
         sw.Stop();
         Assert.True(sw.Elapsed <= MaxCallLatency,
-            $"{name} brauchte {sw.ElapsedMilliseconds} ms (> {MaxCallLatency.TotalMilliseconds} ms) — blockierendes Backend?");
+            $"{name} brauchte {sw.ElapsedMilliseconds} ms (> {MaxCallLatency.TotalMilliseconds} ms) - blockierendes Backend?");
     }
 
     // === INV-8: CanControl stabil + deckungsgleich mit FanDescriptor; true ⇒ SetPwm wirft nicht ========
@@ -328,7 +328,7 @@ public abstract class BackendConformanceTests
     }
 
     // === INV-9 (Windows-Risiko): nebenläufiges Hämmern ohne Crash/State-Korruption ====================
-    // Hintergrund: ReadValue läuft NICHT durch das Fan-Lock — muss parallel zu Fan-Writes sicher sein.
+    // Hintergrund: ReadValue läuft NICHT durch das Fan-Lock - muss parallel zu Fan-Writes sicher sein.
 
     [Fact]
     public void Inv9_ConcurrentReadValue_SetPwm_RestoreDefaults_DoNotCrash()

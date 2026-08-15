@@ -3,7 +3,7 @@
 namespace LinFan.Ipc.Messages;
 
 /// <summary>
-/// Ursache, warum eine automatische Sensor-Kopplung abbrach (für eine lokalisierbare GUI-Meldung) —
+/// Ursache, warum eine automatische Sensor-Kopplung abbrach (für eine lokalisierbare GUI-Meldung) -
 /// parallel zu <see cref="CalibrationFailReason"/>/<see cref="IdentifyFailReason"/>.
 /// </summary>
 public enum TachMappingFailReason
@@ -17,7 +17,7 @@ public enum TachMappingFailReason
     /// <summary>Vom Nutzer abgebrochen.</summary>
     Canceled,
 
-    /// <summary>Lüfter ist nicht steuerbar (read-only / ohne Rechte) — Normalzustand, kein echter Fehler.</summary>
+    /// <summary>Lüfter ist nicht steuerbar (read-only / ohne Rechte) - Normalzustand, kein echter Fehler.</summary>
     NotControllable,
 
     /// <summary>Sonstiger, nicht klassifizierter Fehler.</summary>

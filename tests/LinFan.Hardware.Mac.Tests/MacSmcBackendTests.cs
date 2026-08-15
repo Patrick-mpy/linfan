@@ -100,7 +100,7 @@ public sealed class MacSmcBackendTests
     [Fact]
     public void Control_IsDenied_WhenTargetTypeNotEncodable()
     {
-        // Alle Steuer-Keys da UND Plattform erlaubt — aber der Ziel-Typ ist nicht kodierbar.
+        // Alle Steuer-Keys da UND Plattform erlaubt - aber der Ziel-Typ ist nicht kodierbar.
         // Dann darf der Kanal NICHT steuerbar sein (sonst schaltete SetPwm auf Manual und übersprünge
         // den Ziel-Write mangels Encoder → Lüfter Manual/niedrig mit deaktivierter Firmware-Regelung).
         var smc = new FakeSmc();
@@ -121,7 +121,7 @@ public sealed class MacSmcBackendTests
     public void RestoreDefaults_FallsBackToFullSpeed_WhenAutoWriteFails()
     {
         // Steuerbar (bei Scan lesbar/kodierbar), aber der Md-Write scheitert transient. RestoreDefaults
-        // muss dann den unabhängigen Volllast-Fallback (Ziel = Max-RPM) nehmen — kein Single-Point-of-Failure.
+        // muss dann den unabhängigen Volllast-Fallback (Ziel = Max-RPM) nehmen - kein Single-Point-of-Failure.
         var smc = TwoFanBoard();
         smc.FailWritesFor("F0Md"); // Auto-Write (und Manual-Write) scheitern
 

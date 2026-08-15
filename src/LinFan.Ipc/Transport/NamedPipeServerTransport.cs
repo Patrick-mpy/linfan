@@ -12,15 +12,15 @@ namespace LinFan.Ipc.Transport;
 /// <summary>
 /// Server-Transport über eine Windows-Named-Pipe (<c>\\.\pipe\&lt;name&gt;</c>); der Endpunkt ist der
 /// reine Pipe-Name. Pro akzeptierter Verbindung wird eine <b>eigene</b> Pipe-Instanz erzeugt (mehrere
-/// Clients gleichzeitig) — analog dazu, wie der Unix-Transport pro Accept einen neuen Stream liefert.
+/// Clients gleichzeitig) - analog dazu, wie der Unix-Transport pro Accept einen neuen Stream liefert.
 /// Der zurückgegebene Stream gehört dem Aufrufer (<see cref="IpcServer"/> entsorgt ihn).
 /// <para>
 /// <b>Zugriffskontrolle (Privilege-Separation):</b> die Pipe bekommt eine DACL: SYSTEM und Administratoren
-/// Vollzugriff, die Gruppe <see cref="AllowedGroup"/> Lesen/Schreiben — damit sich <b>nur</b> berechtigte
+/// Vollzugriff, die Gruppe <see cref="AllowedGroup"/> Lesen/Schreiben - damit sich <b>nur</b> berechtigte
 /// GUI-Nutzer (nicht jeder authentifizierte Account) mit dem als SYSTEM/Admin laufenden Daemon verbinden
 /// können. Existiert die Gruppe nicht (Installationsschritt fehlt), wird das geloggt und ersatzweise
 /// „Authentifizierte Benutzer" gewährt, damit die GUI nicht bricht (Härtung greift, sobald die Gruppe da
-/// ist). Zusätzlich bekommt das <b>eigene Konto</b> des Server-Prozesses Vollzugriff — ohne das Recht
+/// ist). Zusätzlich bekommt das <b>eigene Konto</b> des Server-Prozesses Vollzugriff - ohne das Recht
 /// <c>CreateNewInstance</c> ließe sich ab der zweiten Instanz keine weitere mehr anlegen (siehe
 /// <see cref="BuildSecurity"/>). Die ACL wird nur unter Windows gesetzt; auf anderen Systemen (nur Tests,
 /// .NET emuliert Named Pipes über Unix-Domain-Sockets) läuft die Pipe ohne explizite ACL.
@@ -89,7 +89,7 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
             pending = _pending;
             _pending = null;
         }
-        // Eine wartende Instanz disposen bricht ihr WaitForConnectionAsync ab (ObjectDisposedException) —
+        // Eine wartende Instanz disposen bricht ihr WaitForConnectionAsync ab (ObjectDisposedException) -
         // so endet die Accept-Schleife des Servers auch ohne ausgelöstes Cancellation-Token.
         try { pending?.Dispose(); } catch { /* egal */ }
     }
@@ -99,7 +99,7 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
         if (OperatingSystem.IsWindows())
             return CreateSecuredInstance(name);
 
-        // Nicht-Windows (nur Tests): plain Pipe ohne ACL — Unix-Domain-Socket-Emulation.
+        // Nicht-Windows (nur Tests): plain Pipe ohne ACL - Unix-Domain-Socket-Emulation.
         return new NamedPipeServerStream(
             name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
@@ -127,12 +127,12 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
             PipeAccessRights.FullControl, AccessControlType.Allow));
 
         // Eigenes Konto: Windows prüft für JEDE weitere Instanz einer bereits existierenden Pipe das Recht
-        // FILE_CREATE_PIPE_INSTANCE in deren DACL — nur die allererste Instanz ist frei. Läuft der Server
+        // FILE_CREATE_PIPE_INSTANCE in deren DACL - nur die allererste Instanz ist frei. Läuft der Server
         // nicht als SYSTEM/Administrator (z. B. Daemon im Dry-Run ohne Adminrechte, Tests), träfe er sonst
         // nur die ReadWrite-ACE, könnte nach dem ersten Client keine Instanz mehr anlegen und nähme keine
         // weitere Verbindung an. Bewusst NUR fürs eigene Konto: bekäme die erlaubte Gruppe dieses Recht,
         // könnte ein Mitglied eigene Instanzen derselben Pipe anlegen und der GUI gegenüber den Daemon
-        // spielen (Pipe-Squatting) — genau das, was die Zugriffskontrolle hier verhindern soll.
+        // spielen (Pipe-Squatting) - genau das, was die Zugriffskontrolle hier verhindern soll.
         using var self = WindowsIdentity.GetCurrent();
         if (self.User is { } own)
         {
@@ -145,7 +145,7 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
 
     /// <summary>
     /// SID der Gruppe <see cref="AllowedGroup"/>, deren Mitglieder Lese-/Schreibzugriff bekommen. Fehlt die
-    /// Gruppe, wird auf „Authentifizierte Benutzer" zurückgefallen (GUI bleibt funktionsfähig) und gewarnt —
+    /// Gruppe, wird auf „Authentifizierte Benutzer" zurückgefallen (GUI bleibt funktionsfähig) und gewarnt -
     /// die Härtung greift, sobald die Gruppe am Install angelegt und der GUI-Nutzer aufgenommen ist.
     /// </summary>
     [SupportedOSPlatform("windows")]
@@ -158,7 +158,7 @@ internal sealed class NamedPipeServerTransport : IIpcServerTransport
         catch (Exception ex)
         {
             _log.LogWarning(ex,
-                "IPC: Gruppe '{Group}' nicht gefunden — Pipe fällt auf 'Authentifizierte Benutzer' zurück. "
+                "IPC: Gruppe '{Group}' nicht gefunden - Pipe fällt auf 'Authentifizierte Benutzer' zurück. "
                 + "Für die Zugriffsbeschränkung die Gruppe anlegen und den GUI-Nutzer aufnehmen (siehe Packaging).",
                 AllowedGroup);
             return new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null);

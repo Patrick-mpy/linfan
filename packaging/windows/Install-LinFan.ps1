@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Counterpart to packaging/install.sh. Expects a FINISHED cross-published, self-contained
-  win-x64 build (subfolders Daemon\ + App\) — nothing is built on the target PC: no .NET SDK
+  win-x64 build (subfolders Daemon\ + App\) - nothing is built on the target PC: no .NET SDK
   needed, the runtime is inside the build. Produce the build on the Linux/dev machine:
 
     dotnet publish -c Release -r win-x64 --self-contained true src/LinFan.Daemon -o artifacts/LinFan-win-x64/Daemon
@@ -16,10 +16,10 @@
     .\Install-LinFan.ps1 -Source C:\path\to\build
 
 .NOTES
-  The service runs as LocalSystem — writing PWM via LibreHardwareMonitor/WinRing0 needs admin.
+  The service runs as LocalSystem - writing PWM via LibreHardwareMonitor/WinRing0 needs admin.
   The GUI runs as a normal user and connects over the named pipe \\.\pipe\linfan; access to it is
   restricted to the local group "LinFan Users", which this script creates and adds the GUI user to
-  (counterpart to the 'linfan' socket group on Linux — needs a re-login to take effect).
+  (counterpart to the 'linfan' socket group on Linux - needs a re-login to take effect).
   The configuration lives machine-wide under %ProgramData%\linfan (daemon = sole writer).
   -InstallerManaged is set by the Inno Setup installer: files + shortcut are then managed by Inno,
   this script only registers the service.
@@ -65,6 +65,37 @@ if ($existing -and $existing.Status -ne 'Stopped') {
     $existing.WaitForStatus('Stopped', '00:00:30')
 }
 
+# --- Close a running GUI: it holds App\*.dll, and Windows refuses to overwrite a file in use (the
+#     copy below would abort with a sharing violation). Terminate instead of asking it to close: a
+#     close request is answered by hiding into the tray, and with unsaved editor changes it opens a
+#     modal dialog - a hidden installer run would wait there forever. Terminating is safe: the GUI
+#     never writes hardware (the daemon is the sole writer and was just stopped -> fans on hardware
+#     auto), only unsaved editor changes are lost, exactly as when the system closes the app.
+#     Not needed in Inno mode: the Restart Manager has already closed it (CloseApplications in
+#     linfan.iss), and nothing is copied there anyway. ---
+$guiWasRunning = $false
+if (-not $InstallerManaged) {
+    # SilentlyContinue: without it a fresh install with no GUI running would abort right here
+    # ($ErrorActionPreference = 'Stop'). Reading .Path throws for processes of other users, hence the
+    # try. Only instances from $InstallDir count - a dev GUI from a source tree is left alone.
+    $appPattern = Join-Path $InstallDir 'App\*'
+    $gui = @(Get-Process -Name 'LinFan.App' -ErrorAction SilentlyContinue |
+        Where-Object { try { $_.Path -like $appPattern } catch { $false } })
+    if ($gui) {
+        $guiWasRunning = $true
+        Write-Host '==> closing the running GUI (it holds the files about to be replaced)'
+        $gui | Stop-Process -Force
+        # Stop-Process returns once the kill was requested; the file handles are only released when the
+        # process actually exits. Without this wait the copy races the dying process.
+        Wait-Process -InputObject $gui -Timeout 10 -ErrorAction SilentlyContinue
+        $stuck = @($gui | Where-Object { -not $_.HasExited })
+        if ($stuck) {
+            throw ("The running LinFan GUI (PID $($stuck[0].Id)) could not be closed. Close it manually " +
+                'and run the script again.')
+        }
+    }
+}
+
 # --- Copy the files (manual mode) ---
 if (-not $InstallerManaged) {
     Write-Host "==> copying the build to $InstallDir"
@@ -89,7 +120,7 @@ else {
 # --- Failure restart, modeled on systemd Restart=on-failure / RestartSec=3. The failure counter is
 #     reset after 60 s without a failure (analogous to systemd's StartLimitIntervalSec ~10 s), so only a
 #     tight crash loop gives up and isolated, far-apart hiccups do NOT accumulate.
-#     Note: if the service gives up permanently it stays off — Windows has no firmware auto-reversion
+#     Note: if the service gives up permanently it stays off - Windows has no firmware auto-reversion
 #     like thinkpad_acpi; a hard-killed daemon may then hold the fans at manual PWM. ---
 & sc.exe failure $ServiceName reset= 60 actions= restart/3000/restart/3000/restart/3000 | Out-Null
 
@@ -106,7 +137,7 @@ if (-not $InstallerManaged) {
 
 # --- IPC access group (counterpart to the 'linfan' socket group in packaging/install.sh) ---
 # The daemon restricts the named pipe to members of this group. Without it the DACL falls back to
-# "Authenticated Users" — every local account could then talk to the privileged daemon. Must happen
+# "Authenticated Users" - every local account could then talk to the privileged daemon. Must happen
 # BEFORE the service starts: the daemon resolves the group once, when it creates the first pipe.
 # Nothing here may abort the installation; the fallback keeps the GUI working either way.
 $needRelogin = $false
@@ -114,7 +145,7 @@ $guiUser = $null
 try {
     if (-not (Get-LocalGroup -Name $IpcGroup -ErrorAction SilentlyContinue)) {
         Write-Host "==> creating the IPC access group '$IpcGroup'"
-        # Windows caps a local group's description at 48 characters — a longer one makes New-LocalGroup
+        # Windows caps a local group's description at 48 characters - a longer one makes New-LocalGroup
         # fail outright and no group is created at all. Keep this string short.
         New-LocalGroup -Name $IpcGroup -Description 'May connect to the LinFan daemon (IPC pipe).' | Out-Null
     }
@@ -153,6 +184,12 @@ Write-Host 'Done.'
 Write-Host "  GUI:     Start menu -> 'LinFan'  (start as a normal user, NOT as admin)"
 Write-Host "  Service: Get-Service LinFan   |   Stop: Stop-Service LinFan"
 Write-Host "  Config:  $env:ProgramData\linfan\config.json   (daemon is the sole writer)"
+if ($guiWasRunning) {
+    Write-Host ''
+    Write-Host '  NOTE: the running GUI was closed for the upgrade - start it again from the Start menu.'
+    Write-Host '        It is deliberately not restarted here: launched from this elevated shell it would'
+    Write-Host '        inherit admin rights, and the GUI must stay unprivileged.'
+}
 if ($needRelogin) {
     Write-Host ''
     # Console output stays pure ASCII: Windows PowerShell reads a .ps1 without BOM as ANSI, so a

@@ -75,7 +75,7 @@ public class ProfileServiceTests
     [Fact]
     public void Apply_MultiCurveProfile_ActivatesAllCurvesAndAssignments()
     {
-        // Airflow-driven onboarding profiles carry several role curves per profile — Apply must
+        // Airflow-driven onboarding profiles carry several role curves per profile - Apply must
         // activate the whole set, not just a single curve.
         var config = new AppConfig
         {

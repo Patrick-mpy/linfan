@@ -19,7 +19,7 @@ public interface IIpcServerTransport : IDisposable
     /// <summary>
     /// Akzeptiert die nächste Verbindung und liefert sie als Duplex-Stream (besitzt die Verbindung).
     /// Wirft <see cref="OperationCanceledException"/> bzw. <see cref="ObjectDisposedException"/>, wenn
-    /// abgebrochen/disposed wird — das beendet die Accept-Schleife.
+    /// abgebrochen/disposed wird - das beendet die Accept-Schleife.
     /// </summary>
     Task<Stream> AcceptAsync(CancellationToken ct);
 }

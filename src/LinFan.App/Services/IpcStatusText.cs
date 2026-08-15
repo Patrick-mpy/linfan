@@ -22,7 +22,7 @@ internal static class IpcStatusText
 
     /// <summary>
     /// Kalibrier-Phasentext für die Live-Detailzeile. Der Prozentwert der Mess-Phase ist nicht Teil des
-    /// Vertrags — er wird wie im Daemon aus dem PWM-Rampenwert abgeleitet (pwm·100/255, ganzzahlig).
+    /// Vertrags - er wird wie im Daemon aus dem PWM-Rampenwert abgeleitet (pwm·100/255, ganzzahlig).
     /// Terminale Phasen (Done/Failed) werden nur außerhalb eines laufenden Laufs gesetzt und erscheinen
     /// nicht in der Detailzeile → leerer Text.
     /// </summary>

@@ -91,7 +91,7 @@ internal static class ConfigMapper
 
     /// <summary>
     /// <b>Vollständiges Ersetzen</b> (Import/Restore) statt Merge: Kurven, Lüfter, Sensoren und Profile
-    /// kommen ausschließlich aus <paramref name="incoming"/> — im <paramref name="current"/> vorhandene,
+    /// kommen ausschließlich aus <paramref name="incoming"/> - im <paramref name="current"/> vorhandene,
     /// aber nicht mitgelieferte Lüfter/Sensoren <b>entfallen</b>. Anders als <see cref="Merge"/> wird die
     /// <b>eingehende Kalibrierung übernommen</b> (ein Backup trägt sie; Restore auf gleicher Maschine soll
     /// sie wiederherstellen). Daemon-eigene, nicht über den IPC-Vertrag transportierte Felder
@@ -152,7 +152,7 @@ internal static class ConfigMapper
     /// Übernimmt ein Kalibrier-Ergebnis in den Lüfter <paramref name="fanId"/> (legt ihn an, falls er
     /// in <paramref name="current"/> fehlt). <see cref="FanConfig.MinPwm"/> wird nur gesetzt, wenn ein
     /// Anlaufpunkt gefunden wurde (<c>MinRpm &gt; 0</c>); sonst ist <c>StartPwm == 255</c> = „nicht
-    /// angelaufen" und würde den Lüfter dauerhaft auf Volllast zwingen — dann bleibt MinPwm unverändert
+    /// angelaufen" und würde den Lüfter dauerhaft auf Volllast zwingen - dann bleibt MinPwm unverändert
     /// und es wird nur die Messreihe (<see cref="FanConfig.Calibration"/>) gespeichert (Fail-Safe).
     /// </summary>
     public static AppConfig ApplyCalibration(AppConfig current, string fanId, FanCalibration cal)
@@ -170,7 +170,7 @@ internal static class ConfigMapper
 
     /// <summary>
     /// Setzt (oder löscht mit <paramref name="rpmSource"/> = <c>null</c>/leer) die explizite Tacho-Zuordnung
-    /// eines Lüfters (<see cref="FanConfig.RpmSource"/>) — aus manuellem Zuordnen oder der Auto-Kopplung.
+    /// eines Lüfters (<see cref="FanConfig.RpmSource"/>) - aus manuellem Zuordnen oder der Auto-Kopplung.
     /// Legt den Lüfter an, falls er in <paramref name="current"/> fehlt.
     /// </summary>
     public static AppConfig ApplyTachometer(AppConfig current, string fanId, string? rpmSource)
@@ -188,7 +188,7 @@ internal static class ConfigMapper
     /// <summary>
     /// New fan entry created by a daemon-side result (calibration / tach coupling) because the GUI has never
     /// saved this fan. <b>Without</b> a name: <see cref="FanConfig.Name"/> is the user's <i>own</i> name, and
-    /// empty means "none" — then the hardware label applies everywhere. Putting the FanId here would count as
+    /// empty means "none" - then the hardware label applies everywhere. Putting the FanId here would count as
     /// a user-defined name and leave the raw path ("/lpc/nct6797d/0/control/1") stuck as the display name.
     /// </summary>
     private static FanConfig NewFan(string fanId) => new() { FanId = fanId };
@@ -207,7 +207,8 @@ internal static class ConfigMapper
             sources,
             c.Aggregation.ToString(),
             c.InterpolationMode.ToString(),
-            c.Enabled);
+            c.Enabled,
+            c.SmoothingSeconds);
     }
 
     private static CurveConfig ToCoreCurve(IpcCurve c)
@@ -223,6 +224,8 @@ internal static class ConfigMapper
             SourceSensorIds = sources,
             Aggregation = CurveSourceResolver.ParseAggregation(c.Aggregation),
             HysteresisC = c.HysteresisC,
+            // Ältere GUI ohne das Feld → Core-Default (die Glättung bleibt an, statt still auf 0 zu fallen).
+            SmoothingSeconds = c.SmoothingSeconds ?? CurveConfig.DefaultSmoothingSeconds,
             InterpolationMode = CurveSourceResolver.ParseEnum(c.InterpolationMode, InterpolationMode.Linear),
             Points = c.Points.Select(p => new CurvePoint(p.TemperatureC, p.Percent)).ToList(),
         };

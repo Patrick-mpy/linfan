@@ -128,7 +128,7 @@ public class HwmonIdMigrationTests
     public void Apply_CollapsingIds_DeduplicatesKeepingFirst()
     {
         // Alt-Config enthält denselben Kanal zweimal: die instabile Alt-Id UND die bereits stabile Id
-        // (z. B. eine frühere Teil-Migration). Beide zeigen nach dem Remap auf dieselbe stabile Id —
+        // (z. B. eine frühere Teil-Migration). Beide zeigen nach dem Remap auf dieselbe stabile Id -
         // es darf nur EIN Eintrag übrig bleiben, sonst persistierte die Migration eine doppelte Id.
         var config = new AppConfig
         {

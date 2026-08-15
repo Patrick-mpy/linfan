@@ -41,8 +41,8 @@ public partial class MainController : ObservableObject, IDisposable
 
     public CurveEditorController Editor { get; }
 
-    /// <summary>GUI-lokale Einstellungen (Theme, Tray) — als ein DataContext über das Hauptfenster gebunden.</summary>
-    public SettingsController Settings { get; } = new();
+    /// <summary>GUI-lokale Einstellungen (Theme, Tray) - als ein DataContext über das Hauptfenster gebunden.</summary>
+    public SettingsController Settings { get; }
 
     /// <summary>Sicherung/Wiederherstellung/Reset im Einstellungen-Tab (Export/Import/Reset via IPC).</summary>
     public BackupController Backup { get; }
@@ -50,7 +50,7 @@ public partial class MainController : ObservableObject, IDisposable
     /// <summary>Update-Hinweis (GitHub-Release-Check + dismissierbares Banner); der Check startet via <see cref="BeginUpdateCheck"/>.</summary>
     public UpdateController Update { get; } = new();
 
-    // Zuletzt vom Daemon empfangene Config (autoritativ, inkl. Kalibrierung) — Quelle für den Backup-Export.
+    // Zuletzt vom Daemon empfangene Config (autoritativ, inkl. Kalibrierung) - Quelle für den Backup-Export.
     private AppConfig _lastConfig = AppConfig.Empty;
 
     // Nach Reset/Import: den Editor neu aufbauen, sobald der Daemon die geänderte Config zurückspiegelt.
@@ -95,21 +95,21 @@ public partial class MainController : ObservableObject, IDisposable
     [ObservableProperty] private CalibrationStatus? _calibration;
     [ObservableProperty] private OnboardingController? _onboarding;
 
-    /// <summary>Aktiver Tab (0 = Übersicht, 1 = Kurven &amp; Zuordnung, 2 = Einstellungen) — für „Kurve bearbeiten" vom Dashboard.</summary>
+    /// <summary>Aktiver Tab (0 = Übersicht, 1 = Kurven &amp; Zuordnung, 2 = Einstellungen) - für „Kurve bearbeiten" vom Dashboard.</summary>
     [ObservableProperty] private int _selectedTabIndex;
 
-    /// <summary>Dashboard-Karten ein-/ausklappen — reiner View-Zustand, In-Memory (nicht persistiert).</summary>
+    /// <summary>Dashboard-Karten ein-/ausklappen - reiner View-Zustand, In-Memory (nicht persistiert).</summary>
     [ObservableProperty] private bool _temperaturesExpanded = true;
     [ObservableProperty] private bool _fansExpanded = true;
     [ObservableProperty] private bool _activeCurvesExpanded = true;
 
-    /// <summary>True, wenn mindestens eine Kurve einen sichtbaren Lüfter regelt — steuert die Sichtbarkeit des Panels.</summary>
+    /// <summary>True, wenn mindestens eine Kurve einen sichtbaren Lüfter regelt - steuert die Sichtbarkeit des Panels.</summary>
     [ObservableProperty] private bool _hasActiveCurves;
 
     /// <summary>Kurzinfo im eingeklappten Temperatur-Header: der wärmste Sensor (z. B. „max 48.0 °C"); leer ohne Messwert.</summary>
     [ObservableProperty] private string _maxTempDisplay = "";
 
-    /// <summary>True, sobald der erste Snapshot verarbeitet wurde — vorher zeigt das Dashboard keinen Leer-Hinweis.</summary>
+    /// <summary>True, sobald der erste Snapshot verarbeitet wurde - vorher zeigt das Dashboard keinen Leer-Hinweis.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowNoSensors), nameof(ShowNoFans))]
     private bool _hasSnapshot;
@@ -167,13 +167,17 @@ public partial class MainController : ObservableObject, IDisposable
     /// <summary>Laufzeit-ctor (die App setzt diesen Controller als DataContext).</summary>
     public MainController() : this(new IpcLiveMonitor()) => _ownsMonitor = true;
 
-    public MainController(ILiveMonitor monitor, ICommandSink? sink = null, TimeSpan? pollInterval = null)
+    public MainController(ILiveMonitor monitor, ICommandSink? sink = null, TimeSpan? pollInterval = null,
+        SettingsController? settings = null)
     {
         _monitor = monitor;
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(1);
+        // Default: der echte Per-User-Store; Tests reichen einen mit temporärem Pfad herein, damit sie die
+        // Einstellungen des Nutzers nicht umschreiben.
+        Settings = settings ?? new SettingsController();
 
         // Steuerbefehle laufen über die Sink-Abstraktion (Daemon/IPC), nicht direkt auf die Hardware.
-        // Default: derselbe Monitor, falls er Befehle versteht (IpcLiveMonitor) — Tests injizieren einen Fake.
+        // Default: derselbe Monitor, falls er Befehle versteht (IpcLiveMonitor) - Tests injizieren einen Fake.
         _sink = sink ?? monitor as ICommandSink;
         Editor = new CurveEditorController(
             _sink is null ? null : _sink.SendConfigAsync,
@@ -202,7 +206,7 @@ public partial class MainController : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Stößt den einmaligen Update-Check an (von der App nach dem Fenster-Setup aufgerufen, nicht im ctor —
+    /// Stößt den einmaligen Update-Check an (von der App nach dem Fenster-Setup aufgerufen, nicht im ctor -
     /// so bleibt die Controller-Konstruktion in Tests netzfrei). Fire-and-forget, an den Loop-Token gekoppelt.
     /// </summary>
     public void BeginUpdateCheck() => _ = Update.CheckAsync(_loopCts.Token);
@@ -350,7 +354,7 @@ public partial class MainController : ObservableObject, IDisposable
         // Finish/Skip die Config mit OnboardingCompleted = true (+ Positionen/Profile) sendet und der Daemon sie
         // rebroadcastet, greift dieser Aufruf genau einmal mit den echten Daten.
         // Nach Reset/Import: sobald der Daemon die geänderte Config zurückspiegelt (Signatur ≠ Vorher), den
-        // Editor vollständig neu aufbauen — sonst bliebe er stale und ein späteres Speichern schriebe die alte
+        // Editor vollständig neu aufbauen - sonst bliebe er stale und ein späteres Speichern schriebe die alte
         // Config zurück. Vor dem Onboarding-Gate, weil Resync selbst Initialize aus der frischen Config fährt.
         if (_awaitingConfigResync && ConfigSignature(snapshot.Config) != _preResyncSignature)
         {
@@ -368,11 +372,11 @@ public partial class MainController : ObservableObject, IDisposable
         // … und danach pro Tick mit Live-Temperaturen für den Arbeitspunkt im Kurven-Graph speisen.
         Editor.UpdateLive(snapshot);
 
-        // Dashboard-Panel „Aktive Kurven": aus den (live aktualisierten) Editor-Kurven + Zuordnungen ableiten.
-        RebuildActiveCurvesIfChanged();
+        // Dashboard-Panel „Aktive Kurven": aus dem Daemon-Stand ableiten (siehe RebuildActiveCurvesIfChanged).
+        RebuildActiveCurvesIfChanged(snapshot);
 
         // „Keine Geräte erkannt" im Geräte-Tab: verbunden, aber der Daemon meldet weder Sensoren noch Lüfter.
-        // (Nicht an Editor.IsReady gekoppelt — der bleibt bei null Geräten absichtlich „nicht bereit".)
+        // (Nicht an Editor.IsReady gekoppelt - der bleibt bei null Geräten absichtlich „nicht bereit".)
         // Während der Erststart-Assistent aussteht ist der Editor bewusst noch nicht befüllt (siehe oben) →
         // dann nicht „keine Geräte" behaupten, sonst blitzt der Leer-Hinweis hinter dem Assistenten auf.
         ShowNoDevices = Connected && snapshot.Config.OnboardingCompleted != false
@@ -405,11 +409,11 @@ public partial class MainController : ObservableObject, IDisposable
         Onboarding?.Apply(snapshot);
     }
 
-    /// <summary>Gruppiert die Lüfter nach <see cref="FanRow.GroupKey"/> — nur neu, wenn sich die Zugehörigkeit ändert.</summary>
+    /// <summary>Gruppiert die Lüfter nach <see cref="FanRow.GroupKey"/> - nur neu, wenn sich die Zugehörigkeit ändert.</summary>
     private void RebuildFanGroupsIfChanged()
     {
         // Wechsel-Gate zuerst, über die Sammlung in ihrer stabilen Einfügereihenfolge (Upsert hängt an, Remove
-        // entfernt — ohne Mitgliederwechsel keine Umordnung). Damit fällt die teure OrderBy/ThenBy-Sortierung pro
+        // entfernt - ohne Mitgliederwechsel keine Umordnung). Damit fällt die teure OrderBy/ThenBy-Sortierung pro
         // Live-Tick weg; die Signatur ist eine Funktion derselben (GroupKey,Name)-Menge → dasselbe Gate wie zuvor.
         string signature = string.Join("|", Fans.Select(f => $"{f.GroupKey}␟{f.Name}"));
         if (signature == _fanGroupSignature)
@@ -432,7 +436,7 @@ public partial class MainController : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Gruppiert die Sensoren nach <see cref="SensorRow.GroupKey"/> — nur neu bei Zugehörigkeitsänderung.</summary>
+    /// <summary>Gruppiert die Sensoren nach <see cref="SensorRow.GroupKey"/> - nur neu bei Zugehörigkeitsänderung.</summary>
     private void RebuildSensorGroupsIfChanged()
     {
         // Wechsel-Gate zuerst, über die Sammlung in Einfügereihenfolge (wie bei den Lüftern) → OrderBy/ThenBy nur
@@ -474,21 +478,32 @@ public partial class MainController : ObservableObject, IDisposable
     /// Lüfter (versteckte sind aus dem Dashboard ausgeblendet). Jede Zeile referenziert Live-Objekte
     /// (Kurve, Lüfter-Zeilen) → Arbeitstemperatur/PWM folgen per Binding ohne Neuaufbau.
     /// </summary>
-    private void RebuildActiveCurvesIfChanged()
+    private void RebuildActiveCurvesIfChanged(MonitorSnapshot snapshot)
     {
-        var rows = new List<(CurveEditRow Curve, List<FanRow> Fans)>();
-        foreach (CurveEditRow curve in Editor.Curves)
+        // Quelle ist der Daemon-Stand (Editor.LiveCurves + die Zuordnungen der Config), nicht der Editor:
+        // dort kann ein ganz anderes Profil zur Bearbeitung offen sein, und selbst beim aktiven liegen dort
+        // ungespeicherte Änderungen, die noch nichts regeln. Die Übersicht zeigt, was wirklich läuft.
+        var fansByCurve = new Dictionary<string, List<FanRow>>(StringComparer.Ordinal);
+        foreach (FanConfig fan in snapshot.Config.Fans)
         {
-            List<FanRow> fans = Editor.Fans
-                .Where(fa => ReferenceEquals(fa.Selected, curve))
-                .Select(fa => _fanRows.GetValueOrDefault(fa.FanId))
-                .OfType<FanRow>()
-                .ToList();
-            if (fans.Count > 0)
+            if (fan.AssignedCurveId is not { } curveId || _fanRows.GetValueOrDefault(fan.FanId) is not { } row)
+                continue; // keine Kurve zugeordnet oder Lüfter im Dashboard ausgeblendet
+            if (!fansByCurve.TryGetValue(curveId, out List<FanRow>? list))
+                fansByCurve[curveId] = list = new List<FanRow>();
+            if (!list.Contains(row)) // doppelte Lüfter-Einträge einer hand-editierten Config nicht doppeln
+                list.Add(row);
+        }
+
+        var rows = new List<(CurveEditRow Curve, List<FanRow> Fans)>();
+        foreach (CurveEditRow curve in Editor.LiveCurves)
+        {
+            if (fansByCurve.TryGetValue(curve.Id, out List<FanRow>? fans) && fans.Count > 0)
                 rows.Add((curve, fans));
         }
 
-        string signature = string.Join("|", rows.Select(r =>
+        // Die Revision gehört in die Signatur: eine bearbeitete und gespeicherte Kurve behält ihre Id, ihre
+        // Zeile wird aber ersetzt - ohne sie hinge das Panel weiter an der verworfenen, toten Zeile.
+        string signature = Editor.LiveCurvesRevision + "␝" + string.Join("|", rows.Select(r =>
             $"{r.Curve.Id}␟{string.Join(",", r.Fans.Select(f => f.FanId))}␟{string.Join(",", r.Curve.Sources.Select(s => s.Id))}"));
         if (signature == _activeCurvesSignature)
             return;
@@ -506,7 +521,13 @@ public partial class MainController : ObservableObject, IDisposable
     /// <summary>„Kurve bearbeiten" vom Dashboard: die Kurve im Editor auswählen und in den Kurven-Tab wechseln.</summary>
     private void EditCurve(CurveEditRow curve)
     {
-        Editor.SelectedCurve = curve;
+        // Die Dashboard-Zeile spiegelt den Daemon-Stand und liegt selbst nicht im Editor: erst das aktive
+        // Profil öffnen (dort gehört die Kurve hin), dann die zugehörige Editor-Zeile auswählen.
+        if (Editor.ActiveProfile is { } active && !ReferenceEquals(Editor.SelectedProfile, active))
+            Editor.SelectedProfile = active;
+        if (Editor.Curves.FirstOrDefault(c => c.Id == curve.Id) is { } row)
+            Editor.SelectedCurve = row;
+        Editor.Pane = CurveTabPane.Curve;
         SelectedTabIndex = 1; // Kurven & Zuordnung (nach Entfernen des Geräte-Tabs: Index 1)
     }
 
@@ -546,7 +567,7 @@ public partial class MainController : ObservableObject, IDisposable
     /// <summary>
     /// Config-Sender des Assistenten: armiert den Editor-Neuaufbau, BEVOR gesendet wird (so ist die
     /// Signatur-Basis garantiert die Config von vor dem Assistenten). Ohne das bliebe ein bereits befüllter
-    /// Editor — der Fall „Einstellungen → Onboarding", also jede Wiederholung auf bestehender Config — auf
+    /// Editor - der Fall „Einstellungen → Onboarding", also jede Wiederholung auf bestehender Config - auf
     /// dem alten Stand: die im Assistenten gewählten Positionen/Profile wären in den Tabs unsichtbar und das
     /// nächste Speichern schriebe sie stillschweigend wieder weg.
     /// </summary>
@@ -576,7 +597,7 @@ public partial class MainController : ObservableObject, IDisposable
     private Task CancelCalibration() => _cancelCalibrate?.Invoke() ?? Task.CompletedTask;
 
     /// <summary>
-    /// Blendet die Kalibrier-Meldung nach erfolgreichem Abschluss automatisch aus — ein fertiger Lauf
+    /// Blendet die Kalibrier-Meldung nach erfolgreichem Abschluss automatisch aus - ein fertiger Lauf
     /// (Done, kein Fehler) braucht keine Bestätigung. Laufende bzw. fehlgeschlagene Läufe bleiben stehen
     /// (der Fehler bis zum manuellen Schließen). Record-Wertgleichheit sorgt dafür, dass dies pro Übergang
     /// genau einmal greift (gleiche Done-Snapshots feuern kein erneutes Changed).

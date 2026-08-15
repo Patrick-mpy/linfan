@@ -4,7 +4,7 @@ namespace LinFan.Core.Models;
 
 /// <summary>
 /// Vorschlag des Airflow-Auto-Tune für einen einzelnen Lüfter: welche Rolle/Richtung erkannt wurde
-/// und welche Kurve er bekommen soll. Rein beschreibend – erst <see cref="LinFan.Core.Services.AirflowTuneService.Apply"/>
+/// und welche Kurve er bekommen soll. Rein beschreibend - erst <see cref="LinFan.Core.Services.AirflowTuneService.Apply"/>
 /// schreibt das in eine <see cref="AppConfig"/>.
 /// </summary>
 public sealed record AirflowFanSuggestion
@@ -19,6 +19,6 @@ public sealed record AirflowFanSuggestion
     /// <summary>Id der vorgeschlagenen Kurve, oder <c>null</c> = auf Hardware-Auto lassen (z. B. Netzteil).</summary>
     public string? SuggestedCurveId { get; init; }
 
-    /// <summary>Begründungs-Code (für die GUI-Vorschau) — die GUI formatiert den Anzeigetext daraus.</summary>
+    /// <summary>Begründungs-Code (für die GUI-Vorschau) - die GUI formatiert den Anzeigetext daraus.</summary>
     public AirflowReason Reason { get; init; } = AirflowReason.LocationBasedCurve;
 }

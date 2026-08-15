@@ -12,7 +12,7 @@ namespace LinFan.Core.Services;
 /// <para>
 /// Berührt <b>nur</b> Hardware-Ids: Sensor-Ids (<see cref="SensorConfig.SensorId"/>,
 /// <see cref="CurveConfig.SourceSensorId"/>/<see cref="CurveConfig.SourceSensorIds"/>) und Lüfter-Ids
-/// (<see cref="FanConfig.FanId"/>, <see cref="ProfileAssignment.FanId"/>) — auch in den Kurven/
+/// (<see cref="FanConfig.FanId"/>, <see cref="ProfileAssignment.FanId"/>) - auch in den Kurven/
 /// Zuordnungen jedes <see cref="Profile"/>. Kurven- und Profil-Ids bleiben unangetastet.
 /// </para>
 /// <para>
@@ -60,7 +60,7 @@ public static class HwmonIdMigration
         };
 
         // DistinctBy (erster gewinnt): kollabieren zwei Alt-Ids auf dieselbe stabile Id, darf nur ein
-        // Eintrag übrig bleiben — sonst persistierte die Migration eine Config mit doppelter Id, an der
+        // Eintrag übrig bleiben - sonst persistierte die Migration eine Config mit doppelter Id, an der
         // ein späteres ToDictionary (Snapshot/GUI) werfen würde.
         var sensors = config.Sensors.Select(s => s with { SensorId = Remap(s.SensorId) })
             .DistinctBy(s => s.SensorId, StringComparer.Ordinal).ToArray();

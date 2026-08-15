@@ -277,7 +277,7 @@ public sealed class WindowsLhmBackendTests
         var failing = new FakeLhmControl(LhmControlMode.Software, initialValue: 40f) { ThrowOnSetDefault = true };
         var healthy = new FakeLhmControl(LhmControlMode.Software, initialValue: 30f);
         var lhm = new FakeLhmComputer();
-        // Werfender Kanal ZUERST — der gesunde danach muss trotzdem zurückgestellt werden.
+        // Werfender Kanal ZUERST - der gesunde danach muss trotzdem zurückgestellt werden.
         lhm.Add(FakeLhmSensor.Controllable("io/control/1", "Fan Control #1", "SuperIO", failing));
         lhm.Add(FakeLhmSensor.Controllable("io/control/2", "Fan Control #2", "SuperIO", healthy));
 

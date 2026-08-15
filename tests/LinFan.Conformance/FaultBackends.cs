@@ -9,12 +9,12 @@ namespace LinFan.Conformance;
 /// <summary>
 /// Kleine, fokussierte Fehler-Injektoren für die Negativ-/Risiko-Tests der Conformance-Suite. Sie
 /// beweisen, dass die Suite Vertragsverletzungen tatsächlich <b>fängt</b> (statt sie nur zu beschreiben).
-/// Bewusst keine generische Fault-Framework-Maschinerie — jeder Typ verletzt genau eine Garantie.
+/// Bewusst keine generische Fault-Framework-Maschinerie - jeder Typ verletzt genau eine Garantie.
 /// </summary>
 public static class FaultBackends
 {
     /// <summary>
-    /// Konstruiert ein Referenz-Backend mit zwei steuerbaren Kanälen, von denen einer beim Schreiben wirft —
+    /// Konstruiert ein Referenz-Backend mit zwei steuerbaren Kanälen, von denen einer beim Schreiben wirft -
     /// die Basis für INV-2 (best-effort über mehrere Kanäle, ein Write-Fehler stoppt die übrigen nicht).
     /// </summary>
     public static (ISensorBackend Sensors, WriteFailingFanController Fans) WithOneFailingWrite()
@@ -29,7 +29,7 @@ public static class FaultBackends
 
 /// <summary>
 /// Dekoriert einen Fan-Controller so, dass genau ein Kanal bei jedem <b>Schreib</b>zugriff
-/// (<see cref="SetMode"/>/<see cref="SetPwm"/>) wirft — als ob die Hardware/sysfs-Datei für diesen Kanal
+/// (<see cref="SetMode"/>/<see cref="SetPwm"/>) wirft - als ob die Hardware/sysfs-Datei für diesen Kanal
 /// gerade EIO liefert. <see cref="RestoreDefaults"/> selbst bleibt vertragstreu (best-effort, kein Throw):
 /// Der Decorator schluckt den Fehler des kaputten Kanals genauso, wie es ein echtes Backend täte.
 /// </summary>
@@ -63,12 +63,12 @@ public sealed class WriteFailingFanController : IFanController
 
     public void RestoreDefaults()
     {
-        // Best-effort: jeden Kanal versuchen, Fehler je Kanal schlucken — der gesunde Kanal landet sicher.
+        // Best-effort: jeden Kanal versuchen, Fehler je Kanal schlucken - der gesunde Kanal landet sicher.
         foreach (var fan in _inner.DiscoverFans())
         {
             if (!fan.CanControl) continue;
             try { _inner.SetMode(fan.Id, FanMode.Auto); }
-            catch { /* dieser Kanal nicht erreichbar — übrige nicht blockieren */ }
+            catch { /* dieser Kanal nicht erreichbar - übrige nicht blockieren */ }
         }
     }
 
@@ -81,7 +81,7 @@ public sealed class WriteFailingFanController : IFanController
 
 /// <summary>
 /// Absichtlich VERTRAGSWIDRIGES Backend: <see cref="RestoreDefaults"/> stellt den bei Discovery erfassten
-/// Zustand wieder her statt den kühlungs-sicheren — exakt der gefährliche Fall, vor dem der Vertrag warnt.
+/// Zustand wieder her statt den kühlungs-sicheren - exakt der gefährliche Fall, vor dem der Vertrag warnt.
 /// Existiert nur, um zu beweisen, dass INV-1 ihn reißt (Negativ-Test).
 /// </summary>
 public sealed class DiscoveryStateRestoreBackend : IFanController
@@ -97,7 +97,7 @@ public sealed class DiscoveryStateRestoreBackend : IFanController
         lock (_gate)
         {
             _fans[fid] = new FanDescriptor(fid, id, CanControl: true, Tachometer: null, Source: id);
-            _discoveryState[fid] = (initialMode, initialPwm); // „Ausgangszustand" — hier bewusst niedrig
+            _discoveryState[fid] = (initialMode, initialPwm); // „Ausgangszustand" - hier bewusst niedrig
             _current[fid] = (initialMode, initialPwm);
         }
     }
@@ -131,7 +131,7 @@ public sealed class DiscoveryStateRestoreBackend : IFanController
 /// <summary>
 /// Absichtlich NICHT thread-sicheres Backend: <see cref="ReadValue"/> und die Fan-Writes teilen sich einen
 /// ungeschützten <see cref="List{T}"/>. <see cref="ReadValue"/> mutiert ihn (add/remove), während
-/// <see cref="SetPwm"/>/<see cref="RestoreDefaults"/> ihn ohne Lock per <c>foreach</c> durchlaufen — unter
+/// <see cref="SetPwm"/>/<see cref="RestoreDefaults"/> ihn ohne Lock per <c>foreach</c> durchlaufen - unter
 /// Nebenläufigkeit reißt das verlässlich mit <see cref="InvalidOperationException"/> („Collection was modified").
 /// <para>
 /// Modelliert genau das Windows-Risiko, vor dem INV-9 warnt: <c>ReadValue</c> läuft NICHT durch das Fan-Lock
@@ -151,7 +151,7 @@ public sealed class RacyFanController : ISensorBackend, IFanController
 
     public double ReadValue(SensorId id)
     {
-        // Mutiert die geteilte Liste — kollidiert mit dem foreach im Schreibpfad.
+        // Mutiert die geteilte Liste - kollidiert mit dem foreach im Schreibpfad.
         _shared.Add(_shared.Count);
         if (_shared.Count > 1)
             _shared.RemoveAt(_shared.Count - 1);
@@ -168,7 +168,7 @@ public sealed class RacyFanController : ISensorBackend, IFanController
 
     public void SetPwm(FanId id, byte value)
     {
-        // Iteriert die geteilte Liste ohne Lock — wirft, sobald ReadValue parallel mutiert.
+        // Iteriert die geteilte Liste ohne Lock - wirft, sobald ReadValue parallel mutiert.
         int sum = 0;
         foreach (var x in _shared) sum += x;
         _ = sum;
@@ -185,7 +185,7 @@ public sealed class RacyFanController : ISensorBackend, IFanController
 }
 
 /// <summary>
-/// Backend, dessen Aufrufe künstlich blockieren (über <see cref="Latency"/>) — modelliert ein langsames
+/// Backend, dessen Aufrufe künstlich blockieren (über <see cref="Latency"/>) - modelliert ein langsames
 /// natives API (z. B. ein blockierender SMC-/LHM-Call). Beweist, dass die Latenz-Schranke (INV-7) ein
 /// blockierendes Backend als Fehler erkennt. Verzögert nur die Aufrufe, die der Latenz-Test misst.
 /// </summary>

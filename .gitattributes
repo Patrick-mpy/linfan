@@ -4,7 +4,7 @@
 # text=auto keeps the detection: binaries (icons, screenshots) stay untouched.
 *               text=auto eol=lf
 
-# Shell scripts and Linux packaging assets run on Linux targets — force LF so a Windows checkout
+# Shell scripts and Linux packaging assets run on Linux targets - force LF so a Windows checkout
 # can never ship CRLF into a .deb/.run or break a shebang.
 *.sh            text eol=lf
 *.service       text eol=lf

@@ -123,7 +123,7 @@ public class CurveEngineTests
     [Fact]
     public void Spline_ConvexSegment_SmoothsBelowChord_ButNeverBelowLowerPoint()
     {
-        // Auf konvexen Abschnitten liegt die glatte Spline unter der linearen Verbindung — das ist der
+        // Auf konvexen Abschnitten liegt die glatte Spline unter der linearen Verbindung - das ist der
         // sichtbare Effekt des Modus (die frühere Sehnen-Klammer machte Spline ≈ Linear und damit
         // wirkungslos). Sicherheitsgrenze bleibt: nie unter den unteren einschließenden Stützpunkt.
         var pts = new[]
@@ -153,7 +153,7 @@ public class CurveEngineTests
     public void Spline_ConvexDip_MatchesMonotoneHermite()
     {
         // Ehemaliger Sehnen-Klammer-Fall: die reine Fritsch-Carlson-Spline ergibt hier ~42,8 %
-        // (linear wäre 50 %) — genau diese Rundung ist jetzt gewollt und muss stabil bleiben.
+        // (linear wäre 50 %) - genau diese Rundung ist jetzt gewollt und muss stabil bleiben.
         var spline = new Curve("c", new[]
         {
             new CurvePoint(30, 20),

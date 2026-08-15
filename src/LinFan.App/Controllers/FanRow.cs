@@ -10,7 +10,7 @@ namespace LinFan.App.Controllers;
 
 /// <summary>
 /// Zeilen-Controller für einen Lüfter; Drehzahl/PWM/Modus und der RPM-Verlauf aktualisieren sich live.
-/// Steuerbare Lüfter lassen sich manuell setzen (Slider) — die Befehle laufen über die per
+/// Steuerbare Lüfter lassen sich manuell setzen (Slider) - die Befehle laufen über die per
 /// <see cref="BindCommands"/> injizierten Callbacks an den Daemon (IPC). Reine Presentation-Mechanik.
 /// </summary>
 public partial class FanRow : ObservableObject
@@ -20,22 +20,22 @@ public partial class FanRow : ObservableObject
     public string FanId { get; }
 
     [ObservableProperty] private string _name;
-    [ObservableProperty] private string _rpm = "—";
-    [ObservableProperty] private string _pwm = "—";
+    [ObservableProperty] private string _rpm = "-";
+    [ObservableProperty] private string _pwm = "-";
     [ObservableProperty] private string _control = "";
     [ObservableProperty] private string _location = "";
     [ObservableProperty] private bool _canControl;
     [ObservableProperty] private bool _isManual;
     [ObservableProperty] private double _sliderPercent;
 
-    /// <summary>True, sobald für diesen Lüfter eine Kalibrierung vorliegt — steuert das „bereits kalibriert"-Badge
+    /// <summary>True, sobald für diesen Lüfter eine Kalibrierung vorliegt - steuert das „bereits kalibriert"-Badge
     /// im Dashboard. Wird pro Tick aus der Config gespiegelt (nach Neustart aus der persistierten Kalibrierung).</summary>
     [ObservableProperty] private bool _isCalibrated;
 
-    /// <summary>Tooltip des Kalibrier-Badges — Anlaufpunkt in % (bzw. Hinweis, falls keiner gefunden wurde).</summary>
+    /// <summary>Tooltip des Kalibrier-Badges - Anlaufpunkt in % (bzw. Hinweis, falls keiner gefunden wurde).</summary>
     [ObservableProperty] private string _calibrationBadgeHint = "";
 
-    /// <summary>True, solange für diesen Lüfter gerade eine Kalibrierung läuft — zeigt einen Lauf-Indikator und
+    /// <summary>True, solange für diesen Lüfter gerade eine Kalibrierung läuft - zeigt einen Lauf-Indikator und
     /// sperrt den Kalibrier-Button (der Gesamtfortschritt erscheint im Kalibrier-Banner über den Tabs).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanCalibrate))]
@@ -58,13 +58,13 @@ public partial class FanRow : ObservableObject
     /// <summary>Mindestabstand zwischen zwei Manual-Sends während eines Zugs. Test-Naht: in Tests auf <c>Zero</c>.</summary>
     internal TimeSpan ManualThrottle { get => _pump.Throttle; set => _pump.Throttle = value; }
 
-    /// <summary>Läuft, solange die Manual-Pumpe noch sendet — Test-Naht zum deterministischen Abwarten.</summary>
+    /// <summary>Läuft, solange die Manual-Pumpe noch sendet - Test-Naht zum deterministischen Abwarten.</summary>
     internal Task ManualPumpCompletion => _pump.Completion;
 
     // Optimistisches Umschalten: nach einem Nutzer-Toggle hält die UI den gewählten Modus, bis ein
     // Snapshot ihn bestätigt. Sonst spränge der Schalter zurück, sobald ein noch unterwegs befindlicher
     // Snapshot die alte ManualOverride-Bestätigung trägt. Bleibt die Bestätigung aus (Befehl abgelehnt,
-    // z. B. Hardware-Fehler), wird nach MaxPendingStaleTicks die Snapshot-Wahrheit akzeptiert — der
+    // z. B. Hardware-Fehler), wird nach MaxPendingStaleTicks die Snapshot-Wahrheit akzeptiert - der
     // Fehlschlag wird sichtbar statt versteckt.
     private bool? _pendingManual;
     private int _pendingStaleTicks;
@@ -107,7 +107,7 @@ public partial class FanRow : ObservableObject
             }
             else if (++_pendingStaleTicks <= MaxPendingStaleTicks)
             {
-                applyMode = false; // veralteter Snapshot — optimistischen Modus halten, nicht zurückspringen
+                applyMode = false; // veralteter Snapshot - optimistischen Modus halten, nicht zurückspringen
             }
             else
             {
@@ -168,6 +168,6 @@ public partial class FanRow : ObservableObject
     {
         if (_applyingSnapshot || !IsManual)
             return;
-        _pump.Set(PwmScale.ToPwm(value)); // nur den Zielwert merken — die Pumpe sendet gedrosselt
+        _pump.Set(PwmScale.ToPwm(value)); // nur den Zielwert merken - die Pumpe sendet gedrosselt
     }
 }

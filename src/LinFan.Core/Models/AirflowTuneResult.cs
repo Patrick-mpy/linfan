@@ -4,7 +4,7 @@ namespace LinFan.Core.Models;
 
 /// <summary>
 /// Ergebnis von <see cref="LinFan.Core.Services.AirflowTuneService.Analyze"/>: eine grobe Druckbilanz,
-/// vorgeschlagene rollenbasierte Kurven und je Lüfter eine Zuordnung samt Begründung. Reiner Vorschlag –
+/// vorgeschlagene rollenbasierte Kurven und je Lüfter eine Zuordnung samt Begründung. Reiner Vorschlag -
 /// nichts wird geschrieben, bis die GUI ihn über <see cref="LinFan.Core.Services.AirflowTuneService.Apply"/>
 /// übernimmt.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed record AirflowTuneResult
     /// <summary>Summiertes Auslass-„Flow-Gewicht".</summary>
     public double ExhaustWeight { get; init; }
 
-    /// <summary>Hinweis-Codes (z. B. „kein Einlasslüfter", „ohne Kalibrierung geschätzt") — die GUI übersetzt.</summary>
+    /// <summary>Hinweis-Codes (z. B. „kein Einlasslüfter", „ohne Kalibrierung geschätzt") - die GUI übersetzt.</summary>
     public IReadOnlyList<AirflowHint> Hints { get; init; } = [];
 
     /// <summary>Die rollenbasierten Kurven, auf die sich die Lüfter-Vorschläge beziehen (nur tatsächlich genutzte Rollen).</summary>

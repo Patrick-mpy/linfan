@@ -4,7 +4,7 @@
              x:Class="LinFan.App.Controls.CalibrationCard"
              x:Name="Root">
     <!--
-        Geteilte Kalibrier-Statusanzeige (Kopfzeile + Fortschrittsbalken + Detailzeile) — dasselbe Bild im
+        Geteilte Kalibrier-Statusanzeige (Kopfzeile + Fortschrittsbalken + Detailzeile) - dasselbe Bild im
         Onboarding-Assistenten und im Kalibrier-Banner des Hauptfensters. Bindet an die eigenen
         StyledProperties (#Root); der Container (InfoBg-Border, evtl. Abbrechen-Button) liegt am Aufrufer.
     -->

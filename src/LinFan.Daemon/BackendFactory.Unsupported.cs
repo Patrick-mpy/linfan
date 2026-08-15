@@ -6,7 +6,7 @@ namespace LinFan.Daemon;
 
 /// <summary>
 /// Fallback für Builds auf Betriebssystemen ohne Hardware-Backend (weder Linux noch Windows
-/// noch macOS) — hält den Build überall lauffähig. <see cref="DaemonHost"/> fängt die
+/// noch macOS) - hält den Build überall lauffähig. <see cref="DaemonHost"/> fängt die
 /// <see cref="PlatformNotSupportedException"/> sauber ab.
 /// </summary>
 internal static class BackendFactory

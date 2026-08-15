@@ -13,12 +13,12 @@ namespace LinFan.Ipc.Transport;
 /// das veraltete Socket-File wird vor dem Bind aufgeräumt.
 /// <para>
 /// <b>Zugriffskontrolle (Fail-Safe/Privilege-Separation):</b> der als Root laufende System-Daemon
-/// beschränkt den Socket auf die Gruppe <c>linfan</c> (Modus <c>0660</c>, Gruppe <c>linfan</c>) — nur
+/// beschränkt den Socket auf die Gruppe <c>linfan</c> (Modus <c>0660</c>, Gruppe <c>linfan</c>) - nur
 /// Mitglieder dürfen <c>connect()</c>, nicht mehr jeder lokale Account. Der Kernel erzwingt das beim
 /// Verbinden inkl. Supplementary-Groups. Ein User-Session-Daemon (nicht Root) setzt <c>0600</c> (nur der
 /// Eigentümer; der Socket liegt ohnehin in einem 0700-Runtime-Dir). Zusätzlich wird die Peer-UID jeder
 /// Verbindung per <c>SO_PEERCRED</c> als Audit-Spur geloggt. Fehlt die Gruppe <c>linfan</c>, bleibt der
-/// Socket <c>root:root 0660</c> (fail-closed: nur Root erreichbar) samt Hinweis — statt world-rw zu öffnen.
+/// Socket <c>root:root 0660</c> (fail-closed: nur Root erreichbar) samt Hinweis - statt world-rw zu öffnen.
 /// </para>
 /// </summary>
 internal sealed class UnixSocketServerTransport : IIpcServerTransport
@@ -72,7 +72,7 @@ internal sealed class UnixSocketServerTransport : IIpcServerTransport
 
         try
         {
-            // Ownerschreibbar + gruppenschreibbar, aber NICHT world (0660) — Basis für beide Zweige.
+            // Ownerschreibbar + gruppenschreibbar, aber NICHT world (0660) - Basis für beide Zweige.
             const UnixFileMode ownerGroupRw =
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.GroupWrite;
 
@@ -91,7 +91,7 @@ internal sealed class UnixSocketServerTransport : IIpcServerTransport
                     // Fail-closed: ohne Gruppe bleibt der Socket root:root 0660 → nur Root/GUI-als-Root
                     // erreichbar. Besser als world-rw; der Hinweis nennt den fehlenden Installationsschritt.
                     _log.LogError(
-                        "IPC: Gruppe '{Group}' nicht gefunden — Socket bleibt root-only (0660, Gruppe root). Die "
+                        "IPC: Gruppe '{Group}' nicht gefunden - Socket bleibt root-only (0660, Gruppe root). Die "
                         + "unprivilegierte GUI kann sich erst verbinden, wenn die Gruppe existiert und der GUI-"
                         + "Nutzer Mitglied ist (siehe README/Unit).", AllowedGroup);
                 }
@@ -125,7 +125,7 @@ internal sealed class UnixSocketServerTransport : IIpcServerTransport
 
         if (!uint.TryParse(Environment.GetEnvironmentVariable("SUDO_UID"), out uint uid))
         {
-            _log.LogWarning("IPC: Kein SUDO_UID — Socket bleibt root-only (0600). GUI als derselbe Nutzer via "
+            _log.LogWarning("IPC: Kein SUDO_UID - Socket bleibt root-only (0600). GUI als derselbe Nutzer via "
                 + "sudo starten oder LINFAN_SOCKET auf einen gemeinsamen Pfad setzen.");
             return;
         }
@@ -140,7 +140,7 @@ internal sealed class UnixSocketServerTransport : IIpcServerTransport
         try { File.SetUnixFileMode(Path.GetDirectoryName(path)!, dir0755); } catch { /* best effort */ }
 
         if (chown(path, owner: uid, group: gid) != 0)
-            _log.LogWarning("IPC: chown des Socket auf UID {Uid} fehlgeschlagen (errno {Errno}) — GUI kann sich "
+            _log.LogWarning("IPC: chown des Socket auf UID {Uid} fehlgeschlagen (errno {Errno}) - GUI kann sich "
                 + "evtl. nicht verbinden.", uid, Marshal.GetLastWin32Error());
     }
 
@@ -169,7 +169,7 @@ internal sealed class UnixSocketServerTransport : IIpcServerTransport
         IntPtr grp = getgrnam(name);
         if (grp == IntPtr.Zero)
             return -1;
-        // struct group { char* gr_name; char* gr_passwd; gid_t gr_gid; char** gr_mem; } — gr_gid folgt auf
+        // struct group { char* gr_name; char* gr_passwd; gid_t gr_gid; char** gr_mem; } - gr_gid folgt auf
         // zwei Zeiger (LP64: Offset 2×PtrSize). Nur die GID wird gelesen, gr_mem nicht gebraucht.
         return Marshal.ReadInt32(grp, IntPtr.Size * 2);
     }

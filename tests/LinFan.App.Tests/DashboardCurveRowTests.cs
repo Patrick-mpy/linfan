@@ -49,7 +49,7 @@ public sealed class DashboardCurveRowTests
     }
 
     [Theory]
-    [InlineData(new string[0], "—")]
+    [InlineData(new string[0], "-")]
     [InlineData(new[] { "t1" }, "t1")]
     [InlineData(new[] { "t1", "t2" }, "2 Sensoren")]
     public void SourceSummary_ReflectsSourceCount(string[] sources, string expected)

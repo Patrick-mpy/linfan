@@ -41,7 +41,7 @@ public class SynchronizedFanControllerTests
     public async Task RestoreDefaults_DoesNotDeadlock_WhenAnotherWriteIsWedged()
     {
         // Ein hängender Write (z. B. aus dem Kalibrier-/Identify-Thread) hält das Gate. Der Fail-Safe-
-        // RestoreDefaults aus dem Loop-Thread darf darauf NICHT unbegrenzt blockieren — sonst ist der
+        // RestoreDefaults aus dem Loop-Thread darf darauf NICHT unbegrenzt blockieren - sonst ist der
         // einzige Rückfall-Mechanismus selbst deadlockbar. Er wartet begrenzt und schreibt am Gate vorbei.
         var inner = new WedgingController();
         var log = new CapturingLogger();
@@ -85,7 +85,7 @@ public class SynchronizedFanControllerTests
     [Fact]
     public void SlowWrite_LogsWarningAndNewMax()
     {
-        // 60 ms ≥ Schwelle (50 ms) und garantiert > Start-Maximum (0) — beide Pfade feuern deterministisch.
+        // 60 ms ≥ Schwelle (50 ms) und garantiert > Start-Maximum (0) - beide Pfade feuern deterministisch.
         var inner = new RecordingController(TimeSpan.FromMilliseconds(60));
         var log = new CapturingLogger();
         var sut = new SynchronizedFanController(inner, log);

@@ -75,7 +75,7 @@ public class MainControllerOnboardingTests
         {
             UiTestHelpers.PumpUntil(() => ctrl.HasSnapshot);
 
-            // Während des Erststart-Assistenten bleibt der Editor bewusst uninitialisiert — kein vorzeitiges
+            // Während des Erststart-Assistenten bleibt der Editor bewusst uninitialisiert - kein vorzeitiges
             // Befüllen aus der leeren Config (sonst Latch auf „nicht zugeordnet"/leere Kurven).
             Assert.False(ctrl.Editor.IsReady);
             Assert.Empty(ctrl.Editor.Fans);
@@ -99,7 +99,7 @@ public class MainControllerOnboardingTests
 
     /// <summary>
     /// Regression: Assistent auf bestehender Config wiederholt („Einstellungen → Onboarding"). Da war der
-    /// Editor bereits aus der ALTEN Config befüllt und die einmalige Initialisierung griff nicht mehr — die
+    /// Editor bereits aus der ALTEN Config befüllt und die einmalige Initialisierung griff nicht mehr - die
     /// im Assistenten gewählten Positionen blieben unsichtbar und das nächste Speichern schrieb sie wieder
     /// weg. Der Assistent muss den Editor-Neuaufbau auslösen, sobald der Daemon die neue Config spiegelt.
     /// </summary>
@@ -132,7 +132,7 @@ public class MainControllerOnboardingTests
 
     /// <summary>
     /// Regression: the manual re-run ("Settings → Onboarding") must wire the tach-mapping delegates just
-    /// like the first-run path — without them the wizard silently falls back to the legacy no-coupling
+    /// like the first-run path - without them the wizard silently falls back to the legacy no-coupling
     /// calibration and never pairs tach sensors.
     /// </summary>
     [AvaloniaFact]

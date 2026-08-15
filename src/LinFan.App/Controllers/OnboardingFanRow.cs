@@ -23,7 +23,7 @@ public partial class OnboardingFanRow : ObservableObject
     /// <summary>Ob der Lüfter steuerbar ist (nur dann ist Identifizieren möglich). Laufzeit-Info aus der Discovery.</summary>
     public bool CanControl { get; }
 
-    /// <summary>Temporäre Manuell-Steuerung (Slider neben dem Identifizieren) — erleichtert die Zuordnung;
+    /// <summary>Temporäre Manuell-Steuerung (Slider neben dem Identifizieren) - erleichtert die Zuordnung;
     /// beim Verlassen des Geräte-Schritts setzt der Controller sie zurück.</summary>
     public ManualControl Manual { get; }
 

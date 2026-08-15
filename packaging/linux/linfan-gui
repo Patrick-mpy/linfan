@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LinFan GUI launcher for the SELF-CONTAINED build — no .NET runtime needed (unlike the source
+# LinFan GUI launcher for the SELF-CONTAINED build - no .NET runtime needed (unlike the source
 # install, which pins a dotnet path here to dodge the snap-dotnet/Skia issue). Installed to
 # /opt/linfan/linfan-gui and referenced by the desktop entry.
 exec /opt/linfan/LinFan.App "$@"

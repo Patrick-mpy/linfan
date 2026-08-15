@@ -8,7 +8,7 @@ using LinFan.App.Services;
 namespace LinFan.App.UiTests;
 
 // Die Headless-UI-Tests prüfen sichtbaren deutschen Text im echten XAML. Da die GUI ihre Texte über
-// den Localizer auflöst, wird die Kultur für die Test-Assembly auf Deutsch gepinnt — unabhängig von
+// den Localizer auflöst, wird die Kultur für die Test-Assembly auf Deutsch gepinnt - unabhängig von
 // der OS-Kultur des Build-Hosts (englischer CI ⇒ sonst rote Tests).
 internal static class TestCulture
 {

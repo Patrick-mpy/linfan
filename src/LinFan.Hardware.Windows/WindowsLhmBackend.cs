@@ -14,7 +14,7 @@ namespace LinFan.Hardware.Windows;
 /// Firmware-Auto-Ziel ist <c>Control.SetDefault()</c>.
 /// <para>
 /// PWM-Einheit: Der Vertrag ist byte-basiert (0..255), LHM ist prozentbasiert (0..100). Das Backend mappt
-/// intern verlustbehaftet (<see cref="ToPercent"/>/<see cref="ToByte"/>) — daher hat die Conformance-Suite
+/// intern verlustbehaftet (<see cref="ToPercent"/>/<see cref="ToByte"/>) - daher hat die Conformance-Suite
 /// für Windows eine kleine Round-Trip-Toleranz.
 /// </para>
 /// <para>
@@ -26,7 +26,7 @@ namespace LinFan.Hardware.Windows;
 /// <para>
 /// Id-Stabilität: Sensor-/Lüfter-Ids sind LHMs <c>Identifier</c> (z. B. <c>/lpc/nct6797d/0/control/1</c>
 /// = Bus / Chip / Instanz-Index / Kanal). Die sind über Reboots stabil und durch den Instanz-Index auch
-/// bei doppeltem Chip kollisionsfrei — anders als die Linux-<c>hwmonN</c>-Nummerierung. Deshalb
+/// bei doppeltem Chip kollisionsfrei - anders als die Linux-<c>hwmonN</c>-Nummerierung. Deshalb
 /// implementiert dieses Backend <see cref="ILegacyIdMap"/> bewusst <b>nicht</b>: es gibt keine instabilen
 /// Alt-Ids zu migrieren.
 /// </para>
@@ -36,15 +36,15 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
     /// <summary>
     /// Diagnose für den häufigsten Windows-Fehlerfall: Ein anderes Monitoring-/Lüftertool hält den
     /// Sensor-Kerneltreiber (WinRing0) exklusiv, sodass LHM nur noch die treiberfrei (per NVAPI/ADL)
-    /// lesbare GPU sieht. Hedged — dieselbe „nur-GPU"-Signatur entsteht auch bei einem schlicht nicht
+    /// lesbare GPU sieht. Hedged - dieselbe „nur-GPU"-Signatur entsteht auch bei einem schlicht nicht
     /// unterstützten Super-I/O-Chip; daher ein Verdacht, keine Diagnose-Gewissheit.
     /// </summary>
     private const string GpuOnlyWarning =
         "Es wurden nur GPU-Sensoren erkannt (kein Mainboard-/CPU-Chip). Wahrscheinlich belegt ein anderes "
-        + "Monitoring-/Lüftertool (z. B. Armoury Crate, FanControl, HWiNFO) den Sensortreiber exklusiv — "
+        + "Monitoring-/Lüftertool (z. B. Armoury Crate, FanControl, HWiNFO) den Sensortreiber exklusiv - "
         + "solche Programme beenden und den LinFan-Dienst neu starten. Gegentest: LibreHardwareMonitor als Administrator.";
 
-    /// <summary>Serialisiert JEDEN <see cref="_lhm"/>-Zugriff (Reads, Writes, Update) — LHM ist nicht thread-sicher.</summary>
+    /// <summary>Serialisiert JEDEN <see cref="_lhm"/>-Zugriff (Reads, Writes, Update) - LHM ist nicht thread-sicher.</summary>
     private readonly object _gate = new();
 
     private readonly ILhmComputer _lhm;
@@ -57,7 +57,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
     private SensorDescriptor[] _sensorDescriptors = Array.Empty<SensorDescriptor>();
     private FanDescriptor[] _fanDescriptors = Array.Empty<FanDescriptor>();
 
-    /// <summary>Mindestabstand zwischen zwei LHM-Sweeps — ein warmer Sweep kostet (Spike: ~5 ms), kein Sweep pro Read.</summary>
+    /// <summary>Mindestabstand zwischen zwei LHM-Sweeps - ein warmer Sweep kostet (Spike: ~5 ms), kein Sweep pro Read.</summary>
     private static readonly TimeSpan UpdateInterval = TimeSpan.FromMilliseconds(500);
     private readonly Stopwatch _sinceUpdate = Stopwatch.StartNew();
 
@@ -73,7 +73,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
     }
 
     /// <summary>
-    /// Test-/Inject-Ctor: nimmt eine beliebige <see cref="ILhmComputer"/>-Naht. Bewusst plattformneutral —
+    /// Test-/Inject-Ctor: nimmt eine beliebige <see cref="ILhmComputer"/>-Naht. Bewusst plattformneutral -
     /// berührt weder <c>new Computer()</c> noch einen Windows-Guard, damit die Conformance-Tests auf Linux laufen.
     /// </summary>
     internal WindowsLhmBackend(ILhmComputer lhm)
@@ -106,7 +106,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
         if (!_sensors.TryGetValue(id, out var ch))
             throw new KeyNotFoundException($"Unbekannter Sensor: {id}");
 
-        // Vertrag: für eine bekannte id nie werfen — ein gerade nicht lesbarer Kanal liefert NaN („kein Wert").
+        // Vertrag: für eine bekannte id nie werfen - ein gerade nicht lesbarer Kanal liefert NaN („kein Wert").
         lock (_gate)
         {
             try
@@ -136,7 +136,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
         if (fan.Sensor.Control is not { } control)
             return FanMode.Auto; // read-only Kanal: kein Steuermodus → sicherer Default
 
-        // Vertrag: für eine bekannte id nie werfen — ein nicht ermittelbarer Modus fällt auf Auto zurück.
+        // Vertrag: für eine bekannte id nie werfen - ein nicht ermittelbarer Modus fällt auf Auto zurück.
         lock (_gate)
         {
             try
@@ -165,7 +165,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
             else
             {
                 // LHM kennt kein wertfreies „Manual": Software-Modus existiert nur MIT Stellwert. Wir halten
-                // daher den aktuellen Stellwert und schalten so auf Software — der Wert ändert sich nicht.
+                // daher den aktuellen Stellwert und schalten so auf Software - der Wert ändert sich nicht.
                 control.SetSoftware(control.SoftwareValue);
             }
         }
@@ -177,7 +177,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
         if (fan.Sensor.Control is not { } control)
             return 0; // read-only Kanal: kein Stellwert lesbar → Default 0
 
-        // Vertrag: für eine bekannte id nie werfen — ein nicht lesbarer Wert fällt auf 0 zurück.
+        // Vertrag: für eine bekannte id nie werfen - ein nicht lesbarer Wert fällt auf 0 zurück.
         lock (_gate)
         {
             try
@@ -197,7 +197,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
         if (fan.Sensor.Control is not { } control)
             throw new NotSupportedException($"Lüfter {id} ist nicht steuerbar.");
 
-        // SetSoftware schaltet selbsttätig auf Software-Modus (= Manual) — kein vorheriges SetMode nötig.
+        // SetSoftware schaltet selbsttätig auf Software-Modus (= Manual) - kein vorheriges SetMode nötig.
         lock (_gate)
             control.SetSoftware(ToPercent(value));
     }
@@ -207,7 +207,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
         // Der sichere Zustand ist Firmware-Auto über SetDefault() (LHM regelt nicht weiter, die Hardware
         // übernimmt). Best-effort über alle steuerbaren Kanäle; ein scheiternder Kanal stoppt die übrigen
         // nicht, der Aufruf wirft nie und ist nach Dispose wiederholbar. Bleibt SetDefault wirkungslos oder
-        // wirft es, greift ein Volllast-Fallback (analog zum Linux-255-Fallback) — siehe RestoreFanToSafeLocked.
+        // wirft es, greift ein Volllast-Fallback (analog zum Linux-255-Fallback) - siehe RestoreFanToSafeLocked.
         lock (_gate)
             RestoreDefaultsLocked();
     }
@@ -233,7 +233,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
 
     // --- PWM-Mapping (testbar) ------------------------------------------------
 
-    /// <summary>Byte 0..255 → Prozent 0..100 (LHM-Stellwert). Verlustbehaftet — siehe Round-Trip-Toleranz.</summary>
+    /// <summary>Byte 0..255 → Prozent 0..100 (LHM-Stellwert). Verlustbehaftet - siehe Round-Trip-Toleranz.</summary>
     internal static int ToPercent(byte value) => (int)Math.Round(value * 100.0 / 255.0);
 
     /// <summary>Prozent 0..100 → Byte 0..255 (Vertragswert). Inverse von <see cref="ToPercent"/> (gerundet).</summary>
@@ -262,7 +262,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
     /// <summary>
     /// Führt EINEN Kanal in den sicheren Zustand (Aufrufer hält <see cref="_gate"/>): erst Firmware-Auto per
     /// <c>SetDefault()</c>, dann <b>verifizieren</b>. Bleibt der Kanal danach im Software-Modus oder wirft
-    /// <c>SetDefault</c> — d. h. das Board/der Treiber übernimmt die Auto-Umschaltung nicht — wird in die
+    /// <c>SetDefault</c> - d. h. das Board/der Treiber übernimmt die Auto-Umschaltung nicht - wird in die
     /// sichere Richtung erzwungen: Volllast (100 %, maximale Kühlung), analog zum Linux-255-Fallback. So
     /// bleibt ein Lüfter nie ungeregelt bei einem niedrigen Software-Wert hängen. Best-effort, wirft nie.
     /// </summary>
@@ -298,7 +298,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
             .GroupBy(s => s.HardwareName)
             .ToDictionary(g => g.Key, g => g.ToArray());
 
-        // Erst die auslesbaren Sensoren (Temp/Fan) katalogisieren, dann die Controls — so liegen beim
+        // Erst die auslesbaren Sensoren (Temp/Fan) katalogisieren, dann die Controls - so liegen beim
         // Tachometer-Pairing alle Fan-Sensor-Ids bereits im Katalog (unabhängig von der LHM-Reihenfolge).
         foreach (var sensor in all)
         {
@@ -317,7 +317,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
         foreach (var sensor in all.Where(s => s.Type == LhmSensorType.Control))
             AddFan(sensor, fanSensorsByHardware);
 
-        // Deskriptoren einmal sortiert materialisieren (siehe Feld-Kommentar) — danach ist die Kanal-Menge fix.
+        // Deskriptoren einmal sortiert materialisieren (siehe Feld-Kommentar) - danach ist die Kanal-Menge fix.
         _sensorDescriptors = _sensors.Values
             .Select(c => new SensorDescriptor(c.Id, c.Name, c.Kind, c.Unit, c.Source))
             .OrderBy(d => d.Kind)
@@ -334,7 +334,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
     /// <summary>
     /// Setzt die Start-Warnung, wenn <b>ausschließlich</b> GPU-Kanäle gefunden wurden (typische Signatur
     /// eines Treiber-Konflikts). <c>Any() &amp;&amp; All(...)</c>: Bei komplett leerer Discovery (gar nichts
-    /// gefunden) wäre <c>All</c> vakuar-wahr — das ist ein anderer Fall und darf NICHT als „nur GPU" gelten.
+    /// gefunden) wäre <c>All</c> vakuar-wahr - das ist ein anderer Fall und darf NICHT als „nur GPU" gelten.
     /// </summary>
     private void DetectGpuOnly(IReadOnlyList<ILhmSensor> all)
     {
@@ -367,7 +367,7 @@ public sealed class WindowsLhmBackend : ISensorBackend, IFanController, IBackend
     /// <summary>
     /// Paart einen Control-Sensor mit dem RPM-Sensor derselben Hardware, der denselben Namens-Index trägt
     /// (z. B. Control «Fan #2» ↔ Fan «Fan #2»). Bei Mehrdeutigkeit oder ohne eindeutigen Treffer: <c>null</c>
-    /// — lieber kein Tacho als ein falsch gepaarter. Nur wenn der gepaarte Fan-Sensor auch als Sensor im
+    /// - lieber kein Tacho als ein falsch gepaarter. Nur wenn der gepaarte Fan-Sensor auch als Sensor im
     /// Katalog liegt, wird seine Id verlinkt.
     /// </summary>
     private SensorId? MatchTachometer(

@@ -17,9 +17,9 @@ namespace LinFan.App.Controls;
 /// <summary>
 /// Dependency-freier Kurven-Editor als Graph: zeichnet Achsen/Grid, die Lüfterkurve (Temp → %) und
 /// die Stützpunkte als ziehbare Griffe. Überlagert den aktuellen Arbeitspunkt (Live-Temperatur →
-/// resultierendes %), ausgewertet über den vom Controller gesetzten <see cref="Evaluator"/> — dieselbe
+/// resultierendes %), ausgewertet über den vom Controller gesetzten <see cref="Evaluator"/> - dieselbe
 /// CurveEngine-Auswertung wie im Daemon, aber über den Controller bezogen statt LinFan.Core.Services direkt.
-/// Reine View-Mechanik — keine Domain-Logik: Ziehen schreibt nur in die gebundenen
+/// Reine View-Mechanik - keine Domain-Logik: Ziehen schreibt nur in die gebundenen
 /// <see cref="PointRow"/>-Objekte zurück.
 /// </summary>
 public sealed class CurveChart : Control
@@ -31,7 +31,7 @@ public sealed class CurveChart : Control
 
     // Theme-abhängige Pinsel: aus den Farb-Tokens (SemanticColors.axaml) aufgelöst, sobald der Chart im
     // Visual-Tree hängt, und bei Theme-Wechsel neu aufgelöst. Die literalen Fallbacks (Dunkel) greifen,
-    // solange (noch) keine App-Resourcen erreichbar sind — z. B. headless oder vor dem Attach.
+    // solange (noch) keine App-Resourcen erreichbar sind - z. B. headless oder vor dem Attach.
     private IBrush _gridBrush = new SolidColorBrush(Color.Parse("#26262E"));
     private IBrush _axisTextBrush = new SolidColorBrush(Color.Parse("#71717A"));
     private IBrush _curveBrush = new SolidColorBrush(Color.Parse("#38BDF8"));
@@ -40,7 +40,7 @@ public sealed class CurveChart : Control
     private IBrush _liveBrush = new SolidColorBrush(Color.Parse("#F59E0B"));
 
     // Pinsel-abgeleitete Stifte, einmal je Pinsel-Auflösung gebaut statt pro Render-Frame (Render läuft bei
-    // jeder Zeiger-Bewegung). Werden zusammen mit den Pinseln in BuildPens() neu erzeugt — im ctor mit den
+    // jeder Zeiger-Bewegung). Werden zusammen mit den Pinseln in BuildPens() neu erzeugt - im ctor mit den
     // Fallback-Pinseln, danach bei jeder ResolveBrushes()-Auflösung (Attach / Theme-Wechsel).
     private Pen _gridPen = null!;
     private Pen _curvePen = null!;
@@ -153,10 +153,10 @@ public sealed class CurveChart : Control
         _clampBrush = ResolveBrush("ClampColor", _clampBrush);
         _handleFill = ResolveBrush("HandleColor", _handleFill);
         _liveBrush = ResolveBrush("LiveColor", _liveBrush);
-        BuildPens(); // Stifte an die (neu) aufgelösten Pinsel koppeln — sonst zeigten sie noch auf die alten
+        BuildPens(); // Stifte an die (neu) aufgelösten Pinsel koppeln - sonst zeigten sie noch auf die alten
     }
 
-    /// <summary>Baut die gecachten Stifte aus den aktuellen Pinseln — exakt die Strichbreiten/Dash-Stile der Draw-Pfade.</summary>
+    /// <summary>Baut die gecachten Stifte aus den aktuellen Pinseln - exakt die Strichbreiten/Dash-Stile der Draw-Pfade.</summary>
     private void BuildPens()
     {
         _gridPen = new Pen(_gridBrush, 1);
@@ -174,7 +174,7 @@ public sealed class CurveChart : Control
     // --- Datenbindung an die veränderliche Punkt-Sammlung ----------------------
     //
     // Handler laufen nur, solange der Chart im Visual-Tree hängt UND genau auf der aktuellen Points-Sammlung.
-    // Beim Detach werden sie gelöst und beim (Wieder-)Attach neu gesetzt — sonst hielte eine Sammlung, die den
+    // Beim Detach werden sie gelöst und beim (Wieder-)Attach neu gesetzt - sonst hielte eine Sammlung, die den
     // Chart überlebt (sie gehört dem Controller), ihn über CollectionChanged/PropertyChanged am Leben.
 
     private IEnumerable? _subscribed; // Sammlung, auf der aktuell Handler hängen (null = keine)

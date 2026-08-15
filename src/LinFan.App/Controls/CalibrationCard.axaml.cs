@@ -7,7 +7,7 @@ namespace LinFan.App.Controls;
 
 /// <summary>
 /// Wiederverwendbare Kalibrier-Statusanzeige: Kopfzeile, Fortschrittsbalken und Detailzeile als ein
-/// einheitliches Bild. Reine View-Mechanik — der Aufrufer speist die Werte über die StyledProperties und
+/// einheitliches Bild. Reine View-Mechanik - der Aufrufer speist die Werte über die StyledProperties und
 /// stellt den umgebenden Container (z. B. InfoBg-Border, Abbrechen-Button) bereit.
 /// </summary>
 public partial class CalibrationCard : UserControl

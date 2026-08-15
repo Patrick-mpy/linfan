@@ -28,7 +28,9 @@ public partial class CurveEditorController : ObservableObject
     private readonly Func<Task>? _cancelTachMapping;
     private readonly Func<string, string?, Task>? _setFanTachometer;
     private bool _initialized;
-    private bool _applyingProfile; // unterdrückt das Live-Umschalten beim programmatischen Setzen
+    private bool _applyingProfile; // unterdrückt das Nachladen beim programmatischen Setzen der Auswahl
+    private bool _applyingActiveProfile; // dito für das aktive Profil (kein IPC beim Laden/Verwerfen)
+    private string _liveCurvesSignature = ""; // Fingerabdruck der zuletzt aus dem Snapshot gebauten Live-Kurven
     private string? _savedConfigJson; // Baseline (zuletzt geladen/gespeichert) für die Dirty-Erkennung
     private bool _dirtyCheckDeferred; // eine im dirty-Zustand koaleszierte Prüfung wartet auf den nächsten Live-Tick
     private AirflowTuneResult? _lastAirflowResult; // letzte Airflow-Analyse, bis übernommen/verworfen
@@ -45,20 +47,35 @@ public partial class CurveEditorController : ObservableObject
     public ObservableCollection<ProfileRow> Profiles { get; } = new();
 
     /// <summary>
-    /// Im Geräte-Tab angezeigte Teilmenge der Sensoren — gefiltert über <see cref="SensorSearch"/> und
+    /// The curves the daemon is regulating with right now, rebuilt from the snapshot whenever the saved
+    /// configuration changes. Deliberately its own set and not <see cref="Curves"/>: the editor may be
+    /// showing a different profile entirely, and even for the active one its rows carry unsaved edits that
+    /// are not running yet. The dashboard binds to these, so it never claims something is live that is not.
+    /// </summary>
+    public ObservableCollection<CurveEditRow> LiveCurves { get; } = new();
+
+    /// <summary>
+    /// Counts the rebuilds of <see cref="LiveCurves"/>. Consumers that cache rows (the dashboard panel)
+    /// cannot tell a replaced set from an unchanged one by content alone - an edited curve keeps its id -
+    /// and would keep binding to discarded rows, which no longer receive live values.
+    /// </summary>
+    public int LiveCurvesRevision { get; private set; }
+
+    /// <summary>
+    /// Im Geräte-Tab angezeigte Teilmenge der Sensoren - gefiltert über <see cref="SensorSearch"/> und
     /// <see cref="HideHiddenSensors"/>. Discovery-Reihenfolge bleibt erhalten (kein Live-Umsortieren beim
     /// Tippen). Nicht zu verwechseln mit <see cref="VisibleSensors"/> (Quell-Sensoren für Kurven).
     /// </summary>
     public ObservableCollection<SensorOption> FilteredSensors { get; } = new();
 
-    /// <summary>Im Geräte-Tab angezeigte Teilmenge der Lüfter — gefiltert über <see cref="FanSearch"/> und
+    /// <summary>Im Geräte-Tab angezeigte Teilmenge der Lüfter - gefiltert über <see cref="FanSearch"/> und
     /// <see cref="HideHiddenFans"/>. Discovery-Reihenfolge bleibt erhalten.</summary>
     public ObservableCollection<FanAssignRow> FilteredFans { get; } = new();
 
     /// <summary>Lüfter-Checkboxen für die aktuell ausgewählte Kurve (neu aufgebaut bei Kurvenwechsel).</summary>
     public ObservableCollection<FanCurveCheck> SelectedCurveFans { get; } = new();
 
-    /// <summary>Dieselben Lüfter-Checkboxen, nach Position/Gruppe gebündelt (wie das Dashboard) — Bindungsziel der gruppierten Anzeige.</summary>
+    /// <summary>Dieselben Lüfter-Checkboxen, nach Position/Gruppe gebündelt (wie das Dashboard) - Bindungsziel der gruppierten Anzeige.</summary>
     public ObservableCollection<FanCheckGroup> SelectedCurveFanGroups { get; } = new();
 
     /// <summary>Pro-Lüfter-Vorschläge des Airflow-Auto-Tune (nach „Airflow analysieren"); leer bis zur Analyse.</summary>
@@ -81,7 +98,16 @@ public partial class CurveEditorController : ObservableObject
     public ObservableCollection<TachSensorOption> AvailableTachSensors { get; } = new();
 
     [ObservableProperty] private CurveEditRow? _selectedCurve;
+
+    /// <summary>The profile the editor is showing - selecting one does not activate it (see <see cref="ActiveProfile"/>).</summary>
     [ObservableProperty] private ProfileRow? _selectedProfile;
+
+    /// <summary>
+    /// The profile the daemon regulates with. Split from <see cref="SelectedProfile"/> on purpose: while the
+    /// two were one property, opening a profile in the editor switched the running configuration, so a
+    /// profile could never be prepared before it took over the fans.
+    /// </summary>
+    [ObservableProperty] private ProfileRow? _activeProfile;
 
     /// <summary>Save/revert result message, rendered as the transient editor status toast.</summary>
     public TransientStatus Status { get; }
@@ -93,10 +119,14 @@ public partial class CurveEditorController : ObservableObject
     [ObservableProperty] private bool _hideHiddenSensors;
     [ObservableProperty] private bool _hideHiddenFans;
 
-    /// <summary>True, solange das Profil-Namensfeld eingeblendet ist (nach „+ Profil"/„Duplizieren"/„Umbenennen").</summary>
-    [ObservableProperty] private bool _isNamingProfile;
+    /// <summary>
+    /// Welche Seite der Kurven-Tab rechts zeigt. Wird ausschließlich durch Klicks im Seitenmenü und die
+    /// Anlege-/Sprung-Befehle gesetzt - bewusst nicht an die Auswahl gekoppelt: das Laden eines Profils
+    /// setzt auch die Kurven-Auswahl, würde also sofort wieder auf den Kurven-Editor umschalten.
+    /// </summary>
+    [ObservableProperty] private CurveTabPane _pane = CurveTabPane.Curve;
 
-    /// <summary>Standard-Stützpunkte einer neu angelegten Kurve — bewusst ein paar mehr als das frühere 30/80-Paar.</summary>
+    /// <summary>Standard-Stützpunkte einer neu angelegten Kurve - bewusst ein paar mehr als das frühere 30/80-Paar.</summary>
     private static readonly (decimal Temp, decimal Percent)[] DefaultCurvePoints =
     {
         (30, 20), (50, 35), (65, 50), (80, 75), (90, 100),
@@ -104,16 +134,10 @@ public partial class CurveEditorController : ObservableObject
 
     /// <summary>True, sobald sich der Editor-Stand von der zuletzt gespeicherten/geladenen Konfiguration unterscheidet.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowUnsavedToast))]
+    [NotifyPropertyChangedFor(nameof(CanChangeActiveProfile))]
+    [NotifyPropertyChangedFor(nameof(CanActivateSelectedProfile))]
+    [NotifyPropertyChangedFor(nameof(ShowActivationBlockedHint))]
     private bool _hasUnsavedChanges;
-
-    /// <summary>Set when the user closes the unsaved-changes toast with its X; the next edit re-shows it.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowUnsavedToast))]
-    private bool _unsavedToastHidden;
-
-    /// <summary>Drives the unsaved-changes toast: the dirty state minus an explicit user dismissal.</summary>
-    public bool ShowUnsavedToast => HasUnsavedChanges && !UnsavedToastHidden;
 
     /// <summary>True, sobald der erste Snapshot verarbeitet wurde (Geräte/Kurven geladen). Steuert Leer-/Lade-Hinweise.</summary>
     [ObservableProperty] private bool _isReady;
@@ -190,7 +214,7 @@ public partial class CurveEditorController : ObservableObject
         foreach (FanReading f in snapshot.Fans)
         {
             // The hardware label comes along for display only (it applies as long as the fan carries no own
-            // name — e.g. entries the daemon created via calibration or tach coupling). Do NOT write it into
+            // name - e.g. entries the daemon created via calibration or tach coupling). Do NOT write it into
             // the FanConfig: empty means "no own name" there.
             FanConfig baseFan = snapshot.Config.Fans.FirstOrDefault(fc => fc.FanId == f.Id)
                 ?? new FanConfig { FanId = f.Id };
@@ -213,8 +237,13 @@ public partial class CurveEditorController : ObservableObject
         foreach (Profile p in snapshot.Config.Profiles)
             Profiles.Add(new ProfileRow(p.Id, p.Name, p.Curves, p.Assignments));
 
+        // Der Editor startet auf dem aktiven Profil - beides zeigt anfangs dasselbe, ist aber ab hier
+        // getrennt: die Auswahl folgt dem Nutzer, das aktive Profil nur einer ausdrücklichen Aktivierung.
         ProfileRow? active = Profiles.FirstOrDefault(p => p.Id == snapshot.Config.ActiveProfileId)
                              ?? Profiles.FirstOrDefault();
+        _applyingActiveProfile = true;
+        ActiveProfile = active;
+        _applyingActiveProfile = false;
         _applyingProfile = true;
         SelectedProfile = active;
         _applyingProfile = false;
@@ -237,19 +266,24 @@ public partial class CurveEditorController : ObservableObject
             RebuildSelectedCurveFans();
         }
 
+        // Die laufenden Kurven schon hier spiegeln, nicht erst beim ersten Live-Tick: bis dahin wüsste ein
+        // Kurven-An/Aus nicht, dass es den Daemon etwas angeht (siehe IsLiveCurve).
+        RebuildLiveCurvesIfChanged(snapshot.Config);
+
         // Baseline für die Dirty-Erkennung festhalten (entspricht dem geladenen Daemon-Stand).
         _savedConfigJson = Serialize(BuildConfig());
         HasUnsavedChanges = false;
+        RefreshAirflowStatus(); // zeigt in den Einstellungen an, ob schon getunt wurde (auch im Fallback ohne Profile)
         IsReady = true;
     }
 
     /// <summary>
     /// Baut den Editor nach einem <b>Reset/Import</b> vollständig aus der neuen Daemon-Config neu auf.
     /// Lokale, noch nicht gespeicherte Änderungen werden dabei bewusst verworfen (Reset/Import ist eine
-    /// explizite, autoritative Aktion). Ohne diesen Neuaufbau bliebe der Editor auf dem alten Stand — und
+    /// explizite, autoritative Aktion). Ohne diesen Neuaufbau bliebe der Editor auf dem alten Stand - und
     /// ein späteres „Speichern" würde die alte Config zurückschreiben und Reset/Import stillschweigend
     /// rückgängig machen. Wird vom <see cref="MainController"/> ausgelöst, sobald der Daemon die geänderte
-    /// Config zurückspiegelt (nicht schon beim Absenden — dann läge noch die alte vor).
+    /// Config zurückspiegelt (nicht schon beim Absenden - dann läge noch die alte vor).
     /// </summary>
     public void Resync(MonitorSnapshot snapshot)
     {
@@ -259,9 +293,14 @@ public partial class CurveEditorController : ObservableObject
         _applyingProfile = true;  // Profil-Setter-Nebenwirkungen beim Abbau unterdrücken
         SelectedProfile = null;
         _applyingProfile = false;
+        _applyingActiveProfile = true;
+        ActiveProfile = null;
+        _applyingActiveProfile = false;
         SelectedCurve = null;
 
         Curves.Clear();            // Reset → OnCurvesChanged meldet die Zeilen sauber ab
+        LiveCurves.Clear();
+        _liveCurvesSignature = "";
         Profiles.Clear();
         Sensors.Clear();
         VisibleSensors.Clear();
@@ -272,6 +311,8 @@ public partial class CurveEditorController : ObservableObject
         SelectedCurveFanGroups.Clear();
         AirflowSuggestions.Clear();
         AirflowHints.Clear();
+        AirflowStatus.Clear(); // hält Verweise auf die eben abgebauten Lüfter-/Kurven-Zeilen
+        HasAirflowStatus = false;
         HasAirflowSuggestion = false;
         _lastAirflowResult = null;
         AvailableGroups.Clear();
@@ -293,22 +334,25 @@ public partial class CurveEditorController : ObservableObject
             .Where(s => s.Kind == SensorKind.Temperature)
             .ToDictionary(s => s.Id, s => s.Value);
 
-        // Aggregierter Live-Wert über alle Quell-Sensoren — dieselbe Kernregel wie im Daemon-Regelpfad
-        // (NaN-Werte ignorieren; Max bzw. Average; ohne lesbare Quelle → NaN).
-        foreach (CurveEditRow c in Curves)
+        RebuildLiveCurvesIfChanged(snapshot.Config);
+
+        // Aggregierter Live-Wert über alle Quell-Sensoren - dieselbe Kernregel wie im Daemon-Regelpfad
+        // (NaN-Werte ignorieren; Max bzw. Average; ohne lesbare Quelle → NaN). Gilt für die bearbeiteten
+        // Kurven UND die des laufenden Profils (Dashboard) - es sind getrennte Zeilen.
+        foreach (CurveEditRow c in Curves.Concat(LiveCurves))
         {
             IEnumerable<double> values = c.Sources.Select(
                 src => temps.TryGetValue(src.Id, out double t) ? t : double.NaN);
             c.LiveTemperature = SensorAggregator.Aggregate(values, c.Aggregation);
         }
 
-        // Live-Temperatur je Sensor-Zeile (Geräte-Tab) — reine Anzeige, fließt nicht in BuildConfig.
+        // Live-Temperatur je Sensor-Zeile (Geräte-Tab) - reine Anzeige, fließt nicht in BuildConfig.
         foreach (SensorOption s in Sensors)
             s.SetLive(temps.TryGetValue(s.Id, out double t) ? t : double.NaN);
 
         // Live-Drehzahl + Kalibrier-/Identify-/Kopplungs-Status je Lüfter-Zeile spiegeln (ebenfalls reine Anzeige).
         Dictionary<string, double?> rpms = snapshot.Fans.ToDictionary(f => f.Id, f => f.Rpm);
-        // Config-Ids können (durch Id-Migration/Hand-Edit) doppelt sein — erster gewinnt (wie im SnapshotBuilder),
+        // Config-Ids können (durch Id-Migration/Hand-Edit) doppelt sein - erster gewinnt (wie im SnapshotBuilder),
         // statt hart am ToDictionary zu werfen und die ganze GUI abzureißen.
         var rpmSources = new Dictionary<string, string?>();
         var minPwms = new Dictionary<string, byte>();
@@ -318,7 +362,7 @@ public partial class CurveEditorController : ObservableObject
             minPwms.TryAdd(f.FanId, f.MinPwm);
         }
 
-        // Vom Daemon geänderte Anlaufpunkte (Kalibrier-Ergebnis) einsammeln — sie müssen anschließend auch in
+        // Vom Daemon geänderte Anlaufpunkte (Kalibrier-Ergebnis) einsammeln - sie müssen anschließend auch in
         // die Dirty-Baseline, sonst gälten sie als ungespeicherte Nutzer-Änderung (Banner/Verwerfen).
         Dictionary<string, (int Min, int Max)>? adoptedLimits = null;
         foreach (FanAssignRow fan in Fans)
@@ -339,12 +383,34 @@ public partial class CurveEditorController : ObservableObject
         if (adoptedLimits is not null)
             RebaselineFanPwmLimits(adoptedLimits);
 
-        // Dirty-Erkennung läuft NICHT pro Tick aus den Live-Werten (die ändern die Config nicht) — sie hängt an
+        // Dirty-Erkennung läuft NICHT pro Tick aus den Live-Werten (die ändern die Config nicht) - sie hängt an
         // den echten Edit-Pfaden (MarkDirty über die Collection-/Row-Handler). Der Tick zieht nur eine im
         // dirty-Zustand koaleszierte Prüfung nach (z. B. ein Punkt-Drag zurück auf die Baseline), damit der
         // teure Vergleich höchstens einmal je Tick statt pro Maus-Sample läuft.
         if (_dirtyCheckDeferred)
             RefreshDirty();
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="LiveCurves"/> from the daemon's own curve set - that is what actually regulates,
+    /// kept in step with the active profile by <c>ProfileService.Apply</c> on every save. Guarded by a
+    /// signature so the rows survive between ticks (their live working point would otherwise restart every
+    /// second) and are only replaced when the stored configuration really changed.
+    /// </summary>
+    private void RebuildLiveCurvesIfChanged(AppConfig config)
+    {
+        string signature = string.Join("|", config.Curves.Select(c =>
+            $"{c.Id}␟{c.Name}␟{c.Enabled}␟{c.Aggregation}␟{c.HysteresisC}␟{c.SmoothingSeconds}␟{c.InterpolationMode}"
+            + $"␟{string.Join(",", CurveSourceResolver.ResolveSources(c.SourceSensorId, c.SourceSensorIds))}"
+            + $"␟{string.Join(",", c.Points.Select(p => $"{p.TemperatureC}:{p.Percent}"))}"));
+        if (signature == _liveCurvesSignature)
+            return;
+        _liveCurvesSignature = signature;
+
+        LiveCurves.Clear();
+        foreach (CurveConfig c in config.Curves)
+            LiveCurves.Add(CurveEditRow.From(c, Sensors, Fans));
+        LiveCurvesRevision++;
     }
 
     /// <summary>

@@ -7,7 +7,7 @@ using Xunit;
 namespace LinFan.App.Tests;
 
 /// <summary>
-/// Sichert die Logik des <see cref="StringNotEmptyConverter"/> ab — er steuert die Sichtbarkeit des
+/// Sichert die Logik des <see cref="StringNotEmptyConverter"/> ab - er steuert die Sichtbarkeit des
 /// PWM-Auto-Swap-Hinweises (sichtbar nur bei nicht-leerem Text). Reine C#-Logik, ohne Avalonia-Headless testbar.
 /// </summary>
 public sealed class StringNotEmptyConverterTests

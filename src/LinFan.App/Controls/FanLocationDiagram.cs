@@ -15,7 +15,7 @@ namespace LinFan.App.Controls;
 /// Wiederverwendbare, interaktive Gehäuse-Vorschau zur Wahl einer <see cref="FanLocation"/>: zeichnet die
 /// Silhouette mit anklickbaren Zonen und Bauteilen (Layout/Hit-Test in <see cref="FanLocationLayout"/>),
 /// färbt sie nach Luftrichtung (<see cref="FanLocationOption.DirectionOf"/>) und hebt die Auswahl hervor.
-/// Reine View-Mechanik — kennt nur die gebundene <see cref="SelectedLocation"/>, weder Geräte-Tab noch
+/// Reine View-Mechanik - kennt nur die gebundene <see cref="SelectedLocation"/>, weder Geräte-Tab noch
 /// Onboarding; dadurch an beiden Stellen identisch einsetzbar. Theme-Brushes wie <see cref="CurveChart"/>.
 /// </summary>
 public sealed class FanLocationDiagram : Control
@@ -47,7 +47,7 @@ public sealed class FanLocationDiagram : Control
     private Pen _emphasisSelectedPen = null!; // Auswahl-Rahmen (Breite 2)
     private IBrush _accentBrush = null!;       // Auswahl-Label
     private IBrush _labelBrush = null!;        // übrige Labels
-    // Füllpinsel je Richtungsfarbe × Zustands-Deckkraft (ausgewählt/hover/normal) — beide Achsen stammen aus
+    // Füllpinsel je Richtungsfarbe × Zustands-Deckkraft (ausgewählt/hover/normal) - beide Achsen stammen aus
     // kleinen festen Mengen, daher vorberechnet statt pro Region neu (variable Deckkraft 0,34/0,22/0,14).
     private readonly Dictionary<Color, (IBrush Selected, IBrush Hover, IBrush Normal)> _fills = new();
 
@@ -99,7 +99,7 @@ public sealed class FanLocationDiagram : Control
         RebuildBrushes(); // Pinsel/Stifte an die (neu) aufgelösten Farben koppeln
     }
 
-    /// <summary>Baut die gecachten Pinsel/Stifte aus den aktuellen Farben — exakt die Strichbreiten/Deckkräfte der Draw-Pfade.</summary>
+    /// <summary>Baut die gecachten Pinsel/Stifte aus den aktuellen Farben - exakt die Strichbreiten/Deckkräfte der Draw-Pfade.</summary>
     private void RebuildBrushes()
     {
         _accentBrush = new SolidColorBrush(_accent);
@@ -160,7 +160,7 @@ public sealed class FanLocationDiagram : Control
         IReadOnlyList<FanLocationLayout.Region> regions = FanLocationLayout.Build(Bounds.Size);
 
         // Durchgang 1: Füllung, Grundrahmen und Beschriftung. Der hervorgehobene Rahmen kommt erst danach
-        // oben drauf — sonst übermalt ihn der Rahmen des benachbarten (später gezeichneten) Felds an der
+        // oben drauf - sonst übermalt ihn der Rahmen des benachbarten (später gezeichneten) Felds an der
         // gemeinsamen Kante (das war das „Clipping" unter den nicht ausgewählten Feldern).
         foreach (FanLocationLayout.Region r in regions)
         {

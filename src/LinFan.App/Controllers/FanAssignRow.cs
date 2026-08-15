@@ -25,20 +25,20 @@ public partial class FanAssignRow : ObservableObject
     private readonly Func<string, string?, Task>? _sendSetTach; // SetFanTachometer(fanId, sensorId|null)
     private readonly TimeSpan _calibrationHold;
     private CancellationTokenSource? _holdCts; // hält die finale Done/Error-Meldung; gecancelt bei neuem Lauf
-    // Eigenes Halten für die Identify-Meldung — unabhängig vom Kalibrier-Halten (kein gegenseitiges Überschreiben).
+    // Eigenes Halten für die Identify-Meldung - unabhängig vom Kalibrier-Halten (kein gegenseitiges Überschreiben).
     private CancellationTokenSource? _identifyHoldCts;
-    // Eigenes Halten für die Kopplungs-Meldung — unabhängig von Kalibrier-/Identify-Halten.
+    // Eigenes Halten für die Kopplungs-Meldung - unabhängig von Kalibrier-/Identify-Halten.
     private CancellationTokenSource? _tachHoldCts;
     // Zuletzt vom Daemon gespiegelte Tacho-Zuordnung; verhindert, dass ein Snapshot mit unverändertem
     // Wert eine gerade getätigte (noch nicht bestätigte) Nutzer-Auswahl im Dropdown zurücksetzt.
     private string? _lastDaemonRpmSource;
     private bool _applyingRpmSource; // true, während das Dropdown programmatisch aus dem Snapshot gesetzt wird
-    // Zuletzt vom Daemon gemeldeter Anlaufpunkt (MinPwm) — gleiches Muster wie _lastDaemonRpmSource: nur eine
+    // Zuletzt vom Daemon gemeldeter Anlaufpunkt (MinPwm) - gleiches Muster wie _lastDaemonRpmSource: nur eine
     // echte Änderung dort (Kalibrier-Ergebnis) zieht den Wert nach, ein unveränderter Snapshot lässt eine
     // gerade getippte, noch nicht gespeicherte Eingabe in Ruhe.
     private int _lastDaemonMinPwm;
     // Hardware label as resolved by the daemon (from the live fan list). Shown when the fan carries no own
-    // name — and for exactly that reason must never be written back as one (see ToConfig).
+    // name - and for exactly that reason must never be written back as one (see ToConfig).
     private readonly string _hardwareLabel;
 
     public string FanId => _base.FanId;
@@ -47,7 +47,7 @@ public partial class FanAssignRow : ObservableObject
     public string HardwareName => _base.FanId;
 
     /// <summary>
-    /// Placeholder of the name field: the hardware label as resolved by the daemon — exactly what is shown
+    /// Placeholder of the name field: the hardware label as resolved by the daemon - exactly what is shown
     /// everywhere while the fan has no own name. A placeholder rather than a value, so an untouched field
     /// stays empty instead of being persisted as a user-defined name. Falls back to the generic hint when
     /// there is no label.
@@ -59,7 +59,7 @@ public partial class FanAssignRow : ObservableObject
     /// <summary>Ob der Lüfter steuerbar ist (nur dann ist Kalibrierung möglich). Laufzeit-Info aus dem Snapshot.</summary>
     public bool CanControl { get; }
 
-    /// <summary>Temporäre Manuell-Steuerung (Slider in der Erweitert-Sektion) — erleichtert die Zuordnung;
+    /// <summary>Temporäre Manuell-Steuerung (Slider in der Erweitert-Sektion) - erleichtert die Zuordnung;
     /// beim Einklappen der Sektion automatisch zurück auf Kurve/Hardware-Auto.</summary>
     public ManualControl Manual { get; }
 
@@ -72,17 +72,30 @@ public partial class FanAssignRow : ObservableObject
     /// <summary>Auswählbare Einbau-Positionen.</summary>
     public IReadOnlyList<FanLocationOption> Locations => FanLocationOption.All;
 
-    /// <summary>Gruppenschlüssel für die Auto-Gruppierung in der Kurven-Zuordnung (Position › „Ungruppiert") — wie im Dashboard.</summary>
+    /// <summary>Gruppenschlüssel für die Auto-Gruppierung in der Kurven-Zuordnung (Position › „Ungruppiert") - wie im Dashboard.</summary>
     public string GroupKey => Location.Value != FanLocation.Unspecified
         ? FanLocationOption.GroupNameFor(Location.Value)
         : FanGroup.Ungrouped;
 
-    [ObservableProperty] private string _name;
+    /// <summary>
+    /// Name für reine Anzeigen: eigener Name, sonst das Hardware-Label, sonst die rohe Id. <see cref="Name"/>
+    /// bleibt leer, solange der Lüfter keinen eigenen Namen trägt (siehe <see cref="NamePlaceholder"/>) - eine
+    /// Liste, die direkt daran hängt, zeigte dann eine leere Zeile.
+    /// </summary>
+    public string DisplayName =>
+        !string.IsNullOrWhiteSpace(Name) ? Name
+        : !string.IsNullOrWhiteSpace(_hardwareLabel) ? _hardwareLabel
+        : HardwareName;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private string _name;
+
     [ObservableProperty] private CurveEditRow? _selected;
     [ObservableProperty] private FanLocationOption _location;
     [ObservableProperty] private bool _visible;
 
-    // Wahrheit bleibt der rohe PWM-Wert (0–255, so wird gespeichert); MinPercent/MaxPercent sind nur die
+    // Wahrheit bleibt der rohe PWM-Wert (0-255, so wird gespeichert); MinPercent/MaxPercent sind nur die
     // Anzeige in Prozent (konsistent mit Dashboard-Slider & Kalibrierung). Beide Felder benachrichtigen die
     // jeweilige Prozent-Property, damit das nachgezogene Min/Max in der UI sofort mitläuft.
     [ObservableProperty]
@@ -93,7 +106,7 @@ public partial class FanAssignRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(MaxPercent))]
     private int _maxPwm;
 
-    /// <summary>PWM-Untergrenze als Prozent (0–100). Setzen rundet auf den nächsten rohen PWM-Wert; ein
+    /// <summary>PWM-Untergrenze als Prozent (0-100). Setzen rundet auf den nächsten rohen PWM-Wert; ein
     /// unangetasteter Wert bleibt beim Speichern exakt der geladene Hardware-Wert (kein stiller Drift).</summary>
     public int MinPercent
     {
@@ -101,7 +114,7 @@ public partial class FanAssignRow : ObservableObject
         set => MinPwm = PwmScale.ToPwm(value);
     }
 
-    /// <summary>PWM-Obergrenze als Prozent (0–100). Siehe <see cref="MinPercent"/>.</summary>
+    /// <summary>PWM-Obergrenze als Prozent (0-100). Siehe <see cref="MinPercent"/>.</summary>
     public int MaxPercent
     {
         get => PwmScale.ToPercent((byte)Math.Clamp(MaxPwm, 0, 255));
@@ -152,25 +165,25 @@ public partial class FanAssignRow : ObservableObject
 
     /// <summary>
     /// Spiegelt die letzte automatische Min/Max-Korrektur (Min &gt; Max → der jeweils andere Wert wird
-    /// nachgezogen). Leer, sobald eine Änderung ohne Nachziehen passiert. Kein Timer — rein deterministisch.
+    /// nachgezogen). Leer, sobald eine Änderung ohne Nachziehen passiert. Kein Timer - rein deterministisch.
     /// </summary>
     [ObservableProperty] private string _pwmAdjustHint = "";
 
-    /// <summary>True, während gerade der eine PWM-Wert vom anderen nachgezogen wird — der nachgezogene
+    /// <summary>True, während gerade der eine PWM-Wert vom anderen nachgezogen wird - der nachgezogene
     /// Setter soll den Hinweis dann nicht wieder leeren, den der auslösende Setter eben gesetzt hat.</summary>
     private bool _autoAdjusting;
 
     /// <summary>Formatierte Live-Drehzahl für den Geräte-Tab (reine Anzeige, fließt nicht in die Config).</summary>
-    [ObservableProperty] private string _liveRpm = "—";
+    [ObservableProperty] private string _liveRpm = "-";
 
-    /// <summary>Ob die „Erweitert"-Sektion (Grenzwerte + Kalibrierung) aufgeklappt ist — reiner View-Zustand pro Zeile.</summary>
+    /// <summary>Ob die „Erweitert"-Sektion (Grenzwerte + Kalibrierung) aufgeklappt ist - reiner View-Zustand pro Zeile.</summary>
     [ObservableProperty] private bool _showAdvanced;
 
     /// <summary>True, sobald für diesen Lüfter eine Kalibrierung vorliegt (aus der Config geladen oder in dieser
     /// Sitzung erfolgreich gelaufen). Steuert das „bereits kalibriert"-Badge in der Lüfterzeile.</summary>
     [ObservableProperty] private bool _isCalibrated;
 
-    /// <summary>Tooltip des Kalibrier-Badges — Anlaufpunkt in % (bzw. Hinweis, falls keiner gefunden wurde).</summary>
+    /// <summary>Tooltip des Kalibrier-Badges - Anlaufpunkt in % (bzw. Hinweis, falls keiner gefunden wurde).</summary>
     [ObservableProperty] private string _calibrationBadgeHint = "";
 
     /// <param name="calibrationHold">Wie lange die finale Done/Error-Meldung sichtbar bleibt (Default 4 s;
@@ -222,7 +235,7 @@ public partial class FanAssignRow : ObservableObject
     [RelayCommand]
     private Task Identify() => CanControl ? _sendIdentify?.Invoke(FanId) ?? Task.CompletedTask : Task.CompletedTask;
 
-    /// <summary>Startet die automatische Tacho-Kopplung (nur für steuerbare Lüfter — sonst kann nichts angetrieben werden).</summary>
+    /// <summary>Startet die automatische Tacho-Kopplung (nur für steuerbare Lüfter - sonst kann nichts angetrieben werden).</summary>
     [RelayCommand]
     private Task CoupleSensor() => CanControl ? _sendTachMapping?.Invoke(FanId) ?? Task.CompletedTask : Task.CompletedTask;
 
@@ -234,7 +247,7 @@ public partial class FanAssignRow : ObservableObject
     [RelayCommand]
     private void ToggleVisible() => Visible = !Visible;
 
-    /// <summary>Übernimmt die Live-Drehzahl (kein Tacho/lesbar bzw. NaN → „n/a") — für die Zeile und den Manuell-Slider.</summary>
+    /// <summary>Übernimmt die Live-Drehzahl (kein Tacho/lesbar bzw. NaN → „n/a") - für die Zeile und den Manuell-Slider.</summary>
     public void SetLiveRpm(double? rpm)
     {
         LiveRpm = rpm is { } r && !double.IsNaN(r)
@@ -251,7 +264,7 @@ public partial class FanAssignRow : ObservableObject
     }
 
     /// <summary>
-    /// Spiegelt den Kalibrier-Status aus dem Snapshot in diese Zeile — aber nur, wenn er diesen Lüfter
+    /// Spiegelt den Kalibrier-Status aus dem Snapshot in diese Zeile - aber nur, wenn er diesen Lüfter
     /// betrifft. Die finale Done/Error-Meldung wird „gelatcht" und für <see cref="_calibrationHold"/> gehalten,
     /// auch wenn zwischendurch ein Snapshot ohne Kalibrierung für diesen Lüfter kommt (sonst nur einen Tick lesbar).
     /// Ein neu startender Lauf für diesen Lüfter bricht das Halten ab und zeigt wieder Live-Fortschritt.
@@ -261,7 +274,7 @@ public partial class FanAssignRow : ObservableObject
         if (status is null || status.FanId != FanId)
         {
             if (_holdCts is not null)
-                return; // finale Meldung wird gerade gehalten — nicht durch fremden/leeren Snapshot löschen
+                return; // finale Meldung wird gerade gehalten - nicht durch fremden/leeren Snapshot löschen
 
             IsCalibrating = false;
             CalibrationProgress = "";
@@ -294,7 +307,7 @@ public partial class FanAssignRow : ObservableObject
             CalibrationProgress = Localizer.Instance.Format("FanAssignRow.CalibDone", status.StartPwm);
             CalibrationFanProgress = 100;
             CalibrationFailed = false;
-            IsCalibrated = true; // ab jetzt „bereits kalibriert" — auch ohne Reload/Neustart
+            IsCalibrated = true; // ab jetzt „bereits kalibriert" - auch ohne Reload/Neustart
             if (status.StartPwm is { } sp)
                 CalibrationBadgeHint = CalibrationBadge.Hint((byte)Math.Clamp(sp, 0, 255));
         }
@@ -302,7 +315,7 @@ public partial class FanAssignRow : ObservableObject
     }
 
     /// <summary>
-    /// Spiegelt den Identify-Status aus dem Snapshot in diese Zeile — analog zu <see cref="ApplyCalibration"/>,
+    /// Spiegelt den Identify-Status aus dem Snapshot in diese Zeile - analog zu <see cref="ApplyCalibration"/>,
     /// aber mit eigenem Halten (<see cref="_identifyHoldCts"/>), damit Identify und Kalibrierung sich nicht
     /// gegenseitig die gehaltene Meldung wegräumen. Bei Erfolg sendet der Daemon <c>Identify=null</c> → der
     /// „fremde/leere"-Zweig leert wieder (keine Erfolgsmeldung nötig); nur ein Fehler/Abbruch wird gelatcht.
@@ -312,7 +325,7 @@ public partial class FanAssignRow : ObservableObject
         if (status is null || status.FanId != FanId)
         {
             if (_identifyHoldCts is not null)
-                return; // finale (Abbruch-)Meldung wird gerade gehalten — nicht durch fremden/leeren Snapshot löschen
+                return; // finale (Abbruch-)Meldung wird gerade gehalten - nicht durch fremden/leeren Snapshot löschen
 
             IsIdentifying = false;
             IdentifyProgress = "";
@@ -342,17 +355,17 @@ public partial class FanAssignRow : ObservableObject
     }
 
     /// <summary>
-    /// Spiegelt den Tacho-Kopplungs-Status aus dem Snapshot in diese Zeile — analog zu <see cref="ApplyIdentify"/>,
+    /// Spiegelt den Tacho-Kopplungs-Status aus dem Snapshot in diese Zeile - analog zu <see cref="ApplyIdentify"/>,
     /// aber mit <b>eigenem</b> Halten (<see cref="_tachHoldCts"/>), damit sich Kopplung, Identify und Kalibrierung
     /// nicht gegenseitig die gehaltene Meldung wegräumen. Anders als bei Identify werden hier ALLE Abschluss-Phasen
-    /// (Matched/NoResponse/Ambiguous/Failed) als Ergebnistext gelatcht — der Daemon hält den Status bis zur Quittung.
+    /// (Matched/NoResponse/Ambiguous/Failed) als Ergebnistext gelatcht - der Daemon hält den Status bis zur Quittung.
     /// </summary>
     public void ApplyTachMapping(TachMappingStatus? status)
     {
         if (status is null || status.FanId != FanId)
         {
             if (_tachHoldCts is not null)
-                return; // finale Ergebnis-Meldung wird gerade gehalten — nicht durch fremden/leeren Snapshot löschen
+                return; // finale Ergebnis-Meldung wird gerade gehalten - nicht durch fremden/leeren Snapshot löschen
 
             IsTachMapping = false;
             TachMappingProgress = "";
@@ -390,10 +403,10 @@ public partial class FanAssignRow : ObservableObject
 
     /// <summary>
     /// Spiegelt den vom Daemon persistierten Anlaufpunkt (<see cref="FanConfig.MinPwm"/>) in die Zeile. Er ändert
-    /// sich dort <b>ohne Zutun des Editors</b>, sobald eine Kalibrierung durchläuft — ohne dieses Nachziehen bliebe
+    /// sich dort <b>ohne Zutun des Editors</b>, sobald eine Kalibrierung durchläuft - ohne dieses Nachziehen bliebe
     /// die Zeile auf dem alten Wert und das nächste Speichern schriebe das Kalibrier-Ergebnis stillschweigend
     /// wieder weg. Ein Snapshot mit unverändertem Wert wird ignoriert (schützt eine laufende Nutzer-Eingabe, wie
-    /// bei <see cref="ApplyRpmSource"/>). Liefert, ob der Wert übernommen wurde — dann muss der Controller die
+    /// bei <see cref="ApplyRpmSource"/>). Liefert, ob der Wert übernommen wurde - dann muss der Controller die
     /// Dirty-Baseline nachziehen, denn eine Kalibrierung ist keine ungespeicherte Nutzer-Änderung.
     /// </summary>
     public bool ApplyDaemonMinPwm(int minPwm)
@@ -403,7 +416,7 @@ public partial class FanAssignRow : ObservableObject
         _lastDaemonMinPwm = minPwm;
 
         if (minPwm == MinPwm)
-            return false; // eigener, gerade gespeicherter Wert kommt zurück — nichts zu tun
+            return false; // eigener, gerade gespeicherter Wert kommt zurück - nichts zu tun
         MinPwm = minPwm;
         return true;
     }
@@ -436,7 +449,7 @@ public partial class FanAssignRow : ObservableObject
             await Task.Delay(_calibrationHold, cts.Token);
             // Nur leeren, wenn dieses Halten noch das aktuelle ist: ein bereits abgelaufener (aber nicht
             // gecancelter) Timer eines früheren Laufs darf eine inzwischen frisch gelatchte Folge-Meldung
-            // nicht löschen — sonst verschwände bei zwei dicht aufeinanderfolgenden Done/Error die zweite sofort.
+            // nicht löschen - sonst verschwände bei zwei dicht aufeinanderfolgenden Done/Error die zweite sofort.
             if (ReferenceEquals(_holdCts, cts))
             {
                 CalibrationProgress = "";
@@ -446,11 +459,11 @@ public partial class FanAssignRow : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // durch einen neuen Lauf oder ein neueres Halten abgelöst — die neue Meldung steht schon.
+            // durch einen neuen Lauf oder ein neueres Halten abgelöst - die neue Meldung steht schon.
         }
         finally
         {
-            // Feld freigeben, falls es noch auf genau dieses (jetzt entsorgte) CTS zeigt — sonst würde der
+            // Feld freigeben, falls es noch auf genau dieses (jetzt entsorgte) CTS zeigt - sonst würde der
             // nächste CancelHold ein disposed CTS canceln. Single-threaded UI-Dispatch: ReferenceEquals genügt.
             if (ReferenceEquals(_holdCts, cts))
                 _holdCts = null;
@@ -481,7 +494,7 @@ public partial class FanAssignRow : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // durch einen neuen Lauf oder ein neueres Halten abgelöst — die neue Meldung steht schon.
+            // durch einen neuen Lauf oder ein neueres Halten abgelöst - die neue Meldung steht schon.
         }
         finally
         {
@@ -514,7 +527,7 @@ public partial class FanAssignRow : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // durch einen neuen Lauf oder ein neueres Halten abgelöst — die neue Meldung steht schon.
+            // durch einen neuen Lauf oder ein neueres Halten abgelöst - die neue Meldung steht schon.
         }
         finally
         {
@@ -527,7 +540,7 @@ public partial class FanAssignRow : ObservableObject
     partial void OnMaxPwmChanged(int value)
     {
         if (_autoAdjusting)
-            return; // nachgezogen vom Min-Setter — Hinweis dort schon gesetzt, nicht überschreiben
+            return; // nachgezogen vom Min-Setter - Hinweis dort schon gesetzt, nicht überschreiben
 
         if (value < MinPwm)
         {
@@ -545,7 +558,7 @@ public partial class FanAssignRow : ObservableObject
     partial void OnMinPwmChanged(int value)
     {
         if (_autoAdjusting)
-            return; // nachgezogen vom Max-Setter — Hinweis dort schon gesetzt, nicht überschreiben
+            return; // nachgezogen vom Max-Setter - Hinweis dort schon gesetzt, nicht überschreiben
 
         if (value > MaxPwm)
         {
@@ -565,7 +578,7 @@ public partial class FanAssignRow : ObservableObject
 
     /// <summary>
     /// Setzt den editierbaren View-Zustand (Name/Position/Sichtbarkeit/PWM-Grenzen) aus der Config
-    /// zurück — für „Verwerfen". <see cref="Selected"/> bleibt außen vor; die Kurven-Zuordnung stellt der
+    /// zurück - für „Verwerfen". <see cref="Selected"/> bleibt außen vor; die Kurven-Zuordnung stellt der
     /// Controller über das Neuladen der Kurven her. Null → die Discovery-Basis (<c>_base</c>).
     /// </summary>
     public void ApplyConfig(FanConfig? config)

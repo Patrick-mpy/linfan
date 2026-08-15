@@ -12,7 +12,7 @@ namespace LinFan.App.UiTests;
 
 /// <summary>
 /// Fake-Monitor: liefert einen festen, „verbundenen" Snapshot und zeichnet die gesendeten Steuerbefehle
-/// auf (ist zugleich <see cref="ICommandSink"/>) — kein Socket, keine Hardware.
+/// auf (ist zugleich <see cref="ICommandSink"/>) - kein Socket, keine Hardware.
 /// </summary>
 internal sealed class FakeLiveMonitor : ILiveMonitor, ICommandSink
 {
@@ -24,7 +24,7 @@ internal sealed class FakeLiveMonitor : ILiveMonitor, ICommandSink
     public int ReadCount => Volatile.Read(ref _readCount);
 
     /// <summary>
-    /// Der aktuell ausgelieferte Snapshot — im Test zwischen den Pump-Zyklen austauschbar, um Live-Updates
+    /// Der aktuell ausgelieferte Snapshot - im Test zwischen den Pump-Zyklen austauschbar, um Live-Updates
     /// (wechselnde Mess­werte über mehrere Ticks) zu simulieren. <c>volatile</c>, da der Poll-Loop auf dem
     /// ThreadPool liest.
     /// </summary>
@@ -85,14 +85,14 @@ internal static class UiTestHelpers
 
     /// <summary>
     /// Sucht im Visual-Tree (nicht Logical): so erscheint nur der aktuell gewählte Tab und sein Inhalt
-    /// genau einmal — der Logical-Tree würde nicht gewählte Tabs mitführen und den gewählten doppeln
+    /// genau einmal - der Logical-Tree würde nicht gewählte Tabs mitführen und den gewählten doppeln
     /// (TabItem + ContentPresenter). Eingeklappte (`IsVisible=false`) Controls bleiben im Visual-Tree.
     /// </summary>
     public static IEnumerable<T> Find<T>(this Visual root) where T : class =>
         root.GetVisualDescendants().OfType<T>();
 
     /// <summary>
-    /// Text-Beschriftung eines Buttons — egal ob der Content ein reiner String ist oder (seit den
+    /// Text-Beschriftung eines Buttons - egal ob der Content ein reiner String ist oder (seit den
     /// Icon+Text-Buttons) ein Layout mit einem TextBlock. Hält die Button-Suchen stabil gegen PathIcons.
     /// </summary>
     public static string? ButtonLabel(Button button) => button.Content switch

@@ -4,7 +4,7 @@ namespace LinFan.Ipc.Messages;
 
 /// <summary>
 /// Editierbarer Teil der Konfiguration über die IPC-Grenze: Kurven und Lüfter-Zuordnungen.
-/// Der Daemon ist die autoritative Instanz — er führt eingehende Werte in seine vollständige
+/// Der Daemon ist die autoritative Instanz - er führt eingehende Werte in seine vollständige
 /// Konfiguration zusammen (Kalibrierung u. Ä. bleiben dort erhalten). Bewusst nur das, was die
 /// GUI bearbeitet; keine Core-Objekte über die Grenze.
 /// <para>
@@ -39,11 +39,16 @@ public sealed record IpcProfileAssignment(string FanId, string? CurveId);
 public sealed record IpcSensorName(string Id, string Name, string? Group = null, bool Hidden = false);
 
 /// <summary>
-/// Eine Kurve: Name, Quell-Sensoren, Aggregation, Hysterese und Stützpunkte (°C → %).
+/// Eine Kurve: Name, Quell-Sensoren, Aggregation, Hysterese, Glättung und Stützpunkte (°C → %).
 /// <paramref name="SourceSensorId"/> bleibt für Abwärtskompatibilität mit älteren Daemons/GUIs erhalten;
 /// die Schema-2-Quelle ist <paramref name="SourceSensorIds"/>. <paramref name="Aggregation"/> ist der
 /// Name des Core-Enums (<c>Max</c>/<c>Avg</c>); ältere Gegenstellen kennen das Feld noch nicht (null).
 /// </summary>
+/// <param name="SmoothingSeconds">
+/// Averaging window for the curve input in seconds, <c>0</c> = off. Nullable on purpose, like
+/// <paramref name="Aggregation"/>: a peer that predates the field sends nothing, and the mappers resolve
+/// <c>null</c> to the Core default instead of relying on how the JSON layer treats a missing value.
+/// </param>
 public sealed record IpcCurve(
     string Id,
     string Name,
@@ -53,7 +58,8 @@ public sealed record IpcCurve(
     IReadOnlyList<string>? SourceSensorIds = null,
     string? Aggregation = null,
     string? InterpolationMode = null,
-    bool Enabled = true);
+    bool Enabled = true,
+    double? SmoothingSeconds = null);
 
 public sealed record IpcCurvePoint(double TemperatureC, double Percent);
 
@@ -80,7 +86,7 @@ public sealed record IpcFanAssignment(
 
 /// <summary>
 /// Persistiertes Kalibrier-Ergebnis eines Lüfters über die IPC-Grenze: Anlaufpunkt (<paramref name="StartPwm"/>)
-/// und Drehzahlbereich. Die rohe Messreihe (<c>FanCalibration.Samples</c>) bleibt bewusst im Daemon — die GUI
+/// und Drehzahlbereich. Die rohe Messreihe (<c>FanCalibration.Samples</c>) bleibt bewusst im Daemon - die GUI
 /// braucht für Anzeige/Badge nur Anlaufpunkt und Bereich.
 /// </summary>
 public sealed record IpcFanCalibration(int StartPwm, int MinRpm, int MaxRpm);

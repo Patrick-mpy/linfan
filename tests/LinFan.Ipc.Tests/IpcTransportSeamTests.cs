@@ -13,7 +13,7 @@ namespace LinFan.Ipc.Tests;
 /// Beweist, dass die Protokoll-Schicht (<see cref="IpcServer"/>/<see cref="IpcClient"/>) transport-
 /// neutral ist: über einen injizierten Transport, der einen <b>TCP-Loopback-Stream</b> (kein
 /// Unix-Socket) liefert, gehen Snapshot- und Kommando-Strom durch. Genau diese Naht nutzt auch der
-/// Windows-Named-Pipe-Transport — er muss nur einen <see cref="Stream"/> liefern, ohne
+/// Windows-Named-Pipe-Transport - er muss nur einen <see cref="Stream"/> liefern, ohne
 /// <c>IpcServer</c>/<c>IpcClient</c> oder die GUI anzufassen.
 /// </summary>
 public class IpcTransportSeamTests
@@ -78,7 +78,7 @@ public class IpcTransportSeamTests
         }
     }
 
-    /// <summary>Zwei verbundene Loopback-TCP-Streams — bewusst kein Unix-Socket.</summary>
+    /// <summary>Zwei verbundene Loopback-TCP-Streams - bewusst kein Unix-Socket.</summary>
     private static async Task<(Stream Server, Stream Client)> TcpLoopbackPairAsync()
     {
         using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

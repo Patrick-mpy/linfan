@@ -7,7 +7,7 @@ namespace LinFan.Daemon.Tests;
 
 /// <summary>
 /// Sichert die Entscheidung, nach welchen CLI-Kommandos der Fail-Safe-Restore läuft. Read-only-Kommandos
-/// (<c>list</c>/<c>monitor</c>/<c>init</c>) dürfen KEIN RestoreDefaults auslösen — das würfe neben einem
+/// (<c>list</c>/<c>monitor</c>/<c>init</c>) dürfen KEIN RestoreDefaults auslösen - das würfe neben einem
 /// laufenden Daemon alle Lüfter kurz auf Hardware-Auto und riss dessen Kurvenregelung weg.
 /// </summary>
 public class CliAppTests

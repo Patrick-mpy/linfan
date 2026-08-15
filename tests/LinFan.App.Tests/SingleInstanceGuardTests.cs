@@ -7,7 +7,7 @@ namespace LinFan.App.Tests;
 
 /// <summary>
 /// Sichert die Einzelinstanz-Logik: der erste Start bekommt den Endpunkt, jeder weitere wird abgewiesen
-/// und meldet stattdessen die laufende Instanz — und ein nach einem Absturz liegengebliebener Socket darf
+/// und meldet stattdessen die laufende Instanz - und ein nach einem Absturz liegengebliebener Socket darf
 /// den Start nicht blockieren. Läuft gegen einen eigenen Test-Endpunkt (Named Pipe bzw. Socket-Datei),
 /// nie gegen den echten Benutzer-Endpunkt.
 /// </summary>
@@ -53,7 +53,7 @@ public sealed class SingleInstanceGuardTests
         var activations = new SemaphoreSlim(0);
         first!.ListenForActivation(() => activations.Release());
 
-        // Der Endpunkt muss nach der ersten Aktivierung wieder annehmen — sonst öffnet der dritte Start
+        // Der Endpunkt muss nach der ersten Aktivierung wieder annehmen - sonst öffnet der dritte Start
         // doch ein zweites Fenster (auf Windows hält die Pipe genau eine Instanz und muss getrennt werden).
         for (int i = 0; i < 3; i++)
         {
@@ -74,7 +74,7 @@ public sealed class SingleInstanceGuardTests
     }
 
     // Der Unix-Zweig wird direkt gerufen, damit er auf jeder Plattform läuft (AF_UNIX gibt es unter
-    // Windows seit Windows 10) — dasselbe Muster wie NamedPipeTransportTests, das die Windows-Pipe unter
+    // Windows seit Windows 10) - dasselbe Muster wie NamedPipeTransportTests, das die Windows-Pipe unter
     // Linux prüft. Sonst liefe der Zweig der Vorrang-Plattform nur in der CI.
 
     private static string TempSocketPath() =>
@@ -98,7 +98,7 @@ public sealed class SingleInstanceGuardTests
     public void Stale_socket_file_does_not_block_the_start()
     {
         // Abgestürzte Instanz nachstellen: die Socket-Datei liegt da, aber niemand nimmt Verbindungen an.
-        // Dafür wird der Socket gebunden und NICHT geschlossen — Dispose entfernt die Datei sofort wieder
+        // Dafür wird der Socket gebunden und NICHT geschlossen - Dispose entfernt die Datei sofort wieder
         // (nur ein echter Absturz lässt sie liegen). Ohne Listen wird ein connect() abgewiesen: genau die
         // Signatur, an der der Guard die Leiche von einer laufenden Instanz unterscheidet.
         string endpoint = TempSocketPath();
@@ -112,7 +112,7 @@ public sealed class SingleInstanceGuardTests
     }
 
     // Die Unix-Ableitung wird über den Seam auf jeder Plattform geprüft: unter Windows läuft der Zweig
-    // sonst nie, und genau dort schlug er zu (CI-Container ohne HOME) — siehe UnixSocketPath.
+    // sonst nie, und genau dort schlug er zu (CI-Container ohne HOME) - siehe UnixSocketPath.
 
     [Fact]
     public void Unix_endpoint_prefers_the_runtime_dir()
@@ -150,7 +150,7 @@ public sealed class SingleInstanceGuardTests
         Assert.Equal(endpoint, SingleInstanceGuard.DefaultEndpoint()); // beide Prozesse müssen dasselbe ableiten
         if (!OperatingSystem.IsWindows())
         {
-            // Absolut — sonst hinge der Endpunkt am Arbeitsverzeichnis und jeder Startort bekäme seine
+            // Absolut - sonst hinge der Endpunkt am Arbeitsverzeichnis und jeder Startort bekäme seine
             // eigene „Einzel"-Instanz. Ohne Home und ohne XDG_RUNTIME_DIR (CI-Container, Dienstkonten)
             // war genau das der Fall, weil GetFolderPath dann einen leeren Pfad liefert.
             Assert.True(Path.IsPathRooted(endpoint), $"Endpunkt ist relativ: {endpoint}");

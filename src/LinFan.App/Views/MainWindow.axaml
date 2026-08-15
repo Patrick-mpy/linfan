@@ -16,6 +16,7 @@
         Background="{DynamicResource BgWindow}">
 
     <Window.Styles>
+
         <!-- Borderloser Icon-Button (z. B. Augen-Toggle für die Dashboard-Sichtbarkeit im Geräte-Tab). -->
         <Style Selector="Button.iconBtn">
             <Setter Property="Background" Value="Transparent" />
@@ -29,7 +30,7 @@
         </Style>
 
         <!-- Flacher, randloser Aufklapp-Header (Lüfter-„Erweitert"): kein Karten-Kasten, volle Breite,
-             nur ein Trennstrich unter dem Titel (am Inhalt). Der Chevron dreht beim Aufklappen. -->
+             nur ein Trennstrich unter dem Titel (am Inhalt). Der Chevron klappt beim Aufklappen um. -->
         <Style Selector="ToggleButton.advHeader">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -47,16 +48,22 @@
         <Style Selector="ToggleButton.advHeader:checked:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
         </Style>
+        <!-- Deliberately NO RenderTransformOrigin here: Avalonia parses "0.5,0.5" as 0.5 PIXELS from the
+             top-left (relative units need "50%,50%"), so the icon used to turn around its own corner, swing
+             out of the header row and get clipped. The default already is the centre - see
+             ChevronTransformTests. Duration and easing match the panel below (ctrl:Collapsible); without
+             the easing the icon moved at a constant speed and stopped dead while the panel still settled. -->
         <Style Selector="ToggleButton.advHeader PathIcon.chevron">
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="CubicEaseOut" />
                 </Transitions>
             </Setter>
         </Style>
+        <!-- Flip, not spin: an 11px icon sweeps 11·√2 ≈ 15.6px while rotating, but the header row is 14px
+             tall and the ToggleButton clips its content. scaleY never leaves the icon's own box. -->
         <Style Selector="ToggleButton.advHeader:checked PathIcon.chevron">
-            <Setter Property="RenderTransform" Value="rotate(180deg)" />
+            <Setter Property="RenderTransform" Value="scaleY(-1)" />
         </Style>
 
         <!-- Randloses Eingabefeld für die Geräte-Listen: liest sich im Ruhezustand als Text,
@@ -122,6 +129,10 @@
         <Style Selector="ListBox.navList ListBoxItem:pointerover Border.menuRow">
             <Setter Property="Background" Value="{DynamicResource BgInset}" />
         </Style>
+        <!-- Im Kurven-Tab tragen beide Listen (Profile, Kurven) gleichzeitig eine Markierung: die eine zeigt,
+             welches Profil offen ist, die andere, welche Kurve - auch wenn rechts nur eines davon bearbeitet
+             wird. Bewusst so: ohne die zweite Markierung wäre nicht mehr erkennbar, zu welchem Profil die
+             gerade bearbeitete Kurve gehört. -->
         <Style Selector="ListBox.navList ListBoxItem:selected Border.menuRow">
             <Setter Property="Background" Value="{DynamicResource BgCardAlt}" />
         </Style>
@@ -139,45 +150,85 @@
 
     <Grid RowDefinitions="Auto,*" Margin="24">
 
-        <StackPanel Grid.Row="0" Spacing="{StaticResource SpacingXxs}" Margin="0,0,0,16">
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Grid.Column="0" Spacing="{StaticResource SpacingXxs}">
-                    <!-- Wordmark as in Assets/linfan-logo-horizontal.svg: the mark, "Lin" in the text colour,
-                         "Fan" in the accent. Sizes and spacing are the SVG's proportions at FontSize 28. -->
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" HorizontalAlignment="Left">
-                        <ctrl:BrandMark Height="25" VerticalAlignment="Center" />
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Lin" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
-                            <TextBlock Text="Fan" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource Accent}" />
-                        </StackPanel>
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+            <StackPanel Grid.Column="0" Spacing="{StaticResource SpacingXxs}">
+                <!-- Wordmark as in Assets/linfan-logo-horizontal.svg: the mark, "Lin" in the text colour,
+                     "Fan" in the accent. Sizes and spacing are the SVG's proportions at FontSize 28. -->
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" HorizontalAlignment="Left">
+                    <ctrl:BrandMark Height="25" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Lin" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                        <TextBlock Text="Fan" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource Accent}" />
                     </StackPanel>
-                    <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
                 </StackPanel>
-            </Grid>
-        </StackPanel>
+                <!-- Shares the header row with the profile group now, so a long status line ends in an
+                     ellipsis instead of running into it. -->
+                <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource TextMuted}"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <!-- The running profile and the two actions for pending changes belong to the whole window, so they
+                 sit in its header rather than on the tab row. On the tab row they were overlaid on the tab strip
+                 (a closed template), which needs a fixed reserve - and no constant can be right: the picker
+                 grows with user-defined profile names, so the tabs ran into it. Here the Auto column measures
+                 whatever the group needs and the tab strip below keeps the full width. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}"
+                        VerticalAlignment="Center" IsVisible="{Binding Editor.IsReady}">
+                <TextBlock Text="{l:Tr MainWindow.Profile}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                <!-- Switches the RUNNING profile (not the one open in the editor); locked while changes are
+                     pending, like the switch in the profile editor. Capped in width because the profile names
+                     are the user's own - a long one must not squeeze the wordmark out of the header. -->
+                <ComboBox Name="ActiveProfilePicker" MinWidth="160" MaxWidth="220" VerticalAlignment="Center"
+                          ItemsSource="{Binding Editor.Profiles}" SelectedItem="{Binding Editor.ActiveProfile}"
+                          IsEnabled="{Binding Editor.CanChangeActiveProfile}"
+                          ToolTip.Tip="{l:Tr MainWindow.ProfileActiveTooltip}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="c:ProfileRow">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <!-- Grund für die gesperrte Auswahl. Als eigenes (aktives) Icon, nicht als Tooltip auf der
+                     gesperrten ComboBox - ein Tooltip auf einem deaktivierten Control ist nicht verlässlich erreichbar. -->
+                <PathIcon Name="ProfileLockedIcon" Data="{StaticResource IconAlertCircle}" Width="14" Height="14"
+                          VerticalAlignment="Center" Foreground="{DynamicResource WarningText}"
+                          IsVisible="{Binding Editor.HasUnsavedChanges}"
+                          ToolTip.Tip="{l:Tr MainWindow.ProfileSwitchLocked}" />
+                <!-- The only place to apply or discard pending changes; both appear as soon as something is
+                     open. Symbols only - the header is a narrow row - so each carries its label in the tooltip. -->
+                <Button Name="HeaderSaveButton" Classes="primary" Command="{Binding Editor.SaveCommand}"
+                        IsVisible="{Binding Editor.HasUnsavedChanges}" IsEnabled="{Binding Connected}"
+                        VerticalAlignment="Center" Padding="8,4"
+                        ToolTip.Tip="{l:Tr MainWindow.ApplyChangesTooltip}">
+                    <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14" />
+                </Button>
+                <!-- Discard is the destructive counterpart and must not visually outweigh the apply beside
+                     it; the confirmation in front of it runs as a dialog (Click instead of a bound command). -->
+                <Button Name="HeaderRevertButton" Classes="danger" Click="OnRevertChanges"
+                        IsVisible="{Binding Editor.HasUnsavedChanges}"
+                        VerticalAlignment="Center" Padding="8,4"
+                        ToolTip.Tip="{l:Tr MainWindow.RevertTooltip}">
+                    <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
 
         <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
             <!-- ============ Tab 1: Live-Übersicht ============ -->
-            <TabItem Header="{l:Tr MainWindow.TabOverview}">
-                <Grid RowDefinitions="Auto,*" Margin="0,12,0,0">
+            <TabItem>
+                <!-- Icon + label instead of a plain string header. Neither element sets FontSize, FontWeight
+                     or Foreground: both inherit them from the TabItem, so the text looks exactly as before and
+                     the icon dims/brightens with the selected state for free. -->
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}" VerticalAlignment="Center">
+                        <PathIcon Data="{StaticResource IconDashboard}" Width="18" Height="18" VerticalAlignment="Center" />
+                        <TextBlock Text="{l:Tr MainWindow.TabOverview}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid RowDefinitions="*" Margin="0,12,0,0">
 
-                    <!-- Profilauswahl fürs Dashboard -->
-                    <Border Classes="bar" Grid.Row="0">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
-                            <TextBlock Text="{l:Tr MainWindow.Profile}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
-                            <ComboBox MinWidth="180" ItemsSource="{Binding Editor.Profiles}"
-                                      SelectedItem="{Binding Editor.SelectedProfile}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="c:ProfileRow">
-                                        <TextBlock Text="{Binding Name}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </StackPanel>
-                    </Border>
-
-                    <ScrollViewer Grid.Row="1">
+                    <ScrollViewer>
                     <StackPanel Spacing="{StaticResource SpacingXl}">
 
                     <!-- ============ Aktive Kurven (Quelle → Kurve → geregelte Lüfter, live an/aus) ============ -->
@@ -194,7 +245,8 @@
                                               Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
                                 </Grid>
                             </ToggleButton>
-                            <ItemsControl IsVisible="{Binding ActiveCurvesExpanded}" ItemsSource="{Binding ActiveCurves}" Margin="0,8,0,0">
+                            <ctrl:Collapsible IsOpen="{Binding ActiveCurvesExpanded}">
+                            <ItemsControl ItemsSource="{Binding ActiveCurves}" Margin="0,8,0,0">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="c:DashboardCurveRow">
                                         <Border Classes="itemCard">
@@ -211,8 +263,10 @@
                                                     </StackPanel>
                                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
                                                         <TextBlock Text="{Binding SourceSummary}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
-                                                        <TextBlock Text="{Binding Curve.LiveTemperatureDisplay}"
-                                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+                                                        <!-- Same temperature colouring as the sensor list below (green/amber/red at
+                                                             60 and 80 C); without a source sensor the value is NaN and stays grey. -->
+                                                        <TextBlock Text="{Binding Curve.LiveTemperatureDisplay}" FontSize="12"
+                                                                   Foreground="{Binding Curve.LiveTemperature, Converter={x:Static lconv:TempToBrushConverter.Instance}}" />
                                                     </StackPanel>
                                                     <ItemsControl ItemsSource="{Binding Fans}" Margin="0,4,0,0">
                                                         <ItemsControl.ItemTemplate>
@@ -247,6 +301,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            </ctrl:Collapsible>
                         </StackPanel>
                     </Border>
 
@@ -268,7 +323,8 @@
                                               Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
                                 </Grid>
                             </ToggleButton>
-                            <StackPanel IsVisible="{Binding TemperaturesExpanded}" Margin="0,4,0,0">
+                            <ctrl:Collapsible IsOpen="{Binding TemperaturesExpanded}">
+                            <StackPanel Margin="0,4,0,0">
                                 <TextBlock Text="{l:Tr MainWindow.History60s}" Foreground="{DynamicResource TextFaintest}"
                                            FontSize="10" Margin="0,0,0,14" />
                                 <TextBlock Text="{l:Tr MainWindow.NoTemperatureSensors}" Foreground="{DynamicResource TextFaint}"
@@ -305,6 +361,7 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
+                            </ctrl:Collapsible>
                         </StackPanel>
                     </Border>
 
@@ -321,7 +378,8 @@
                                               Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
                                 </Grid>
                             </ToggleButton>
-                            <StackPanel IsVisible="{Binding FansExpanded}" Margin="0,4,0,0">
+                            <ctrl:Collapsible IsOpen="{Binding FansExpanded}">
+                            <StackPanel Margin="0,4,0,0">
                                 <TextBlock Text="{l:Tr MainWindow.History60s}" Foreground="{DynamicResource TextFaintest}"
                                            FontSize="10" Margin="0,0,0,14" />
                                 <TextBlock Text="{l:Tr MainWindow.NoFans}" Foreground="{DynamicResource TextFaint}"
@@ -341,7 +399,7 @@
                                                                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
                                                                             <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}"
                                                                                        FontWeight="SemiBold" ToolTip.Tip="{Binding FanId}" />
-                                                                            <!-- Kalibrier-Status — gleiche Optik wie Onboarding/Geräte-Tab (läuft / fertig). -->
+                                                                            <!-- Kalibrier-Status - gleiche Optik wie Onboarding/Geräte-Tab (läuft / fertig). -->
                                                                             <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13"
                                                                                       Foreground="{DynamicResource Accent}" VerticalAlignment="Center"
                                                                                       IsVisible="{Binding IsCalibrating}"
@@ -396,6 +454,7 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
+                            </ctrl:Collapsible>
                         </StackPanel>
                     </Border>
                     </Grid>
@@ -404,92 +463,79 @@
                 </Grid>
             </TabItem>
 
-            <!-- ============ Tab 3: Kurven & Zuordnung ============ -->
-            <TabItem Header="{l:Tr MainWindow.TabCurves}">
-                <Grid RowDefinitions="Auto,*" Margin="0,12,0,0">
-
-                    <!-- Profil-Leiste: umschalten, anlegen, umbenennen, löschen -->
-                    <Border Classes="bar" Grid.Row="0">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
-                            <TextBlock Text="{l:Tr MainWindow.Profile}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
-                            <ComboBox MinWidth="160" ItemsSource="{Binding Editor.Profiles}"
-                                      SelectedItem="{Binding Editor.SelectedProfile}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="c:ProfileRow">
-                                        <TextBlock Text="{Binding Name}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <!-- Namensfeld nur beim Anlegen/Duplizieren/Umbenennen sichtbar -->
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" VerticalAlignment="Center"
-                                        IsVisible="{Binding Editor.IsNamingProfile}">
-                                <TextBox Width="160" Text="{Binding Editor.SelectedProfile.Name}"
-                                         PlaceholderText="{l:Tr MainWindow.ProfileNamePlaceholder}" />
-                                <Button Content="{l:Tr MainWindow.Done}" Command="{Binding Editor.FinishNamingProfileCommand}"
-                                        ToolTip.Tip="{l:Tr MainWindow.CloseNameFieldTooltip}" />
-                            </StackPanel>
-                            <Button Command="{Binding Editor.AddProfileCommand}"
-                                    ToolTip.Tip="{l:Tr MainWindow.AddProfileTooltip}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                    <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
-                                    <TextBlock Text="{l:Tr MainWindow.Profile}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding Editor.DuplicateProfileCommand}"
-                                    ToolTip.Tip="{l:Tr MainWindow.DuplicateProfileTooltip}">
-                                <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" />
-                            </Button>
-                            <Button Command="{Binding Editor.RenameProfileCommand}"
-                                    ToolTip.Tip="{l:Tr MainWindow.RenameProfileTooltip}">
-                                <PathIcon Data="{StaticResource IconRename}" Width="13" Height="13" />
-                            </Button>
-                            <Button Click="OnDeleteProfile" ToolTip.Tip="{l:Tr MainWindow.DeleteProfileTooltip}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
-                                    <TextBlock Text="{l:Tr MainWindow.Delete}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Border>
+            <!-- ============ Tab 2: Kurven & Zuordnung ============ -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}" VerticalAlignment="Center">
+                        <PathIcon Data="{StaticResource IconChartLine}" Width="18" Height="18" VerticalAlignment="Center" />
+                        <TextBlock Text="{l:Tr MainWindow.TabCurves}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+                <!-- Profile and curves are both managed in the side menu below, so this tab no longer needs
+                     a bar of its own above the content. -->
+                <Grid RowDefinitions="*" Margin="0,12,0,0">
 
                     <!-- Pre-Load-Hinweis: vor dem ersten Snapshot, Text je nach Verbindungszustand -->
-                    <Border Classes="card" Grid.Row="1" IsVisible="{Binding ShowCurveLoading}" VerticalAlignment="Top">
+                    <Border Classes="card" IsVisible="{Binding ShowCurveLoading}" VerticalAlignment="Top">
                         <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="13" TextWrapping="Wrap"
                                    Text="{Binding CurveLoadingText}" />
                     </Border>
 
                     <!-- Verbunden, aber der Daemon meldet keine Geräte → keine Kurven möglich -->
-                    <Border Classes="card" Grid.Row="1" IsVisible="{Binding ShowNoDevices}" VerticalAlignment="Top">
+                    <Border Classes="card" IsVisible="{Binding ShowNoDevices}" VerticalAlignment="Top">
                         <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="13" TextWrapping="Wrap"
                                    Text="{l:Tr MainWindow.NoDevicesForCurves}" />
                     </Border>
 
-                    <Grid Grid.Row="1" ColumnDefinitions="240,*" IsVisible="{Binding Editor.IsReady}">
+                    <Grid ColumnDefinitions="240,*" IsVisible="{Binding Editor.IsReady}">
 
-                    <!-- Kurvenliste + anlegen/löschen -->
-                    <DockPanel Grid.Column="0" Margin="0,0,14,0">
-                        <TextBlock DockPanel.Dock="Top" Text="{l:Tr MainWindow.Curves}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextHeading}" Margin="0,0,0,10" />
-                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}" Margin="0,10,0,0">
-                            <Button Command="{Binding Editor.AddCurveCommand}"
+                    <!-- Side menu: the profiles, then the curves of whichever profile is selected. Selecting a
+                         profile only opens it - the one the daemon regulates with is marked by the green dot and
+                         changes solely through the switch in the profile editor. Both lists set which editor the
+                         right-hand side shows via Tapped, not via SelectionChanged: clicking the already-selected
+                         profile has to bring its editor back, and that changes no selection. -->
+                    <Grid Grid.Column="0" Margin="0,0,14,0" RowDefinitions="Auto,Auto,Auto,*">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Profiles}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="iconBtn" Command="{Binding Editor.AddProfileCommand}"
+                                    ToolTip.Tip="{l:Tr MainWindow.AddProfileTooltip}">
+                                <PathIcon Data="{StaticResource IconPlus}" Width="14" Height="14"
+                                          Foreground="{DynamicResource TextSecondary}" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Capped and scrollable: many profiles must not push the curve list out of the column. -->
+                        <ListBox Grid.Row="1" Classes="navList" Background="Transparent" MaxHeight="180"
+                                 Tapped="OnProfileListTapped"
+                                 ItemsSource="{Binding Editor.Profiles}" SelectedItem="{Binding Editor.SelectedProfile}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="c:ProfileRow">
+                                    <Border Classes="menuRow">
+                                        <Grid ColumnDefinitions="Auto,Auto,*">
+                                            <Border Grid.Column="0" Classes="selBar" Width="3" Height="16" CornerRadius="2"
+                                                    Background="Transparent" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                            <Ellipse Grid.Column="1" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                     Fill="{Binding IsActive, Converter={x:Static lconv:BoolToBrushConverter.Instance}, ConverterParameter='#22C55E,#52525B'}"
+                                                     ToolTip.Tip="{Binding ActivityHint}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Name}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,20,0,6">
+                            <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Curves}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="iconBtn" Command="{Binding Editor.AddCurveCommand}"
                                     ToolTip.Tip="{l:Tr MainWindow.AddCurveTooltip}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                    <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
-                                    <TextBlock Text="{l:Tr MainWindow.Curve}" />
-                                </StackPanel>
+                                <PathIcon Data="{StaticResource IconPlus}" Width="14" Height="14"
+                                          Foreground="{DynamicResource TextSecondary}" />
                             </Button>
-                            <Button Command="{Binding Editor.DuplicateCurveCommand}"
-                                    ToolTip.Tip="{l:Tr MainWindow.DuplicateCurveTooltip}">
-                                <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" />
-                            </Button>
-                            <Button Click="OnDeleteCurve" ToolTip.Tip="{l:Tr MainWindow.DeleteCurveTooltip}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
-                                    <TextBlock Text="{l:Tr MainWindow.Delete}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                        <ListBox Classes="navList" Background="Transparent"
+                        </Grid>
+
+                        <ListBox Grid.Row="3" Classes="navList" Background="Transparent" Tapped="OnCurveListTapped"
                                  ItemsSource="{Binding Editor.Curves}" SelectedItem="{Binding Editor.SelectedCurve}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="c:CurveEditRow">
@@ -510,11 +556,13 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                    </DockPanel>
+                    </Grid>
 
-                    <!-- rechte Seite: ausgewählte Kurve + Zuordnung + Speichern -->
+                    <!-- rechte Seite: das im Seitenmenü zuletzt angeklickte Objekt - Kurve oder Profil -->
                     <ScrollViewer Grid.Column="1">
-                        <StackPanel Spacing="{StaticResource SpacingXl}">
+                        <Panel>
+                        <StackPanel Spacing="{StaticResource SpacingXl}"
+                                    IsVisible="{Binding Editor.Pane, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Curve}">
 
                             <!-- Flach wie die Einstellungen-Sektionen: Titel + Inhalt auf dem Hintergrund, kein Karten-Kasten. -->
                             <Border Classes="card" Background="Transparent">
@@ -523,17 +571,42 @@
                                         <DataTemplate x:DataType="c:CurveEditRow">
                                             <StackPanel Spacing="{StaticResource SpacingLg}">
                                                 <!-- Titel + An/Aus-Toggle (live, kein Dirty-Banner). Der Toggle schaltet die
-                                                     ausgewählte Kurve über den Controller — Bindung an dessen DataContext (Window-Ahne). -->
+                                                     ausgewählte Kurve über den Controller - Bindung an dessen DataContext (Window-Ahne). -->
                                                 <Grid ColumnDefinitions="*,Auto">
                                                     <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.EditCurve}" FontWeight="SemiBold"
                                                                Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
-                                                    <ToggleSwitch Grid.Column="1" MinWidth="0" OnContent="{l:Tr MainWindow.CurveOn}" OffContent="{l:Tr MainWindow.CurveOff}"
-                                                                  IsChecked="{Binding $parent[Window].((c:MainController)DataContext).Editor.SelectedCurveEnabled, Mode=TwoWay}"
-                                                                  ToolTip.Tip="{l:Tr MainWindow.CurveToggleTooltip}" />
+                                                    <!-- Duplicate and delete act on the curve being edited, so they sit with it rather than
+                                                         under the list. Their commands live on the editor controller, hence the same
+                                                         Window-ancestor binding the toggle uses; deleting stays a Click handler, because the
+                                                         confirmation dialog is what gates it. -->
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}"
+                                                                VerticalAlignment="Center">
+                                                        <Button Padding="8,3" FontSize="11"
+                                                                Command="{Binding $parent[Window].((c:MainController)DataContext).Editor.DuplicateCurveCommand}"
+                                                                ToolTip.Tip="{l:Tr MainWindow.DuplicateCurveTooltip}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                <PathIcon Data="{StaticResource IconCopy}" Width="12" Height="12" />
+                                                                <TextBlock Text="{l:Tr MainWindow.Duplicate}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Name="CurveDeleteButton" Classes="danger" Padding="8,3" FontSize="11" Click="OnDeleteCurve"
+                                                                ToolTip.Tip="{l:Tr MainWindow.DeleteCurveTooltip}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                <PathIcon Data="{StaticResource IconDelete}" Width="12" Height="12" />
+                                                                <TextBlock Text="{l:Tr MainWindow.Delete}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <ToggleSwitch MinWidth="0" Margin="10,0,0,0"
+                                                                      OnContent="{l:Tr MainWindow.CurveOn}" OffContent="{l:Tr MainWindow.CurveOff}"
+                                                                      IsChecked="{Binding $parent[Window].((c:MainController)DataContext).Editor.SelectedCurveEnabled, Mode=TwoWay}"
+                                                                      ToolTip.Tip="{l:Tr MainWindow.CurveToggleTooltip}" />
+                                                    </StackPanel>
                                                 </Grid>
 
                                                 <!-- Name oben, Graph direkt darunter -->
-                                                <Grid ColumnDefinitions="90,*">
+                                                <!-- Label column 100, not 90: the sensor row below carries an icon
+                                                     in front of its label and both grids share the same column width. -->
+                                                <Grid ColumnDefinitions="100,*">
                                                     <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Name}" Foreground="{DynamicResource TextMuted}"
                                                                VerticalAlignment="Center" Margin="0,0,12,0" />
                                                     <TextBox Grid.Column="1" Classes="ghost" Text="{Binding Name}"
@@ -553,10 +626,17 @@
                                                            FontSize="11" TextWrapping="Wrap"
                                                            Text="{l:Tr MainWindow.NoSourceSensor}" />
 
-                                                <!-- Einstellungen: Quell-Sensoren (eingeklappt auf 3), Mix, Interpolation, Hysterese -->
-                                                <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto">
-                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:Tr MainWindow.Sensors}" Foreground="{DynamicResource TextMuted}"
-                                                               VerticalAlignment="Top" Margin="0,4,12,8" />
+                                                <!-- Einstellungen: Quell-Sensoren (eingeklappt auf 3), Mix, Interpolation, Hysterese, Glättung -->
+                                                <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                                    <!-- Same thermometer mark (and the same faint tone) as the sensor rows in the
+                                                         settings tab, here labelling the whole block of source sensors. -->
+                                                    <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal"
+                                                                Spacing="{StaticResource SpacingXs}" VerticalAlignment="Top" Margin="0,4,12,8">
+                                                        <PathIcon Data="{StaticResource IconThermometer}" Width="13" Height="13"
+                                                                  Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{l:Tr MainWindow.Sensors}" Foreground="{DynamicResource TextMuted}"
+                                                                   VerticalAlignment="Center" />
+                                                    </StackPanel>
                                                     <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
                                                         <ItemsControl ItemsSource="{Binding DisplayedSensorGroups}">
                                                             <ItemsControl.ItemTemplate>
@@ -589,71 +669,88 @@
                                                     </StackPanel>
 
                                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr MainWindow.Mix}" Foreground="{DynamicResource TextMuted}"
-                                                               VerticalAlignment="Center" Margin="0,0,12,8" />
+                                                               VerticalAlignment="Center" Margin="0,0,12,8"
+                                                               ToolTip.Tip="{l:Tr MainWindow.MixTooltip}" />
                                                     <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Aggregations}"
                                                               SelectedItem="{Binding SelectedAggregation}"
                                                               HorizontalAlignment="Right" Width="220" Margin="0,0,0,8"
                                                               ToolTip.Tip="{l:Tr MainWindow.MixTooltip}" />
 
                                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:Tr MainWindow.Interpolation}" Foreground="{DynamicResource TextMuted}"
-                                                               VerticalAlignment="Center" Margin="0,0,12,8" />
+                                                               VerticalAlignment="Center" Margin="0,0,12,8"
+                                                               ToolTip.Tip="{l:Tr MainWindow.InterpolationTooltip}" />
                                                     <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Interpolations}"
                                                               SelectedItem="{Binding SelectedInterpolation}"
                                                               HorizontalAlignment="Right" Width="220" Margin="0,0,0,8"
                                                               ToolTip.Tip="{l:Tr MainWindow.InterpolationTooltip}" />
 
                                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{l:Tr MainWindow.Hysteresis}" Foreground="{DynamicResource TextMuted}"
-                                                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                               VerticalAlignment="Center" Margin="0,0,12,8"
+                                                               ToolTip.Tip="{l:Tr MainWindow.HysteresisTooltip}" />
                                                     <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Hysteresis}"
                                                                    Minimum="0" Maximum="20" Increment="0.5"
-                                                                   HorizontalAlignment="Right" Width="130"
+                                                                   HorizontalAlignment="Right" Width="130" Margin="0,0,0,8"
                                                                    ToolTip.Tip="{l:Tr MainWindow.HysteresisTooltip}" />
+
+                                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{l:Tr MainWindow.Smoothing}" Foreground="{DynamicResource TextMuted}"
+                                                               VerticalAlignment="Center" Margin="0,0,12,0"
+                                                               ToolTip.Tip="{l:Tr MainWindow.SmoothingTooltip}" />
+                                                    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding SmoothingSeconds}"
+                                                                   Minimum="0" Maximum="15" Increment="1"
+                                                                   HorizontalAlignment="Right" Width="130"
+                                                                   ToolTip.Tip="{l:Tr MainWindow.SmoothingTooltip}" />
                                                 </Grid>
 
                                                 <!-- Stützpunkte einklappbar (wie „Erweitert" im Geräte-Tab): der Header zeigt nur die
                                                      Anzahl, der Graph oben bleibt die primäre Editierfläche. Die ⚠-Warnung steht bewusst
                                                      außerhalb des Collapse → ein sicherheitsrelevanter Hinweis wird nie versteckt. -->
-                                                <ToggleButton Classes="advHeader" IsChecked="{Binding ShowPoints}" Margin="0,4,0,0"
-                                                              ToolTip.Tip="{l:Tr MainWindow.PointsToggleTooltip}">
-                                                    <Grid ColumnDefinitions="*,Auto">
-                                                        <TextBlock Grid.Column="0" Text="{Binding PointsLabel}"
-                                                                   Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" />
-                                                        <PathIcon Grid.Column="1" Classes="chevron" Data="{StaticResource IconChevronDown}"
-                                                                  Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
-                                                    </Grid>
-                                                </ToggleButton>
-                                                <TextBlock IsVisible="{Binding HasDecreasingPercent}" Foreground="{DynamicResource WarningText}"
-                                                           FontSize="11" TextWrapping="Wrap"
-                                                           Text="{l:Tr MainWindow.DecreasingPercentWarning}" />
-                                                <Border IsVisible="{Binding ShowPoints}" BorderBrush="{DynamicResource TextFaintest}"
-                                                        BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,6,0,0">
-                                                    <StackPanel Spacing="{StaticResource SpacingXs}">
-                                                        <TextBlock Text="{l:Tr MainWindow.TempToPercentHeader}" Foreground="{DynamicResource TextMuted}" FontSize="11" />
-                                                        <ItemsControl ItemsSource="{Binding Points}">
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate x:DataType="c:PointRow">
-                                                                    <Grid ColumnDefinitions="*,*,Auto" Margin="0,3">
-                                                                        <NumericUpDown Grid.Column="0" Value="{Binding Temperature}"
-                                                                                       Minimum="0" Maximum="120" Increment="1" Margin="0,0,8,0"
-                                                                                       ToolTip.Tip="{l:Tr MainWindow.PointTempTooltip}" />
-                                                                        <NumericUpDown Grid.Column="1" Value="{Binding Percent}"
-                                                                                       Minimum="0" Maximum="100" Increment="1" Margin="0,0,8,0"
-                                                                                       ToolTip.Tip="{l:Tr MainWindow.PointPercentTooltip}" />
-                                                                        <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}"
-                                                                                ToolTip.Tip="{l:Tr MainWindow.RemovePointTooltip}" />
-                                                                    </Grid>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                        <Button Command="{Binding AddPointCommand}" HorizontalAlignment="Left"
-                                                                ToolTip.Tip="{l:Tr MainWindow.AddPointTooltip}">
-                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                                                <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
-                                                                <TextBlock Text="{l:Tr MainWindow.Point}" />
-                                                            </StackPanel>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Border>
+                                                <!-- No Spacing on this panel: the gaps below the header live as Margins, so the one in
+                                                     front of the Collapsible expands with it instead of snapping in when it opens. -->
+                                                <StackPanel>
+                                                    <ToggleButton Classes="advHeader" IsChecked="{Binding ShowPoints}" Margin="0,4,0,0"
+                                                                  ToolTip.Tip="{l:Tr MainWindow.PointsToggleTooltip}">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Grid.Column="0" Text="{Binding PointsLabel}"
+                                                                       Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" />
+                                                            <PathIcon Grid.Column="1" Classes="chevron" Data="{StaticResource IconChevronDown}"
+                                                                      Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </ToggleButton>
+                                                    <TextBlock IsVisible="{Binding HasDecreasingPercent}" Foreground="{DynamicResource WarningText}"
+                                                               FontSize="11" TextWrapping="Wrap" Margin="0,12,0,0"
+                                                               Text="{l:Tr MainWindow.DecreasingPercentWarning}" />
+                                                    <ctrl:Collapsible IsOpen="{Binding ShowPoints}">
+                                                    <Border BorderBrush="{DynamicResource TextFaintest}"
+                                                            BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,18,0,0">
+                                                        <StackPanel Spacing="{StaticResource SpacingXs}">
+                                                            <TextBlock Text="{l:Tr MainWindow.TempToPercentHeader}" Foreground="{DynamicResource TextMuted}" FontSize="11" />
+                                                            <ItemsControl ItemsSource="{Binding Points}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="c:PointRow">
+                                                                        <Grid ColumnDefinitions="*,*,Auto" Margin="0,3">
+                                                                            <NumericUpDown Grid.Column="0" Value="{Binding Temperature}"
+                                                                                           Minimum="0" Maximum="120" Increment="1" Margin="0,0,8,0"
+                                                                                           ToolTip.Tip="{l:Tr MainWindow.PointTempTooltip}" />
+                                                                            <NumericUpDown Grid.Column="1" Value="{Binding Percent}"
+                                                                                           Minimum="0" Maximum="100" Increment="1" Margin="0,0,8,0"
+                                                                                           ToolTip.Tip="{l:Tr MainWindow.PointPercentTooltip}" />
+                                                                            <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}"
+                                                                                    ToolTip.Tip="{l:Tr MainWindow.RemovePointTooltip}" />
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <Button Command="{Binding AddPointCommand}" HorizontalAlignment="Left"
+                                                                    ToolTip.Tip="{l:Tr MainWindow.AddPointTooltip}">
+                                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                    <PathIcon Data="{StaticResource IconPlus}" Width="13" Height="13" />
+                                                                    <TextBlock Text="{l:Tr MainWindow.Point}" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    </ctrl:Collapsible>
+                                                </StackPanel>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ContentControl.ContentTemplate>
@@ -662,7 +759,12 @@
 
                             <Border Classes="card" Background="Transparent">
                                 <StackPanel Spacing="{StaticResource SpacingSm}">
-                                    <TextBlock Text="{l:Tr MainWindow.FansOfCurve}" FontWeight="SemiBold" Foreground="{DynamicResource TextHeading}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                        <PathIcon Data="{StaticResource IconFan}" Width="14" Height="14"
+                                                  Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{l:Tr MainWindow.FansOfCurve}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                    </StackPanel>
                                     <TextBlock Text="{l:Tr MainWindow.FansOfCurveSubtitle}"
                                                Foreground="{DynamicResource TextFaint}" FontSize="11" Margin="0,0,0,4" />
                                     <ItemsControl ItemsSource="{Binding Editor.SelectedCurveFanGroups}">
@@ -692,12 +794,145 @@
                             </Border>
 
                         </StackPanel>
+
+                        <!-- ===== Profil-Editor (zweite Seite derselben Fläche) ===== -->
+                        <StackPanel Spacing="{StaticResource SpacingXl}"
+                                    IsVisible="{Binding Editor.Pane, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Profile}">
+                            <Border Classes="card" Background="Transparent">
+                                <StackPanel Spacing="{StaticResource SpacingLg}">
+                                    <!-- Kopf wie beim Kurven-Editor: Titel, Aktionen, Zustands-Schalter. Der Aktiv-Schalter
+                                         kennt nur „ein": es regelt immer genau ein Profil, ein „aus" hätte keinen Empfänger -
+                                         beim laufenden Profil ist er deshalb gesperrt, ebenso bei offenen Änderungen. -->
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.EditProfile}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}"
+                                                    VerticalAlignment="Center">
+                                            <Button Padding="8,3" FontSize="11" Command="{Binding Editor.DuplicateProfileCommand}"
+                                                    ToolTip.Tip="{l:Tr MainWindow.DuplicateProfileTooltip}">
+                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                    <PathIcon Data="{StaticResource IconCopy}" Width="12" Height="12" />
+                                                    <TextBlock Text="{l:Tr MainWindow.Duplicate}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Name="ProfileDeleteButton" Classes="danger" Padding="8,3" FontSize="11" Click="OnDeleteProfile"
+                                                    ToolTip.Tip="{l:Tr MainWindow.DeleteProfileTooltip}">
+                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                    <PathIcon Data="{StaticResource IconDelete}" Width="12" Height="12" />
+                                                    <TextBlock Text="{l:Tr MainWindow.Delete}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <ToggleSwitch MinWidth="0" Margin="10,0,0,0"
+                                                          OnContent="{l:Tr MainWindow.ProfileActive}" OffContent="{l:Tr MainWindow.ProfileActive}"
+                                                          IsChecked="{Binding Editor.SelectedProfileActive, Mode=TwoWay}"
+                                                          IsEnabled="{Binding Editor.CanActivateSelectedProfile}"
+                                                          ToolTip.Tip="{l:Tr MainWindow.ProfileActiveTooltip}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Warum der Schalter gesperrt ist. Nur bei offenen Änderungen: beim laufenden Profil
+                                         sagt der Schalter den Grund („Aktiv", eingeschaltet) bereits selbst. -->
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}"
+                                                HorizontalAlignment="Right" Margin="0,-8,0,0"
+                                                IsVisible="{Binding Editor.ShowActivationBlockedHint}">
+                                        <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13"
+                                                  Foreground="{DynamicResource WarningText}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{l:Tr MainWindow.ProfileSwitchLocked}" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource WarningText}" VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="100,*">
+                                        <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Name}" Foreground="{DynamicResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                                        <TextBox Grid.Column="1" Classes="ghost" Text="{Binding Editor.SelectedProfile.Name}"
+                                                 FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                                    </Grid>
+
+                                    <TextBlock Text="{l:Tr MainWindow.ProfileNotActiveNote}" Foreground="{DynamicResource TextFaint}"
+                                               FontSize="11" TextWrapping="Wrap"
+                                               IsVisible="{Binding !Editor.SelectedProfileIsActive}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Die Kurven des Profils in derselben Darstellung wie „Aktive Kurven" in der Übersicht. -->
+                            <Border Classes="card" Background="Transparent">
+                                <StackPanel Spacing="{StaticResource SpacingSm}">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                        <PathIcon Data="{StaticResource IconChartLine}" Width="14" Height="14"
+                                                  Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{l:Tr MainWindow.ProfileCurves}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextHeading}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Editor.Curves.Count, StringFormat='({0})'}"
+                                                   Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{l:Tr MainWindow.ProfileCurvesSubtitle}"
+                                               Foreground="{DynamicResource TextFaint}" FontSize="11" Margin="0,0,0,4" />
+                                    <ItemsControl ItemsSource="{Binding Editor.Curves}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="c:CurveEditRow">
+                                                <Border Classes="itemCard">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <StackPanel Grid.Column="0" Spacing="{StaticResource SpacingXxs}" VerticalAlignment="Top">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}"
+                                                                           FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{l:Tr MainWindow.CurveOffHardwareAuto}" Foreground="{DynamicResource TextFaint}"
+                                                                           FontSize="11" VerticalAlignment="Center" IsVisible="{Binding !Enabled}" />
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                <TextBlock Text="{Binding SourceSummary}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
+                                                                <TextBlock Text="{Binding LiveTemperatureDisplay}" FontSize="12"
+                                                                           Foreground="{Binding LiveTemperature, Converter={x:Static lconv:TempToBrushConverter.Instance}}" />
+                                                            </StackPanel>
+                                                            <ItemsControl ItemsSource="{Binding AssignedFans}" Margin="0,4,0,0">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="c:FanAssignRow">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}" Margin="0,1">
+                                                                            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
+                                                                                       FontSize="12" VerticalAlignment="Center" />
+                                                                            <TextBlock Text="{Binding LiveRpm}" Foreground="{DynamicResource TextFaint}"
+                                                                                       FontSize="12" VerticalAlignment="Center" />
+                                                                        </StackPanel>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <Button Command="{Binding $parent[Window].((c:MainController)DataContext).Editor.EditCurveCommand}"
+                                                                    CommandParameter="{Binding}" HorizontalAlignment="Left" FontSize="11"
+                                                                    Padding="8,3" Margin="0,8,0,0"
+                                                                    ToolTip.Tip="{l:Tr MainWindow.OpenCurveTooltip}">
+                                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                    <PathIcon Data="{StaticResource IconRename}" Width="12" Height="12" />
+                                                                    <TextBlock Text="{l:Tr MainWindow.EditCurve}" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="1" CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgInset}"
+                                                                Padding="4" Margin="12,0,0,0" VerticalAlignment="Top">
+                                                            <ctrl:CurveChart Points="{Binding Points}" LiveTemperature="{Binding LiveTemperature}"
+                                                                             InterpolationMode="{Binding InterpolationMode}" Evaluator="{Binding CurveEvaluator}"
+                                                                             IsReadOnly="True" Width="300" Height="130" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        </Panel>
                     </ScrollViewer>
                     </Grid>
                 </Grid>
             </TabItem>
             <!-- ============ Tab 3: Einstellungen ============ -->
-            <TabItem Header="{l:Tr MainWindow.TabSettings}">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}" VerticalAlignment="Center">
+                        <PathIcon Data="{StaticResource IconCog}" Width="18" Height="18" VerticalAlignment="Center" />
+                        <TextBlock Text="{l:Tr MainWindow.TabSettings}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
                 <Grid RowDefinitions="*" Margin="0,12,0,0">
                     <Grid ColumnDefinitions="240,*">
 
@@ -794,7 +1029,7 @@
                                                             </Panel>
                                                         </Button>
                                                     </StackPanel>
-                                                    <!-- Sekundärzeile: HW-Adresse (Tooltip) links, Gruppe als Chip rechts — kein wiederholtes Label. -->
+                                                    <!-- Sekundärzeile: HW-Adresse (Tooltip) links, Gruppe als Chip rechts - kein wiederholtes Label. -->
                                                     <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto"
                                                           Margin="0,4,0,0" VerticalAlignment="Center">
                                                         <TextBlock Grid.Column="0" Text="{Binding Id}" Foreground="{DynamicResource TextFaintest}"
@@ -936,7 +1171,8 @@
                                                                           Width="11" Height="11" Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
                                                             </Grid>
                                                         </ToggleButton>
-                                                        <Border IsVisible="{Binding ShowAdvanced}" BorderBrush="{DynamicResource TextFaintest}"
+                                                        <ctrl:Collapsible IsOpen="{Binding ShowAdvanced}">
+                                                        <Border BorderBrush="{DynamicResource TextFaintest}"
                                                                 BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,6,0,0">
                                                             <StackPanel Spacing="{StaticResource SpacingMd}">
                                                                 <!-- Min/Max per Slider (Roh-PWM bleibt die Wahrheit; % nur Anzeige). Ganzzahlige Schritte
@@ -990,24 +1226,29 @@
                                                                              Height="5" Margin="0,4,0,0" IsVisible="{Binding IsCalibrating}" />
                                                                 <!-- Temporäre Manuell-Steuerung: erleichtert die Zuordnung („welcher Lüfter ist das?").
                                                                      Beim Zuklappen der Erweitert-Sektion automatisch zurück auf Kurve/Auto (FanAssignRow.OnShowAdvancedChanged). -->
-                                                                <StackPanel Spacing="{StaticResource SpacingSm}" IsVisible="{Binding CanControl}">
+                                                                <!-- No Spacing on the outer panel: the gap below the checkbox lives as a Margin INSIDE the
+                                                                     Collapsible, so it expands along with it instead of snapping in when it opens. -->
+                                                                <StackPanel IsVisible="{Binding CanControl}">
                                                                     <CheckBox IsChecked="{Binding Manual.IsActive}" Content="{l:Tr MainWindow.ManualControl}"
                                                                               ToolTip.Tip="{l:Tr MainWindow.ManualControlTooltip}" />
-                                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSm}"
-                                                                          IsVisible="{Binding Manual.IsActive}">
-                                                                        <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Pwm}" Foreground="{DynamicResource TextMuted}"
-                                                                                   VerticalAlignment="Center" Width="28" />
-                                                                        <Slider Grid.Column="1" Value="{Binding Manual.Percent}" Minimum="0" Maximum="100"
-                                                                                TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
-                                                                        <TextBlock Grid.Column="2" Text="{Binding Manual.Percent, StringFormat='{}{0:0} %'}"
-                                                                                   Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
-                                                                                   MinWidth="40" TextAlignment="Right" />
-                                                                        <TextBlock Grid.Column="3" Text="{Binding Manual.LiveRpm}" Foreground="{DynamicResource Accent}"
-                                                                                   VerticalAlignment="Center" FontSize="11" MinWidth="64" TextAlignment="Right" />
-                                                                    </Grid>
-                                                                    <TextBlock IsVisible="{Binding Manual.IsActive}" Foreground="{DynamicResource TextFaint}"
-                                                                               FontSize="11" TextWrapping="Wrap"
-                                                                               Text="{l:Tr MainWindow.ManualPwmFloorHint}" />
+                                                                    <ctrl:Collapsible IsOpen="{Binding Manual.IsActive}">
+                                                                    <StackPanel Spacing="{StaticResource SpacingSm}" Margin="0,8,0,0">
+                                                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSm}">
+                                                                            <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Pwm}" Foreground="{DynamicResource TextMuted}"
+                                                                                       VerticalAlignment="Center" Width="28" />
+                                                                            <Slider Grid.Column="1" Value="{Binding Manual.Percent}" Minimum="0" Maximum="100"
+                                                                                    TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
+                                                                            <TextBlock Grid.Column="2" Text="{Binding Manual.Percent, StringFormat='{}{0:0} %'}"
+                                                                                       Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                                                                       MinWidth="40" TextAlignment="Right" />
+                                                                            <TextBlock Grid.Column="3" Text="{Binding Manual.LiveRpm}" Foreground="{DynamicResource Accent}"
+                                                                                       VerticalAlignment="Center" FontSize="11" MinWidth="64" TextAlignment="Right" />
+                                                                        </Grid>
+                                                                        <TextBlock Foreground="{DynamicResource TextFaint}"
+                                                                                   FontSize="11" TextWrapping="Wrap"
+                                                                                   Text="{l:Tr MainWindow.ManualPwmFloorHint}" />
+                                                                    </StackPanel>
+                                                                    </ctrl:Collapsible>
                                                                 </StackPanel>
                                                                 <!-- Drehzahl-Sensor-Kopplung: automatisch koppeln (nur steuerbar) + manuelle Zuordnung des Tachos. -->
                                                                 <StackPanel Spacing="{StaticResource SpacingSm}">
@@ -1030,7 +1271,7 @@
                                                                                    FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" />
                                                                     </StackPanel>
                                                                     <ProgressBar IsIndeterminate="True" Height="5" IsVisible="{Binding IsTachMapping}" />
-                                                                    <!-- Manuelle Zuordnung: verfügbaren Drehzahl-Sensor wählen; „— (keiner) —" löscht die Zuordnung. -->
+                                                                    <!-- Manuelle Zuordnung: verfügbaren Drehzahl-Sensor wählen; „- (keiner) -" löscht die Zuordnung. -->
                                                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SpacingSm}">
                                                                         <TextBlock Grid.Column="0" Text="{l:Tr MainWindow.Tachometer}" Foreground="{DynamicResource TextMuted}"
                                                                                    VerticalAlignment="Center" />
@@ -1047,6 +1288,7 @@
                                                                 </StackPanel>
                                                             </StackPanel>
                                                         </Border>
+                                                        </ctrl:Collapsible>
                                                     </StackPanel>
                                                 </Grid>
                                             </Border>
@@ -1069,6 +1311,37 @@
                                         <TextBlock Foreground="{DynamicResource TextFaint}" FontSize="12" TextWrapping="Wrap"
                                                    Text="{l:Tr MainWindow.AirflowAutoTuneSubtitle}" />
                                     </StackPanel>
+
+                                    <!-- Bisheriges Ergebnis: sichtbar, sobald Lüfter einer Airflow-Rollen-Kurve folgen. -->
+                                    <Border Classes="card" IsVisible="{Binding Editor.HasAirflowStatus}">
+                                        <StackPanel Spacing="{StaticResource SpacingSm}">
+                                            <StackPanel Spacing="{StaticResource SpacingXxs}">
+                                                <TextBlock Text="{l:Tr MainWindow.AirflowStatusTitle}" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimary}" />
+                                                <TextBlock Text="{l:Tr MainWindow.AirflowStatusSubtitle}" FontSize="11"
+                                                           Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <TextBlock Text="{Binding Editor.AirflowStatusPressureText}" Foreground="{DynamicResource InfoText}"
+                                                       FontSize="12" TextWrapping="Wrap" />
+
+                                            <ItemsControl ItemsSource="{Binding Editor.AirflowStatus}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="c:AirflowStatusRow">
+                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                                <TextBlock Text="{Binding Fan.DisplayName}" Foreground="{DynamicResource TextPrimary}" />
+                                                                <TextBlock Text="{Binding Fan.Location.Display}" Foreground="{DynamicResource TextFaint}"
+                                                                           FontSize="11" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Curve.Name}" Foreground="{DynamicResource Accent}"
+                                                                       FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
 
                                     <StackPanel Spacing="{StaticResource SpacingMd}" IsVisible="{Binding Editor.IsReady}">
                                 <Button Command="{Binding Editor.AnalyzeAirflowCommand}"
@@ -1117,7 +1390,7 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
 
-                                    <Button Content="{l:Tr MainWindow.ApplySuggestion}" Command="{Binding Editor.ApplyAirflowCommand}"
+                                    <Button Classes="primary" Content="{l:Tr MainWindow.ApplySuggestion}" Command="{Binding Editor.ApplyAirflowCommand}"
                                             HorizontalAlignment="Left"
                                             ToolTip.Tip="{l:Tr MainWindow.ApplySuggestionTooltip}" />
                                 </StackPanel>
@@ -1195,7 +1468,7 @@
                                         <StackPanel Spacing="{StaticResource SpacingSm}">
                                             <TextBlock Text="{l:Tr Settings.DangerZone}" FontWeight="SemiBold" Foreground="{DynamicResource DangerText}" />
                                             <TextBlock Text="{l:Tr Settings.ResetTooltip}" FontSize="12" Foreground="{DynamicResource DangerText}" TextWrapping="Wrap" />
-                                            <Button Click="OnResetConfig" IsEnabled="{Binding Connected}" HorizontalAlignment="Left" Margin="0,4,0,0">
+                                            <Button Classes="danger" Click="OnResetConfig" IsEnabled="{Binding Connected}" HorizontalAlignment="Left" Margin="0,4,0,0">
                                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
                                                     <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
                                                     <TextBlock Text="{l:Tr Settings.Reset}" />
@@ -1229,53 +1502,24 @@
             </TabItem>
         </TabControl>
 
-        <!-- Toast overlay: top-right, layout-neutral (spans both grid rows, so showing a toast never
-             shifts the tab content). The StackPanel has no background -> its empty area is not
-             hit-testable; only the toast cards themselves catch the pointer. -->
-        <StackPanel Grid.Row="0" Grid.RowSpan="2" ZIndex="100" Width="360"
+        <!-- Toast overlay: top-right of the tab area, layout-neutral (it overlays the TabControl in the
+             same grid row, so showing a toast never shifts the tab content). Deliberately not in the
+             header row - it would cover the profile picker and its save/discard buttons. The StackPanel
+             has no background -> its empty area is not hit-testable; only the toast cards themselves
+             catch the pointer. -->
+        <StackPanel Grid.Row="1" ZIndex="100" Width="360"
                     HorizontalAlignment="Right" VerticalAlignment="Top"
                     Spacing="{StaticResource SpacingSm}">
 
             <!-- Daemon unreachable (persistent state): X hides it until the next disconnect. -->
             <Border Classes="toast danger" IsVisible="{Binding ShowDisconnectedToast}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
-                    <TextBlock Grid.Column="1" Text="{l:Tr MainWindow.DaemonUnreachable}"
-                               Foreground="{DynamicResource DangerText}" FontSize="12" TextWrapping="Wrap"
+                    <PathIcon Grid.Column="1" Classes="toastIcon" />
+                    <TextBlock Grid.Column="2" Classes="toastText" Text="{l:Tr MainWindow.DaemonUnreachable}"
+                               Foreground="{DynamicResource DangerText}" TextWrapping="Wrap"
                                VerticalAlignment="Center" />
-                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding HideDisconnectedToastCommand}"
-                            VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
-                        <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
-                    </Button>
-                </Grid>
-            </Border>
-
-            <!-- Unsaved changes (persistent state): actions apply/revert; X hides, the next edit re-shows. -->
-            <Border Classes="toast warning" IsVisible="{Binding Editor.ShowUnsavedToast}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
-                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingSm}">
-                        <TextBlock Text="{l:Tr MainWindow.UnsavedChanges}" Foreground="{DynamicResource WarningText}"
-                                   FontSize="12" TextWrapping="Wrap" />
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
-                            <Button Command="{Binding Editor.SaveCommand}"
-                                    IsEnabled="{Binding Connected}" Padding="10,3" FontSize="12"
-                                    ToolTip.Tip="{l:Tr MainWindow.ApplyChangesTooltip}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                    <PathIcon Data="{StaticResource IconSave}" Width="13" Height="13" />
-                                    <TextBlock Text="{l:Tr MainWindow.Apply}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Padding="10,3" FontSize="12" Click="OnRevertChanges"
-                                    ToolTip.Tip="{l:Tr MainWindow.RevertTooltip}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
-                                    <TextBlock Text="{l:Tr MainWindow.Revert}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </StackPanel>
-                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Editor.HideUnsavedToastCommand}"
+                    <Button Grid.Column="3" Classes="iconBtn" Command="{Binding HideDisconnectedToastCommand}"
                             VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
                         <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
                     </Button>
@@ -1284,14 +1528,15 @@
 
             <!-- Calibration progress (live-bound card); X cancels/closes via the existing command. -->
             <Border Classes="toast" IsVisible="{Binding Calibration, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
-                    <ctrl:CalibrationCard Grid.Column="1" VerticalAlignment="Center"
+                    <PathIcon Grid.Column="1" Classes="toastIcon" Data="{StaticResource IconGauge}" />
+                    <ctrl:CalibrationCard Grid.Column="2" VerticalAlignment="Center"
                                           Headline="{Binding Calibration.Headline}"
                                           Detail="{Binding Calibration.Detail}"
                                           Progress="{Binding Calibration.Progress}"
                                           ShowProgress="{Binding Calibration.ShowProgress}" />
-                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding CancelCalibrationCommand}"
+                    <Button Grid.Column="3" Classes="iconBtn" Command="{Binding CancelCalibrationCommand}"
                             VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
                         <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
                     </Button>
@@ -1301,33 +1546,37 @@
             <!-- Update-Hinweis: rein additiv, nur bei neuerer Release sichtbar; „Öffnen" führt zur Release-Seite,
                  das X merkt sich die Version wie zuvor „Später" (eine neuere zeigt wieder). Opt-out in den Einstellungen. -->
             <Border Classes="toast" IsVisible="{Binding Update.UpdateAvailable}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
-                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingSm}">
+                    <PathIcon Grid.Column="1" Classes="toastIcon" Data="{StaticResource IconSparkle}" />
+                    <StackPanel Grid.Column="2" Spacing="{StaticResource SpacingSm}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
-                            <TextBlock Text="{l:Tr MainWindow.UpdateAvailable}" Foreground="{DynamicResource TextPrimary}"
-                                       FontSize="12" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding Update.LatestVersion}" Foreground="{DynamicResource TextPrimary}"
-                                       FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Classes="toastText" Text="{l:Tr MainWindow.UpdateAvailable}"
+                                       Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                            <TextBlock Classes="toastText" Text="{Binding Update.LatestVersion}"
+                                       Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
                         </StackPanel>
-                        <Button Content="{l:Tr MainWindow.UpdateOpen}" Command="{Binding Update.OpenReleaseCommand}"
+                        <Button Classes="primary" Content="{l:Tr MainWindow.UpdateOpen}" Command="{Binding Update.OpenReleaseCommand}"
                                 Padding="10,3" FontSize="12" HorizontalAlignment="Left" />
                     </StackPanel>
-                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Update.DismissCommand}"
+                    <Button Grid.Column="3" Classes="iconBtn" Command="{Binding Update.DismissCommand}"
                             VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.UpdateDismiss}">
                         <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
                     </Button>
                 </Grid>
             </Border>
 
-            <!-- Editor save/revert status (transient: successes auto-hide, errors stay + turn red). -->
+            <!-- Editor save/revert status (transient: successes auto-hide, errors stay + turn red).
+                 Icon and stripe follow Classes.danger - see the toastIcon styles in Theme/Layout.axaml. -->
             <Border Classes="toast" Classes.danger="{Binding Editor.Status.IsError}"
                     IsVisible="{Binding Editor.Status.Text, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
-                    <TextBlock Grid.Column="1" Text="{Binding Editor.Status.Text}" Foreground="{DynamicResource TextPrimary}"
-                               FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Editor.Status.DismissCommand}"
+                    <PathIcon Grid.Column="1" Classes="toastIcon" />
+                    <TextBlock Grid.Column="2" Classes="toastText" Text="{Binding Editor.Status.Text}"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Classes="iconBtn" Command="{Binding Editor.Status.DismissCommand}"
                             VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
                         <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
                     </Button>
@@ -1337,11 +1586,13 @@
             <!-- Backup/import/reset status (transient, same semantics as the editor status toast). -->
             <Border Classes="toast" Classes.danger="{Binding Backup.Status.IsError}"
                     IsVisible="{Binding Backup.Status.Text, Converter={x:Static lconv:StringNotEmptyConverter.Instance}}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Border Grid.Column="0" Classes="toastStripe" Margin="0,0,10,0" />
-                    <TextBlock Grid.Column="1" Text="{Binding Backup.Status.Text}" Foreground="{DynamicResource TextPrimary}"
-                               FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    <Button Grid.Column="2" Classes="iconBtn" Command="{Binding Backup.Status.DismissCommand}"
+                    <PathIcon Grid.Column="1" Classes="toastIcon" />
+                    <TextBlock Grid.Column="2" Classes="toastText" Text="{Binding Backup.Status.Text}"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Classes="iconBtn" Command="{Binding Backup.Status.DismissCommand}"
                             VerticalAlignment="Top" ToolTip.Tip="{l:Tr MainWindow.Close}">
                         <PathIcon Data="{StaticResource IconClose}" Width="11" Height="11" />
                     </Button>

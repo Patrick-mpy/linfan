@@ -13,7 +13,7 @@ namespace LinFan.App.Views;
 /// <summary>
 /// Modale Positions-Auswahl mit interaktiver Gehäuse-Vorschau (<see cref="Controls.FanLocationDiagram"/>)
 /// plus Listen-Fallback. Liefert die gewählte <see cref="FanLocation"/> bzw. <c>null</c> (Abbrechen/Esc/
-/// Fenster-X) über <c>ShowDialog&lt;FanLocation?&gt;</c> zurück. Reine UI, keine Domain-Logik — wie
+/// Fenster-X) über <c>ShowDialog&lt;FanLocation?&gt;</c> zurück. Reine UI, keine Domain-Logik - wie
 /// <see cref="ConfirmDialog"/>. Diagramm und Liste binden two-way an dieselbe <see cref="SelectedLocation"/>.
 /// </summary>
 public partial class FanLocationDialog : Window
@@ -21,7 +21,7 @@ public partial class FanLocationDialog : Window
     public static readonly StyledProperty<FanLocation> SelectedLocationProperty =
         AvaloniaProperty.Register<FanLocationDialog, FanLocation>(nameof(SelectedLocation));
 
-    /// <summary>Aktuelle Auswahl — gemeinsame Wahrheit für Diagramm und Listen-Fallback.</summary>
+    /// <summary>Aktuelle Auswahl - gemeinsame Wahrheit für Diagramm und Listen-Fallback.</summary>
     public FanLocation SelectedLocation
     {
         get => GetValue(SelectedLocationProperty);
@@ -59,7 +59,7 @@ public partial class FanLocationDialog : Window
     }
 
     // Den Richtungs-Schalter an die aktuelle Auswahl koppeln (reine UI): nur für umschaltbare Gehäuse-Positionen
-    // sichtbar, Text spiegelt die Richtung. Läuft bei jeder Auswahländerung — egal ob aus Diagramm, Liste oder Schalter.
+    // sichtbar, Text spiegelt die Richtung. Läuft bei jeder Auswahländerung - egal ob aus Diagramm, Liste oder Schalter.
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);

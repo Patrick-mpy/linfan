@@ -20,7 +20,7 @@ internal sealed class RunGate
     public RunGate(CancellationToken hostToken) => _hostToken = hostToken;
 
     /// <summary>
-    /// Läuft gerade ein Lauf? Liest den echten Lauf-Zustand (<c>_cts</c>), nicht einen Snapshot-Status —
+    /// Läuft gerade ein Lauf? Liest den echten Lauf-Zustand (<c>_cts</c>), nicht einen Snapshot-Status -
     /// maßgeblich für die Exklusivität zwischen Kalibrierung und Identifikation.
     /// </summary>
     public bool IsRunning
@@ -29,12 +29,12 @@ internal sealed class RunGate
     }
 
     /// <summary>
-    /// Versucht, einen Lauf zu beginnen. Unter der Sperre wird geprüft, dass keiner läuft und — falls
-    /// angegeben — <paramref name="canStart"/> zustimmt (z. B. Cooldown). Erfolg ⇒ <paramref name="token"/>
+    /// Versucht, einen Lauf zu beginnen. Unter der Sperre wird geprüft, dass keiner läuft und - falls
+    /// angegeben - <paramref name="canStart"/> zustimmt (z. B. Cooldown). Erfolg ⇒ <paramref name="token"/>
     /// ist das an das Host-Token gekoppelte Lauf-Token; Fehlschlag ⇒ <c>false</c> und <c>default</c>.
     /// </summary>
     /// <param name="underLock">
-    /// On success, runs while still holding the lock and before the run becomes visible — for coordinator
+    /// On success, runs while still holding the lock and before the run becomes visible - for coordinator
     /// state that must be read or set consistently with the run start (e.g. the remaining cooldown). Kept
     /// separate from <paramref name="canStart"/> so the predicate stays a predicate.
     /// </param>
@@ -79,7 +79,7 @@ internal sealed class RunGate
         }
     }
 
-    /// <summary>Bricht ab und wartet auf das Ende (Daemon-Shutdown). Fehler werden geschluckt — der <c>RunAsync</c>-finally des Aufrufers sichert den Hardware-Zustand ab.</summary>
+    /// <summary>Bricht ab und wartet auf das Ende (Daemon-Shutdown). Fehler werden geschluckt - der <c>RunAsync</c>-finally des Aufrufers sichert den Hardware-Zustand ab.</summary>
     public async Task StopAsync()
     {
         Task? task;
@@ -97,7 +97,7 @@ internal sealed class RunGate
 
     /// <summary>
     /// Beendet den Lauf: verwirft die CTS und gibt das Gate frei. <paramref name="underLock"/> läuft noch
-    /// unter der Sperre — für Zustand, der atomar mit dem Lauf-Ende gesetzt werden muss (z. B. den
+    /// unter der Sperre - für Zustand, der atomar mit dem Lauf-Ende gesetzt werden muss (z. B. den
     /// Cooldown-Anker). Für den <c>finally</c>-Pfad gedacht.
     /// </summary>
     public void End(Action? underLock = null)

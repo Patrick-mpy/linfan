@@ -1,4 +1,4 @@
-# LinFan — Architecture (detail)
+# LinFan - Architecture (detail)
 
 Complements [README.md](../README.md) with the binding architecture details.
 Pattern: **MVC** with process separation (privileged daemon ⟷ user GUI).
@@ -6,41 +6,55 @@ The **IPC boundary equals the Controller↔Model boundary**.
 
 ---
 
+**MVC** with process separation: the **model** (domain + hardware access) lives authoritatively in the
+**privileged daemon**, **view + controller** run in the unprivileged user process, and the **IPC boundary
+is the Controller↔Model boundary**.
+
+```
+        GUI process (user, no root)                   Daemon process (privileged)
+   ┌───────────────────────────────────────┐      ┌──────────────────────────────────┐
+   │   VIEW                CONTROLLER       │ IPC  │   MODEL (authoritative)          │
+   │   Avalonia .axaml ◄─► presentation     │◄────►│   domain + services + hardware   │
+   │   (DataContext)       logic / commands │      │   curve engine, calibration,     │
+   │                                        │      │   fail-safe watchdog             │
+   └───────────────────────────────────────┘      └──────────────────────────────────┘
+```
+
 ## 1. Layers & responsibilities
 
-### Model — `LinFan.Core` + `LinFan.Hardware.*`
+### Model - `LinFan.Core` + `LinFan.Hardware.*`
 
 Platform-neutral domain in **`LinFan.Core`**:
 
-- **Models/** — POCOs without behavior/dependencies: `Sensor`, `Fan`, `Curve`, `Profile`, `Config`.
-- **Services/** — the actual logic:
-  - `CurveEngine` — computes temperature → PWM (interpolation, hysteresis, clamping).
-  - `CalibrationService` — the onboarding flow (ramp PWM, measure RPM, start-up point).
-  - `ConfigStore` — JSON persistence (load/save, schema versioning).
-  - `ControlLoop` — poll cycle: read sensors → apply curves → set PWM.
-- **Abstractions/** — `ISensorBackend` (read), `IFanController` (control), `IConfigStore`.
+- **Models/** - POCOs without behavior/dependencies: `Sensor`, `Fan`, `Curve`, `Profile`, `Config`.
+- **Services/** - the actual logic:
+  - `CurveEngine` - computes temperature → PWM (interpolation, hysteresis, clamping).
+  - `CalibrationService` - the onboarding flow (ramp PWM, measure RPM, start-up point).
+  - `ConfigStore` - JSON persistence (load/save, schema versioning).
+  - `ControlLoop` - poll cycle: read sensors → apply curves → set PWM.
+- **Abstractions/** - `ISensorBackend` (read), `IFanController` (control), `IConfigStore`.
 
 **`LinFan.Hardware.{Linux,Windows,Mac}`** implement these abstractions per platform (see §6).
 
 Rules:
 - Knows **nothing** about Avalonia, IPC, or the GUI.
-- No `#if <OS>` switches — platform differences live in `Hardware.*`.
+- No `#if <OS>` switches - platform differences live in `Hardware.*`.
 - Lives **authoritatively in the daemon process**.
 
-### View — `LinFan.App/Views`
+### View - `LinFan.App/Views`
 
 - Avalonia `.axaml` + **minimal** code-behind (only pure UI concerns like focus, animations).
 - Only presentation, layout, bindings. **No** domain/hardware logic.
 - The `DataContext` is the corresponding controller.
 
-### Controller — `LinFan.App/Controllers`
+### Controller - `LinFan.App/Controllers`
 
 - Presentation logic: takes view commands, calls the model via the **IPC client**, holds the bound
   state (live RPM, temperatures, status, calibration progress).
 - Mechanics via CommunityToolkit.Mvvm (`[ObservableProperty]`, `[RelayCommand]`), conceptually an
   **MVC controller**. Naming: `XyzController`.
 - Marshals incoming IPC updates onto the UI thread (`Dispatcher.UIThread`).
-- Contains **no** hardware logic — delegates everything to the daemon.
+- Contains **no** hardware logic - delegates everything to the daemon.
 
 ---
 
@@ -83,7 +97,7 @@ directly. Each stage only talks to its neighbor.
 
 ---
 
-## 4. IPC contract — `LinFan.Ipc`
+## 4. IPC contract - `LinFan.Ipc`
 
 - Shared **DTOs/commands**, referenced by both app **and** daemon (single source of truth for the
   contract).
@@ -92,7 +106,7 @@ directly. Each stage only talks to its neighbor.
   swappable.
 - **Example commands:** `ListDevices`, `StartCalibration`, `AssignCurve`, `SetManualPwm`, `SaveConfig`,
   `Subscribe(stream SensorUpdate)`.
-- Only serializable DTOs cross the boundary — **never** pass Core service objects through.
+- Only serializable DTOs cross the boundary - **never** pass Core service objects through.
 
 ---
 
@@ -128,7 +142,7 @@ public interface IFanController
   hardware auto.
 - **Windows:** `LibreHardwareMonitorLib` (`Control.SetSoftware(percent)`).
 - **macOS:** IOKit/SMC (`F*Tg`/`F*Md`); `CanControl` often `false` on Apple Silicon.
-- "Not controllable" is a **regular state**, not an error — the UI shows such channels as read-only.
+- "Not controllable" is a **regular state**, not an error - the UI shows such channels as read-only.
 
 ---
 
@@ -146,7 +160,7 @@ public interface IFanController
 - ❌ View → Model **directly** (always via the controller).
 - ❌ `LinFan.Core` → Avalonia / IPC / a concrete hardware implementation.
 - ❌ `LinFan.App` → `LinFan.Hardware.*` **directly** (only the daemon loads backends).
-- ❌ `#if <OS>` in `Core` or `App` — platform **hardware** access belongs exclusively in `Hardware.*`.
+- ❌ `#if <OS>` in `Core` or `App` - platform **hardware** access belongs exclusively in `Hardware.*`.
   Pure platform *presentation or infrastructure* details with no domain meaning (window decoration, config
   paths, the IPC transport, the single-instance endpoint) may live in `App`/`Core` when they are selected by a **runtime** check
   (`OperatingSystem.IsWindows()` …), so the same binary stays correct everywhere. Moving them into
@@ -188,7 +202,7 @@ Sensor      { Id, Name(custom), Source(hwmon path|SMC key|chip+idx),
 Fan         { Id, Name(custom), PwmSource, RpmSource(override → wins over backend tach heuristic),
               minPwm, maxPwm, calibration(PWM→RPM), assignedCurveId }
 Curve       { Id, Name, sourceSensorId, points[(temp,percent)],
-              hysteresis, minClamp, maxClamp, interpolation(linear|spline) }
+              hysteresis, smoothingSeconds, minClamp, maxClamp, interpolation(linear|spline) }
 Profile     { Id, Name, fan→curve assignments }   // optional, multiple setups
 Config      { schemaVersion, sensors[], fans[], curves[], profiles[],
               pollIntervalMs, failSafeTemp }
@@ -196,5 +210,5 @@ Config      { schemaVersion, sensors[], fans[], curves[], profiles[],
 
 Storage location (one path, OS-conforming via `SpecialFolder.ApplicationData`):
 `Linux/macOS ~/.config/linfan/`, `Windows %AppData%\LinFan\` (machine-wide `%ProgramData%\linfan\` for
-the service). Deliberately **no** macOS-specific path (`~/Library/Application Support`) — macOS is
+the service). Deliberately **no** macOS-specific path (`~/Library/Application Support`) - macOS is
 deferred for now to avoid maintaining a second path branch.

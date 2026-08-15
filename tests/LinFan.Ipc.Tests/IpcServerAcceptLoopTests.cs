@@ -8,7 +8,7 @@ namespace LinFan.Ipc.Tests;
 
 /// <summary>
 /// Verhalten der Accept-Schleife bei fehlschlagender Verbindungsannahme. Regression: sie wiederholte
-/// sofort und ohne Pause — ein <b>dauerhafter</b> Fehler (unter Windows z. B. das fehlende Recht, eine
+/// sofort und ohne Pause - ein <b>dauerhafter</b> Fehler (unter Windows z. B. das fehlende Recht, eine
 /// weitere Pipe-Instanz anzulegen) ließ den privilegierten Daemon damit frei drehen, statt in Ruhe zu
 /// wiederholen. Erholen muss sie sich weiterhin.
 /// </summary>
@@ -29,7 +29,7 @@ public class IpcServerAcceptLoopTests
         cts.Cancel();
 
         // Mit Backoff sind ~8 Versuche zu erwarten; ohne Backoff waren es Zehntausende. Die Obergrenze ist
-        // bewusst großzügig — geprüft wird „dreht nicht frei", nicht die exakte Taktung.
+        // bewusst großzügig - geprüft wird „dreht nicht frei", nicht die exakte Taktung.
         Assert.InRange(transport.Attempts, 1, 40);
     }
 
@@ -75,7 +75,7 @@ public class IpcServerAcceptLoopTests
             if (attempt <= _failures)
                 throw new UnauthorizedAccessException("Zugriff verweigert (simuliert).");
             if (attempt == _failures + 1)
-                return new MemoryStream(); // liefert sofort EOF — der Server nimmt sie an und räumt sie ab
+                return new MemoryStream(); // liefert sofort EOF - der Server nimmt sie an und räumt sie ab
 
             await Task.Delay(Timeout.Infinite, ct);
             throw new OperationCanceledException(ct);

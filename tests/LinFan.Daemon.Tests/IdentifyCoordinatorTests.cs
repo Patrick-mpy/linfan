@@ -138,7 +138,7 @@ public class IdentifyCoordinatorTests
     public async Task Identify_OneSensorThrows_ButAnotherReadable_CompletesNormally()
     {
         // Ein Kanal wirft EIO, ein zweiter ist lesbar (kühl). Der defensive Watchdog überspringt den
-        // kaputten Kanal und überwacht mit dem Rest weiter — KEIN Spurious-Abort (vormals riss der
+        // kaputten Kanal und überwacht mit dem Rest weiter - KEIN Spurious-Abort (vormals riss der
         // werfende Read den Lauf ab).
         var hw = new FakeHardware();
         hw.AddThrowingTempSensor("bad");
@@ -226,7 +226,7 @@ public class IdentifyCoordinatorTests
     public async Task Start_WithinCooldownAfterRun_IsRejected_ThenAllowedAfter()
     {
         // Fail-Safe: Identifikation drosselt ALLE anderen Lüfter auf PWM 0. Aufeinanderfolgende Läufe
-        // ohne Pause könnten die Kühlung dauerhaft reduzieren — daher nach jedem Lauf eine Abklingzeit.
+        // ohne Pause könnten die Kühlung dauerhaft reduzieren - daher nach jedem Lauf eine Abklingzeit.
         var hw = Rig();
         using var cts = new CancellationTokenSource();
         var clock = new MutableClock(DateTimeOffset.UnixEpoch);

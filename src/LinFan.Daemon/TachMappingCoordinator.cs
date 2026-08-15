@@ -14,17 +14,17 @@ namespace LinFan.Daemon;
 /// hochtreibt (alle anderen steuerbaren drosseln) und die Reaktion misst. Ein eindeutiger Treffer wird als
 /// <see cref="FanConfig.RpmSource"/>-Override persistiert.
 /// <para>
-/// Fail-Safe: identisch zur Identifikation — das Drosseln der anderen Lüfter reduziert die Kühlung, daher
+/// Fail-Safe: identisch zur Identifikation - das Drosseln der anderen Lüfter reduziert die Kühlung, daher
 /// läuft im Service ein Temperatur-Watchdog (Übertemp / keine lesbare Temperatur → Abbruch), und der
 /// <c>finally</c>-Pfad ruft IMMER <see cref="IFanController.RestoreDefaults"/> und gibt jeden Lüfter per
-/// Resume an den Loop zurück — auch bei Abbruch/Shutdown/Exception. Der Haupt-Loop bleibt zweiter Watchdog
+/// Resume an den Loop zurück - auch bei Abbruch/Shutdown/Exception. Der Haupt-Loop bleibt zweiter Watchdog
 /// (bricht diese Aktion im Fail-Safe-Tick ab). Exklusiv mit Kalibrierung und Identifikation.
 /// </para>
 /// </summary>
 internal sealed class TachMappingCoordinator
 {
     /// <summary>
-    /// Mindest-Abklingzeit nach einem Lauf, bevor ein neuer starten darf — verhindert, dass wiederholte
+    /// Mindest-Abklingzeit nach einem Lauf, bevor ein neuer starten darf - verhindert, dass wiederholte
     /// Kopplungen die anderen Lüfter dauerhaft nahe PWM 0 (weniger Kühlung) halten.
     /// </summary>
     private static readonly TimeSpan DefaultCooldown = TimeSpan.FromSeconds(3);
@@ -83,11 +83,11 @@ internal sealed class TachMappingCoordinator
     {
         var controllable = _fans.DiscoverFans().Where(f => f.CanControl).Select(f => f.Id).ToList();
         if (!controllable.Contains(target))
-            return; // Ziel nicht steuerbar — der Aufrufer prüft das ebenfalls
+            return; // Ziel nicht steuerbar - der Aufrufer prüft das ebenfalls
 
         // The cooldown must NOT drop the request: the GUI cannot see a silent drop and waits out its 60 s
         // timeout, writing the fan off as failed and skipping its calibration too. Wait out the remainder
-        // inside the run instead — read under the RunGate lock so it stays consistent with the run end
+        // inside the run instead - read under the RunGate lock so it stays consistent with the run end
         // (_lastRunEndedAt).
         TimeSpan cooldownWait = TimeSpan.Zero;
         if (!_run.TryBegin(out CancellationToken token, underLock: () => cooldownWait = RemainingCooldown()))
@@ -120,7 +120,7 @@ internal sealed class TachMappingCoordinator
 
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
 
-    /// <summary>Bricht eine laufende Kopplung ab — oder quittiert (löscht) einen Abschluss-Status.</summary>
+    /// <summary>Bricht eine laufende Kopplung ab - oder quittiert (löscht) einen Abschluss-Status.</summary>
     public void Cancel() => _run.Cancel(whenIdle: () => _status = null);
 
     /// <summary>Bricht ab und wartet auf das Ende (für den Daemon-Shutdown, vor dem finalen RestoreDefaults).</summary>
@@ -133,7 +133,7 @@ internal sealed class TachMappingCoordinator
             // Wait out the cooldown BEFORE throttling: no hardware has been touched yet and the control loop
             // keeps regulating. Waiting after the suspend would stretch the window with reduced cooling
             // (fail-safe). Deliberately OUTSIDE DriveAsync: everything that touches hardware sits behind an
-            // unconditional finally in there — out here there is nothing to restore yet.
+            // unconditional finally in there - out here there is nothing to restore yet.
             if (cooldownWait > TimeSpan.Zero)
                 await _delay(cooldownWait, ct).ConfigureAwait(false);
 
@@ -155,14 +155,14 @@ internal sealed class TachMappingCoordinator
                     // telling whether the fan really has no tachometer or had merely not coasted down far
                     // enough when measured (inert fan → baseline too high → rise ≈ 0).
                     _log.LogInformation(
-                        "Sensor-Kopplung: {Fan} — kein reagierender Tacho (kein Drehzahlsignal); gemessen: {Rises}.",
+                        "Sensor-Kopplung: {Fan} - kein reagierender Tacho (kein Drehzahlsignal); gemessen: {Rises}.",
                         target.Value, DescribeContenders(result, top: 3));
                     break;
                 default: // Ambiguous (Matched ohne Sensor kann nicht auftreten)
                     _status = new IpcTachMapping(target.Value, TachMappingPhase.Ambiguous, Running: false,
                         RiseRpm: result.RiseRpm);
                     _log.LogInformation(
-                        "Sensor-Kopplung: {Fan} — mehrdeutig ({Contenders}), bitte manuell zuordnen.",
+                        "Sensor-Kopplung: {Fan} - mehrdeutig ({Contenders}), bitte manuell zuordnen.",
                         target.Value, DescribeContenders(result));
                     break;
             }
@@ -180,13 +180,13 @@ internal sealed class TachMappingCoordinator
         catch (NoTemperatureReadingException ex)
         {
             _status = Fail(target, TachMappingFailReason.NoTemperatureReading);
-            _log.LogWarning("Sensor-Kopplung abgebrochen (kein Watchdog): {Fan} — {Reason}", target.Value, ex.Message);
+            _log.LogWarning("Sensor-Kopplung abgebrochen (kein Watchdog): {Fan} - {Reason}", target.Value, ex.Message);
         }
         catch (FanNotControllableException ex)
         {
             // „Nicht steuerbar" ist ein Normalzustand → saubere Info ohne Exception-Trace.
             _status = Fail(target, TachMappingFailReason.NotControllable);
-            _log.LogInformation("Sensor-Kopplung nicht möglich: {Fan} — {Reason}", target.Value, ex.Message);
+            _log.LogInformation("Sensor-Kopplung nicht möglich: {Fan} - {Reason}", target.Value, ex.Message);
         }
         catch (Exception ex)
         {
@@ -201,7 +201,7 @@ internal sealed class TachMappingCoordinator
 
     /// <summary>
     /// Everything that touches hardware, behind an <b>unconditional</b> finally: throttle the other fans,
-    /// drive the target, then always hand every fan back to the loop on firmware auto — cancellation,
+    /// drive the target, then always hand every fan back to the loop on firmware auto - cancellation,
     /// over-temperature and shutdown included. Kept separate from the cooldown wait on purpose, so the
     /// restore can never end up behind a condition again.
     /// </summary>

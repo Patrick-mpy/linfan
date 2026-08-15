@@ -10,7 +10,7 @@ namespace LinFan.App.Tests;
 /// <summary>
 /// Parität der Ressourcen-Tabellen: die neutrale (englische) und die deutsche .resx müssen exakt
 /// dieselben Keys enthalten. Fängt vergessene Übersetzungen oder verwaiste Keys in einer der beiden
-/// Dateien ab — billig und wertvoll, weil ein fehlender Key sonst still als Key-Literal in der UI
+/// Dateien ab - billig und wertvoll, weil ein fehlender Key sonst still als Key-Literal in der UI
 /// landet (Localizer-Fallback).
 /// </summary>
 public sealed class LocalizationParityTests

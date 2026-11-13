@@ -3,6 +3,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LinFan.App.Localization;
@@ -24,30 +25,6 @@ public partial class CurveEditRow : ObservableObject
 
     /// <summary>Quell-Auswahl: pro sichtbarem Sensor eine Checkbox (mehrere Sensoren mischbar).</summary>
     public ObservableCollection<SensorCheck> SensorChecks { get; } = new();
-
-    /// <summary>
-    /// Die im Editor angezeigte Teilmenge der <see cref="SensorChecks"/>: aktive (ausgewählte) zuerst,
-    /// eingeklappt auf die ersten <see cref="CollapsedCount"/>, ausgeklappt alle. Hält die Quell-Liste
-    /// übersichtlich, wenn viele Sensoren existieren.
-    /// </summary>
-    public ObservableCollection<SensorCheck> DisplayedSensorChecks { get; } = new();
-
-    /// <summary>Die angezeigten Quell-Sensoren (<see cref="DisplayedSensorChecks"/>) nach Gruppe gebündelt -
-    /// wie die Dashboard-Sensorgruppen; Container für die gruppierte Anzeige im Kurven-Tab.</summary>
-    public ObservableCollection<SensorCheckGroup> DisplayedSensorGroups { get; } = new();
-
-    private const int CollapsedCount = 3;
-
-    /// <summary>True = alle Quell-Sensoren zeigen; false = nur die ersten <see cref="CollapsedCount"/>.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ToggleSensorsLabel))]
-    private bool _showAllSensors;
-
-    /// <summary>Ob es mehr Sensoren als die eingeklappte Anzahl gibt (steuert die Sichtbarkeit des Toggle-Buttons).</summary>
-    public bool HasCollapsibleSensors => SensorChecks.Count > CollapsedCount;
-
-    /// <summary>Beschriftung des Einblenden/Ausblenden-Buttons.</summary>
-    public string ToggleSensorsLabel => ShowAllSensors ? Localizer.Instance["CurveEditRow.ShowLess"] : Localizer.Instance.Format("CurveEditRow.ShowAll", SensorChecks.Count);
 
     public ObservableCollection<PointRow> Points { get; } = new();
 
@@ -72,13 +49,32 @@ public partial class CurveEditRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(Label))]
     private string _name;
 
-    [ObservableProperty] private decimal _hysteresis;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HysteresisLabel), nameof(HasHysteresisBand))]
+    private decimal _hysteresis;
+
+    /// <summary>Caption of the hysteresis band in the chart, e.g. „±2°".</summary>
+    public string HysteresisLabel => $"±{Hysteresis.ToString("0.#", CultureInfo.InvariantCulture)}°";
+
+    /// <summary>
+    /// Whether the chart shades the hysteresis band: it is drawn around the live value, so it needs one. The band is an
+    /// approximation - the daemon's dead band is centred on the last applied (smoothed) temperature per fan, which the
+    /// snapshot does not carry.
+    /// </summary>
+    public bool HasHysteresisBand => Hysteresis > 0 && !double.IsNaN(LiveTemperature);
 
     /// <summary>
     /// Averaging window (seconds) for the curve's input temperature, <c>0</c> = off. Initialized to the Core
     /// default so a newly created curve carries it without every call site having to pass it.
     /// </summary>
-    [ObservableProperty] private decimal _smoothingSeconds = (decimal)CurveConfig.DefaultSmoothingSeconds;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SmoothingHint))]
+    private decimal _smoothingSeconds = (decimal)CurveConfig.DefaultSmoothingSeconds;
+
+    /// <summary>What the smoothing does at its current value - „Aus …" at 0.</summary>
+    public string SmoothingHint => SmoothingSeconds == 0
+        ? Localizer.Instance["CurveEditRow.SmoothingOff"]
+        : Localizer.Instance.Format("CurveEditRow.SmoothingOn", SmoothingSeconds.ToString("0.#", CultureInfo.InvariantCulture));
 
     /// <summary>
     /// Ob die Kurve aktiv regelt. <c>false</c> = stillgelegt (zugeordnete Lüfter → Hardware-Auto im Daemon).
@@ -92,14 +88,21 @@ public partial class CurveEditRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(SelectedAggregation))]
     private SensorAggregation _aggregation;
 
-    /// <summary>Auswählbare Aggregationen (für die ComboBox).</summary>
+    /// <summary>The aggregations offered (the segmented switch).</summary>
     public IReadOnlyList<AggregationOption> Aggregations => AggregationOption.All;
 
-    /// <summary>Aggregation als Anzeige-Option (für die ComboBox-Bindung).</summary>
+    /// <summary>
+    /// The aggregation as a display option (bound by the segmented switch). <c>null</c> is ignored: a list box writes it
+    /// when it loses its selection (e.g. Ctrl+click), and that must not turn into a silent switch to Max.
+    /// </summary>
     public AggregationOption SelectedAggregation
     {
         get => AggregationOption.For(Aggregation);
-        set => Aggregation = value?.Value ?? SensorAggregation.Max;
+        set
+        {
+            if (value is not null)
+                Aggregation = value.Value;
+        }
     }
 
     /// <summary>Interpolationsmodus der Kurve (Linear oder Spline).</summary>
@@ -107,24 +110,34 @@ public partial class CurveEditRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(SelectedInterpolation))]
     private InterpolationMode _interpolationMode;
 
-    /// <summary>Auswählbare Interpolationsmodi (für die ComboBox).</summary>
+    /// <summary>The interpolation modes offered (the segmented switch).</summary>
     public IReadOnlyList<InterpolationOption> Interpolations => InterpolationOption.All;
 
-    /// <summary>Interpolationsmodus als Anzeige-Option (für die ComboBox-Bindung).</summary>
+    /// <summary>The interpolation mode as a display option (bound by the segmented switch). <c>null</c> is ignored, see <see cref="SelectedAggregation"/>.</summary>
     public InterpolationOption SelectedInterpolation
     {
         get => InterpolationOption.For(InterpolationMode);
-        set => InterpolationMode = value?.Value ?? InterpolationMode.Linear;
+        set
+        {
+            if (value is not null)
+                InterpolationMode = value.Value;
+        }
     }
 
     /// <summary>Aggregierte Live-Temperatur der Quell-Sensoren (live), oder NaN - für den Arbeitspunkt im Graph.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LiveTemperatureDisplay))]
+    [NotifyPropertyChangedFor(nameof(LiveTemperatureDisplay), nameof(HasHysteresisBand))]
     private double _liveTemperature = double.NaN;
 
     /// <summary>Formatierte Live-Temperatur fürs Dashboard-Panel (z. B. „48 °C"); „-" ohne lesbare Quelle.</summary>
     public string LiveTemperatureDisplay =>
         double.IsNaN(LiveTemperature) ? "-" : $"{LiveTemperature:0} °C";
+
+    /// <summary>
+    /// Unsaved changes in this curve (its settings or the fans following it) compared with the saved state of
+    /// its profile. Set by the controller's diff; display only, never part of the config.
+    /// </summary>
+    [ObservableProperty] private bool _isDirty;
 
     /// <summary>
     /// True, wenn die nach Temperatur sortierten Stützpunkte irgendwo eine <b>sinkende</b> Leistung haben
@@ -143,6 +156,9 @@ public partial class CurveEditRow : ObservableObject
     /// über <see cref="OnSourceSelectionChanged"/> bei Quell-Auswahländerungen.
     /// </summary>
     public bool HasNoSource => Sources.Count == 0;
+
+    /// <summary>Two or more sources - only then does the mix (Max/Avg) matter, so the editor shows it only then.</summary>
+    public bool HasMultipleSources => Sources.Count >= 2;
 
     /// <summary>
     /// True, wenn die Kurve „aktiv" ist: mindestens ein Quell-Sensor UND mindestens ein zugeordneter Lüfter.
@@ -177,17 +193,71 @@ public partial class CurveEditRow : ObservableObject
                 ? Localizer.Instance["CurveEditRow.InactiveNoSource"]
                 : Localizer.Instance["CurveEditRow.InactiveNoFan"];
 
+    /// <summary>The texts built in code follow a language switch (called by the controller).</summary>
+    internal void NotifyLanguageChanged()
+    {
+        OnPropertyChanged(nameof(PointsLabel));
+        OnPropertyChanged(nameof(SmoothingHint));
+        OnPropertyChanged(nameof(ActivityHint));
+        OnPropertyChanged(nameof(LowerLimitLabel));
+        OnPropertyChanged(nameof(UpperLimitLabel));
+        OnPropertyChanged(nameof(SourceSummary));
+        OnPropertyChanged(nameof(Label));
+        foreach (PointRow point in Points)
+            point.NotifyLanguageChanged();
+    }
+
     /// <summary>Re-evaluiert das Aktiv-Badge (vom Controller bei Zuordnungswechsel aufgerufen).</summary>
     public void NotifyActiveChanged()
     {
         OnPropertyChanged(nameof(IsActive));
         OnPropertyChanged(nameof(ActivityHint));
         OnPropertyChanged(nameof(AssignedFans));
+        NotifyLimitsChanged();
     }
 
     /// <summary>Die dieser Kurve zugeordneten Lüfter - für die Kurven-Übersicht im Profil-Editor.</summary>
     public IReadOnlyList<FanAssignRow> AssignedFans =>
         Fans.Where(f => ReferenceEquals(f.Selected, this)).ToList();
+
+    // --- Power limits of the assigned fans (the chart's grey bands) ------------------------------
+
+    // Only controllable fans: the daemon applies Min/Max when it writes PWM, a read-only fan never gets either.
+    private IEnumerable<FanAssignRow> LimitingFans => Fans.Where(f => f.CanControl && ReferenceEquals(f.Selected, this));
+
+    // The narrowest limit wins - the one the curve runs into first. Ties keep the first fan.
+    private FanAssignRow? LowestFloorFan => LimitingFans.Where(f => f.MinPercent > 0).MaxBy(f => f.MinPercent);
+
+    private FanAssignRow? LowestCeilingFan => LimitingFans.Where(f => f.MaxPercent < 100).MinBy(f => f.MaxPercent);
+
+    /// <summary>The highest minimum (%) among the assigned controllable fans, or <c>null</c> when none has one.</summary>
+    public double? LowerLimit => LowestFloorFan?.MinPercent;
+
+    /// <summary>The lowest maximum (%) among the assigned controllable fans, or <c>null</c> when none has one.</summary>
+    public double? UpperLimit => LowestCeilingFan?.MaxPercent;
+
+    /// <summary>„Min 25 % · CPU" - the limit and the fan it comes from.</summary>
+    public string? LowerLimitLabel => LowestFloorFan is { } fan
+        ? Localizer.Instance.Format("CurveEditRow.LimitMin", fan.MinPercent, fan.DisplayName)
+        : null;
+
+    /// <summary>„Max 80 % · Front" - the limit and the fan it comes from.</summary>
+    public string? UpperLimitLabel => LowestCeilingFan is { } fan
+        ? Localizer.Instance.Format("CurveEditRow.LimitMax", fan.MaxPercent, fan.DisplayName)
+        : null;
+
+    /// <summary>Whether the chart shades a limit at all (drives its caption).</summary>
+    public bool HasLimits => LowerLimit is not null || UpperLimit is not null;
+
+    /// <summary>Re-reads the limits - called when an assignment or a fan's Min/Max/name changes.</summary>
+    public void NotifyLimitsChanged()
+    {
+        OnPropertyChanged(nameof(LowerLimit));
+        OnPropertyChanged(nameof(UpperLimit));
+        OnPropertyChanged(nameof(LowerLimitLabel));
+        OnPropertyChanged(nameof(UpperLimitLabel));
+        OnPropertyChanged(nameof(HasLimits));
+    }
 
     /// <summary>Kurz-Beschreibung der Quell-Sensoren (Name bzw. „n Sensoren"); „-" ohne Quelle.</summary>
     public string SourceSummary => Sources.Count switch
@@ -251,14 +321,9 @@ public partial class CurveEditRow : ObservableObject
     /// Rebuilds the source checkboxes after a global visibility change; keeps the current selection.
     /// Called by the controller when a sensor's eye toggle flips (mirror of the fan list, a057c3d).
     /// </summary>
-    public void RebuildSensorChecks()
-    {
+    public void RebuildSensorChecks() =>
         // Collect the selection BEFORE clearing - Sources reads SensorChecks.
         BuildSensorChecks(new HashSet<string>(Sources.Select(s => s.Id)));
-        // Both are plain getters over SensorChecks.Count; the count is no longer constant.
-        OnPropertyChanged(nameof(HasCollapsibleSensors));
-        OnPropertyChanged(nameof(ToggleSensorsLabel));
-    }
 
     /// <summary>
     /// Hidden sensors are not offered - unless they are a source of THIS curve: hidden is display-only
@@ -270,7 +335,6 @@ public partial class CurveEditRow : ObservableObject
         SensorChecks.Clear();
         foreach (SensorOption opt in Sensors.Where(o => o.Visible || selected.Contains(o.Id)))
             SensorChecks.Add(new SensorCheck(opt, selected.Contains(opt.Id)) { SelectionChanged = OnSourceSelectionChanged });
-        RebuildDisplayedSensors();
     }
 
     private void OnSourceSelectionChanged()
@@ -278,54 +342,90 @@ public partial class CurveEditRow : ObservableObject
         OnPropertyChanged(nameof(Label));
         OnPropertyChanged(nameof(SourceSummary));
         OnPropertyChanged(nameof(HasNoSource));
+        OnPropertyChanged(nameof(HasMultipleSources));
         NotifyActiveChanged(); // Quelländerung kann das Aktiv-Badge kippen
         RaiseConfigChanged();  // Quell-Sensor-Mix fließt in SourceSensorIds
     }
 
-    [RelayCommand]
-    private void ToggleShowAllSensors() => ShowAllSensors = !ShowAllSensors;
+    // --- Points -----------------------------------------------------------------------------------
 
-    partial void OnShowAllSensorsChanged(bool value) => RebuildDisplayedSensors();
+    /// <summary>At least one point stays: an empty curve has no shape (the engine would run the fans at 100 %).</summary>
+    private bool CanRemovePoint => Points.Count > 1;
 
-    /// <summary>Baut <see cref="DisplayedSensorChecks"/> neu: aktive zuerst, eingeklappt auf <see cref="CollapsedCount"/>.</summary>
-    private void RebuildDisplayedSensors()
-    {
-        // OrderBy ist stabil → gleiche Selektion behält die ursprüngliche Reihenfolge; aktive nach vorn.
-        IEnumerable<SensorCheck> ordered = SensorChecks.OrderByDescending(c => c.Selected);
-        IEnumerable<SensorCheck> shown = ShowAllSensors ? ordered : ordered.Take(CollapsedCount);
+    /// <summary>Appends a point (loading, tests); the editor's own adds keep the list in temperature order.</summary>
+    public void AddPointRow(decimal temperature, decimal percent) => Points.Add(CreatePointRow(temperature, percent));
 
-        DisplayedSensorChecks.Clear();
-        foreach (SensorCheck c in shown)
-            DisplayedSensorChecks.Add(c);
-
-        RebuildDisplayedSensorGroups();
-    }
-
-    /// <summary>Bündelt die angezeigten Quell-Sensoren nach Gruppe (Ungruppiert zuletzt) - wie die Dashboard-Sensorgruppen.</summary>
-    private void RebuildDisplayedSensorGroups()
-    {
-        static string Key(SensorCheck c) =>
-            string.IsNullOrWhiteSpace(c.Sensor.Group) ? SensorGroup.Ungrouped : c.Sensor.Group.Trim();
-
-        DisplayedSensorGroups.Clear();
-        IEnumerable<SensorCheck> ordered = DisplayedSensorChecks
-            .OrderBy(c => Key(c) == SensorGroup.Ungrouped ? "￿" : Key(c), StringComparer.OrdinalIgnoreCase)
-            .ThenBy(c => c.Sensor.Name, StringComparer.OrdinalIgnoreCase);
-        // Case-insensitive so "cpu"/"CPU" merge into one block (first-seen casing names the header).
-        foreach (IGrouping<string, SensorCheck> grp in ordered.GroupBy(Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var group = new SensorCheckGroup(grp.Key);
-            foreach (SensorCheck c in grp)
-                group.Sensors.Add(c);
-            DisplayedSensorGroups.Add(group);
-        }
-    }
-
-    public void AddPointRow(decimal temperature, decimal percent)
+    private PointRow CreatePointRow(decimal temperature, decimal percent)
     {
         var row = new PointRow(temperature, percent);
-        row.RemoveCommand = new RelayCommand(() => Points.Remove(row));
-        Points.Add(row);
+        // The row's own command, so the remove button and Delete in the chart share one rule.
+        row.RemoveCommand = new RelayCommand(() =>
+        {
+            if (CanRemovePoint)
+                Points.Remove(row);
+        }, () => CanRemovePoint);
+        return row;
+    }
+
+    /// <summary>Inserts before the first hotter point - a sorted list stays sorted, so the numbering follows the curve.</summary>
+    private void InsertPoint(decimal temperature, decimal percent)
+    {
+        int index = 0;
+        while (index < Points.Count && Points[index].Temperature <= temperature)
+            index++;
+        Points.Insert(index, CreatePointRow(temperature, percent));
+    }
+
+    private bool IsTemperatureFree(decimal temperature) => Points.All(p => p.Temperature != temperature);
+
+    /// <summary>
+    /// The point „Punkt hinzufügen" adds: 10 °C above the hottest point at its percentage; once that point is above
+    /// 90 °C, halfway between it and the one before. <c>null</c> when there is no room (point limit, or the
+    /// temperature is taken).
+    /// </summary>
+    private (decimal Temperature, decimal Percent)? NextPoint()
+    {
+        if (Points.Count >= ConfigLimits.MaxPointsPerCurve)
+            return null;
+        List<PointRow> sorted = Points.OrderBy(p => p.Temperature).ToList();
+        if (sorted.Count == 0)
+            return (50, 50);
+
+        PointRow last = sorted[^1];
+        (decimal Temperature, decimal Percent) next;
+        if (last.Temperature <= 90)
+        {
+            next = (last.Temperature + 10, last.Percent);
+        }
+        else
+        {
+            decimal t0 = sorted.Count > 1 ? sorted[^2].Temperature : 0;
+            decimal p0 = sorted.Count > 1 ? sorted[^2].Percent : 0;
+            next = (Math.Round((t0 + last.Temperature) / 2, MidpointRounding.AwayFromZero),
+                    Math.Round((p0 + last.Percent) / 2, MidpointRounding.AwayFromZero));
+        }
+        return IsTemperatureFree(next.Temperature) ? next : null;
+    }
+
+    private bool CanAddPoint() => NextPoint() is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAddPoint))]
+    private void AddPoint()
+    {
+        if (NextPoint() is { } next)
+            InsertPoint(next.Temperature, next.Percent);
+    }
+
+    /// <summary>A double-click in the chart may add a point unless the curve is full or the temperature is taken.</summary>
+    private bool CanAddPointAt(ChartPoint point) =>
+        Points.Count < ConfigLimits.MaxPointsPerCurve && IsTemperatureFree(point.Temperature);
+
+    /// <summary>The chart's double-click (<c>CurveChart.AddPointCommand</c>).</summary>
+    [RelayCommand(CanExecute = nameof(CanAddPointAt))]
+    private void AddPointAt(ChartPoint point)
+    {
+        if (CanAddPointAt(point))
+            InsertPoint(point.Temperature, Math.Clamp(point.Percent, 0, 100));
     }
 
     /// <summary>Hält die Warnung aktuell: Werteänderung eines Punkts (Add/Remove abonnieren/abmelden) → neu prüfen.</summary>
@@ -338,6 +438,12 @@ public partial class CurveEditRow : ObservableObject
             foreach (PointRow row in added.OfType<PointRow>())
                 row.PropertyChanged += OnPointPropertyChanged;
 
+        for (int i = 0; i < Points.Count; i++)
+        {
+            Points[i].Number = i + 1;
+            (Points[i].RemoveCommand as IRelayCommand)?.NotifyCanExecuteChanged(); // the count crossed 1 or not
+        }
+        NotifyAddPointChanged();
         OnPropertyChanged(nameof(PointsLabel)); // Zähler im eingeklappten Header folgt Add/Remove
         RecomputeDecreasing();
         RaiseConfigChanged();                   // Stützpunkt hinzugefügt/entfernt
@@ -347,9 +453,17 @@ public partial class CurveEditRow : ObservableObject
     {
         if (e.PropertyName is nameof(PointRow.Temperature) or nameof(PointRow.Percent))
         {
+            if (e.PropertyName == nameof(PointRow.Temperature))
+                NotifyAddPointChanged(); // which temperatures are taken changed
             RecomputeDecreasing();
             RaiseConfigChanged();               // Stützpunkt-Wert geändert
         }
+    }
+
+    private void NotifyAddPointChanged()
+    {
+        AddPointCommand.NotifyCanExecuteChanged();
+        AddPointAtCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Sortiert wie beim Speichern nach Temperatur und prüft, ob die Leistung dabei je echt sinkt.</summary>
@@ -373,25 +487,35 @@ public partial class CurveEditRow : ObservableObject
         HasDecreasingPercent = decreasing;
     }
 
-    [RelayCommand]
-    private void AddPoint() => AddPointRow(50, 50);
-
     public static CurveEditRow From(CurveConfig c, ObservableCollection<SensorOption> sensors,
                                     ObservableCollection<FanAssignRow>? fans = null)
     {
         // Schema-2-Quellen bevorzugen; sonst (Altbestand) aus dem alten Einzelfeld migrieren.
         IEnumerable<string> sourceIds = CurveSourceResolver.ResolveSources(c.SourceSensorId, c.SourceSensorIds);
 
-        var row = new CurveEditRow(c.Id, c.Name, sourceIds, c.Aggregation, (decimal)c.HysteresisC,
+        var row = new CurveEditRow(c.Id, c.Name, sourceIds, c.Aggregation,
+                                   ToEditor(c.HysteresisC, 0, ConfigSanitizer.MaxHysteresisC, CurveConfig.DefaultHysteresisC),
                                    sensors, c.InterpolationMode, fans)
         {
             Enabled = c.Enabled,
-            SmoothingSeconds = (decimal)c.SmoothingSeconds,
+            SmoothingSeconds = ToEditor(c.SmoothingSeconds, 0, ConfigSanitizer.MaxSmoothingSeconds,
+                                        CurveConfig.DefaultSmoothingSeconds),
         };
-        foreach (CurvePoint p in c.Points.OrderBy(p => p.TemperatureC))
-            row.AddPointRow((decimal)p.TemperatureC, (decimal)p.Percent);
+        foreach (CurvePoint p in c.Points.Where(p => double.IsFinite(p.TemperatureC) && double.IsFinite(p.Percent))
+                                         .OrderBy(p => p.TemperatureC))
+        {
+            row.AddPointRow(ToEditor(p.TemperatureC, ConfigSanitizer.MinPointTempC, ConfigSanitizer.MaxPointTempC, 0),
+                            ToEditor(p.Percent, 0, 100, 0));
+        }
         return row;
     }
+
+    /// <summary>
+    /// The curve came through the daemon, which takes it from any client: clamp to the editor's range instead of
+    /// a bare <c>(decimal)</c> cast, which throws above ~7.9e28 and on NaN - on the UI thread, ending the GUI.
+    /// </summary>
+    private static decimal ToEditor(double value, double min, double max, double fallback) =>
+        (decimal)(double.IsFinite(value) ? Math.Clamp(value, min, max) : fallback);
 
     public CurveConfig ToConfig() => new()
     {

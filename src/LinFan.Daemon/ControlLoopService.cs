@@ -8,6 +8,7 @@ using LinFan.Core.Services;
 using LinFan.Ipc;
 using LinFan.Ipc.Messages;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Logging;
 
 namespace LinFan.Daemon;
@@ -26,6 +27,25 @@ internal sealed class ControlLoopService : BackgroundService
     /// </summary>
     private static readonly TimeSpan DefaultCoordinatorStopTimeout = TimeSpan.FromSeconds(3);
 
+    /// <summary>
+    /// Upper bound <see cref="StopAsync"/> waits for <see cref="ExecuteAsync"/> to finish, so a loop wedged in a
+    /// hardware call cannot delay the final RestoreDefaults past systemd's <c>TimeoutStopSec=20</c> and its SIGKILL.
+    /// Budget against the host's ShutdownTimeout (15 s, set in <c>DaemonHost</c>): coordinators exclude each other,
+    /// so one stop (3 s) + this (5 s) + two restores' gate waits (2 × 0.5 s) take about 9 s; even all three stops
+    /// timing out (9 s) end at about 15 s, still below systemd's 20 s.
+    /// </summary>
+    private static readonly TimeSpan DefaultExecuteStopTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// What a tick that threw reports: the watchdog did not run, the fans were put on firmware auto. Without a
+    /// snapshot for it the GUI would keep showing the last good tick for as long as the ticks fail.
+    /// </summary>
+    private static readonly ControlTick FailedTick =
+        new(FailSafeTriggered: true, double.NaN, Array.Empty<FanAction>(), "Tick-Fehler", FailSafeState.Error);
+
+    // Sent after every tick in which the watchdog ran; a unit with WatchdogSec= restarts a daemon whose loop hangs.
+    private static readonly ServiceState WatchdogPing = new("WATCHDOG=1");
+
     private readonly ISensorBackend _sensors;
     private readonly IFanController _fans;
     private readonly IConfigStore _store;
@@ -34,21 +54,52 @@ internal sealed class ControlLoopService : BackgroundService
 
     private volatile bool _reloadRequested;
     private volatile bool _pendingReset;  // Config auf Werkszustand zurücksetzen (GUI-Befehl)
+    // Set when StopAsync begins: fans are already back on hardware auto, so a calibration or tach-mapping
+    // result finishing now may have been measured against firmware control and must not be persisted.
+    private volatile bool _stopping;
     private IpcConfig? _pendingSave;   // von der GUI gesendete Config (per Interlocked übergeben)
     private IpcConfig? _pendingReplace; // von der GUI gesendete Config, die die bestehende vollständig ersetzt
     private string? _pendingActiveProfile;
-    // Kurve-an/aus vom Dashboard: gepuffert je Tick (Queue statt Einzel-Slot, damit rasche Mehrfach-
-    // Umschaltungen verschiedener Kurven nicht verloren gehen). Wird auf dem Loop-Thread gedrained.
-    private readonly ConcurrentQueue<(string CurveId, bool Enabled)> _pendingCurveToggles = new();
+    // Curve on/off from the dashboard, buffered per tick. One slot per curve (last value wins) rather than a queue, so
+    // quick toggles of different curves are all kept while a client cannot pile up entries - only curves of the live
+    // config get in. Drained on the loop thread.
+    private readonly ConcurrentDictionary<string, bool> _pendingCurveToggles = new(StringComparer.Ordinal);
     // Tacho-Zuordnung(en) (manuell / Auto-Kopplung): je Lüfter das RpmSource-Override setzen/löschen.
-    // Queue statt Einzel-Slot, damit das Onboarding mehrere Lüfter in Folge zuordnen kann, ohne dass
-    // Zuordnungen verloren gehen; wird auf dem Loop-Thread gedrained.
-    private readonly ConcurrentQueue<(string FanId, string? RpmSource)> _pendingTachAssignments = new();
+    // One slot per fan (last value wins) rather than a queue: the onboarding can still assign several fans in a
+    // row, while a client can no longer pile up entries - only discovered fans get in. Drained on the loop thread.
+    private readonly ConcurrentDictionary<string, string?> _pendingTachAssignments = new(StringComparer.Ordinal);
+
+    // Hardware changes the user resolved (acceptHardware / forgetHardware), one slot per change key (last command wins).
+    // Only keys of the last reported changes get in. Drained on the loop thread, which resolves each key afresh.
+    private readonly ConcurrentDictionary<string, (bool Forget, bool ResetSensorNames)> _pendingHardware =
+        new(StringComparer.Ordinal);
+
+    // The hardware changes the last snapshot reported (written on the loop thread, read by OnCommand).
+    private volatile IReadOnlyList<HardwareChange> _reportedChanges = [];
+    // Change keys already logged this run, and whether detecting them failed (loop thread only).
+    private readonly HashSet<string> _loggedHardwareChanges = new(StringComparer.Ordinal);
+    private bool _hardwareChangesFailed;
+
+    // Whether the calibration check failed this run (loop thread only) - logged once.
+    private bool _calibrationCheckFailed;
+
+    // Fans and fan-speed sensors the backend discovered. Discovery is fixed for the process lifetime in every
+    // backend, so this is read once at start - the IPC thread must not wait on the hardware gate per command.
+    private IReadOnlySet<string> _discoveredFanIds = new HashSet<string>();
+    private IReadOnlySet<string> _discoveredRpmSensorIds = new HashSet<string>();
+    // The descriptors themselves, for the devices behind them; null until read, or if discovery failed.
+    private IReadOnlyList<FanDescriptor>? _discoveredFans;
+    private IReadOnlyList<SensorDescriptor>? _discoveredSensors;
     private ControlLoop? _loop;        // für thread-sichere Steuerbefehle aus dem IPC-Thread
     private CalibrationCoordinator? _calibration;
     private IdentifyCoordinator? _identify;
     private TachMappingCoordinator? _tachMapping;
     private volatile AppConfig? _config;  // Live-Config (Referenz-Swap atomar) - u. a. für den Kalibrier-Watchdog
+
+    // Why the config found at start is not the one in use, for the snapshot - until the next saved change. Only the
+    // loop thread (and the start before it) touches these.
+    private ConfigLoadProblem? _configProblem;
+    private string? _configSetAsidePath;
 
     private readonly object _calLock = new();
     private (string FanId, FanCalibration Cal)? _pendingCalibration;
@@ -59,6 +110,17 @@ internal sealed class ControlLoopService : BackgroundService
 
     // Bereits gemeldete unbekannte Kurven-Quellen - dedup, damit je ID nur einmal pro Daemon-Lauf gewarnt wird.
     private readonly HashSet<string> _warnedUnknownSensors = new();
+
+    // Fans handed back at full speed and reported (loop thread only) - a transient auto failure repeats every tick until
+    // auto can be set again; cleared by the fan's next action that is no failure, so a channel flapping between full
+    // speed and a failed write is not reported again at every flip.
+    private readonly HashSet<string> _fullSpeedFans = new(StringComparer.Ordinal);
+
+    // Fans whose last action failed and was reported (loop thread only) - cleared by the next action that does not fail.
+    private readonly HashSet<string> _failingFans = new(StringComparer.Ordinal);
+
+    // Set while ticks keep failing (loop thread only): the failure is logged as an error once per run.
+    private bool _ticksFailing;
 
     // Test-Seam: überschreibt das aus der Config abgeleitete Tick-Intervall (Default: aus der Config).
     private readonly TimeSpan? _tickIntervalOverride;
@@ -78,11 +140,28 @@ internal sealed class ControlLoopService : BackgroundService
     // Erlaubt einem Test, den „hängender Stop"-Pfad ohne echte 3-s-Wartezeit zu prüfen.
     private readonly TimeSpan _coordinatorStopTimeout;
 
-    // Test-Seam: erzwingt den Dry-Run-Zustand (Default: aus den Prozessrechten via Privileges.IsElevated()).
-    // Nötig, weil Unit-Tests je nach Runner mit ODER ohne Root laufen (der CI-Container läuft als Root) -
-    // ohne Seam hinge der berichtete DaemonStatus (DryRun/Active) an der euid des Test-Runners. Produktiv
-    // bleibt der Parameter null → die echte Rechte-Erkennung entscheidet.
-    private readonly bool? _dryRunOverride;
+    // Test seam: bound on waiting for ExecuteAsync in StopAsync (default: DefaultExecuteStopTimeout).
+    private readonly TimeSpan _executeStopTimeout;
+
+    // Without root the daemon only computes and never writes - no restore and no device action either: such an
+    // instance (e.g. a dev build) would otherwise act on the fans of a live daemon wherever udev makes the PWM files
+    // group-writable. Test seam dryRunOverride: tests run with or without root depending on the runner (the CI
+    // container runs as root); in production the real privilege check decides.
+    private readonly bool _dryRun;
+
+    // Restores wait until it is settled that no other daemon holds the IPC endpoint: until then the fans may be another
+    // daemon's, so a stop that comes first (SIGTERM while starting) restores nothing - under systemd ExecStopPost covers
+    // that. A start that fails for any other reason settles it as ours, so whatever a predecessor left goes back to auto.
+    private volatile bool _fansAreOurs;
+    private volatile bool _anotherDaemonHoldsTheEndpoint;
+
+    private readonly ISystemdNotifier? _systemd;
+
+    // Test seam: replaces HardwareChanges.Detect over the discovery read at start (default: that).
+    private readonly Func<AppConfig, IReadOnlyList<HardwareChange>>? _detectHardwareChanges;
+
+    // Test seam: the calibration check with its own clock and tolerances (default: system clock, the tick interval).
+    private readonly CalibrationPlausibility? _calibrationPlausibility;
 
     public ControlLoopService(
         ISensorBackend sensors, IFanController fans, IConfigStore store, IIpcServer ipc,
@@ -91,7 +170,11 @@ internal sealed class ControlLoopService : BackgroundService
         Func<TimeSpan, CancellationToken, Task>? identifyDelay = null,
         TimeSpan? coordinatorStopTimeout = null,
         Func<ISensorBackend, IFanController, TachometerMappingService>? tachMappingFactory = null,
-        bool? dryRunOverride = null)
+        bool? dryRunOverride = null,
+        TimeSpan? executeStopTimeout = null,
+        ISystemdNotifier? systemd = null,
+        Func<AppConfig, IReadOnlyList<HardwareChange>>? detectHardwareChanges = null,
+        CalibrationPlausibility? calibrationPlausibility = null)
     {
         _sensors = sensors;
         _fans = fans;
@@ -103,18 +186,21 @@ internal sealed class ControlLoopService : BackgroundService
         _identifyDelay = identifyDelay;
         _coordinatorStopTimeout = coordinatorStopTimeout ?? DefaultCoordinatorStopTimeout;
         _tachMappingFactory = tachMappingFactory;
-        _dryRunOverride = dryRunOverride;
+        _dryRun = dryRunOverride ?? !Privileges.IsElevated();
+        _executeStopTimeout = executeStopTimeout ?? DefaultExecuteStopTimeout;
+        _systemd = systemd;
+        _detectHardwareChanges = detectHardwareChanges;
+        _calibrationPlausibility = calibrationPlausibility;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        bool dryRun = _dryRunOverride ?? !Privileges.IsElevated();
-        var loop = new ControlLoop(_sensors, _fans, dryRun);
+        var loop = new ControlLoop(_sensors, _fans, _dryRun);
         _loop = loop; // Steuerbefehle (Manual/Auto) greifen thread-sicher über die Loop-Methoden
         var calibration = new CalibrationCoordinator(
             _sensors, _fans, _log, loop.Suspend, loop.Resume, QueueCalibrationResult, ct, _calibrationFactory,
             failSafeTempC: () => _config?.FailSafeTempC ?? CalibrationOptions.DefaultFailSafeTempC,
-            tachometerOverride: ResolveTachOverride);
+            couplings: CurrentCouplings);
         _calibration = calibration;
         var identify = new IdentifyCoordinator(
             _sensors, _fans, _log, loop.Suspend, loop.Resume, ct, _identifyDelay,
@@ -122,7 +208,7 @@ internal sealed class ControlLoopService : BackgroundService
         _identify = identify;
         var tachMapping = new TachMappingCoordinator(
             _sensors, _fans, _log, loop.Suspend, loop.Resume,
-            (fanId, tachId) => _pendingTachAssignments.Enqueue((fanId, tachId)),
+            QueueTachMappingResult,
             ct, _tachMappingFactory,
             failSafeTempC: () => _config?.FailSafeTempC ?? CalibrationOptions.DefaultFailSafeTempC);
         _tachMapping = tachMapping;
@@ -131,38 +217,103 @@ internal sealed class ControlLoopService : BackgroundService
         // RestoreDefaults - auch bei einem Setup-Fehler garantiert läuft (Fail-Safe, M1).
         try
         {
-            AppConfig config = LoadAndMigrate();
+            // The endpoint first: if another daemon answers there, the fans are its - this instance must not even run
+            // the start restore below (see _fansAreOurs, StandDown). Until the handlers are set further down, the server
+            // drops what a client sends; the daemon has not taken on the fans yet either.
+            try
+            {
+                await _ipc.StartAsync(ct).ConfigureAwait(false);
+            }
+            catch (IpcEndpointInUseException ex)
+            {
+                _anotherDaemonHoldsTheEndpoint = true;
+                StandDown(ex);
+                throw;
+            }
+            catch
+            {
+                _fansAreOurs = true;
+                throw;
+            }
+            _fansAreOurs = true;
+
+            // Whatever a predecessor left behind (SIGKILL, crash) goes back to hardware auto before the first tick:
+            // a fan the loaded config does not regulate would otherwise keep that PWM, and with no fan under
+            // control the watchdog's blind-sensor check is off too. This holds where the backend writes the auto
+            // mode outright (Linux); the Windows backend can only restore what it changed itself in this process,
+            // so if another LinFan writer of this boot left a restore marker (crashed or still running) it puts the
+            // fans on 100 % instead.
+            // Not in a dry run (see _dryRun) - TryRestoreDefaults skips it there.
+            TryRestoreDefaults("Start-RestoreDefaults");
+            AppConfig config = LoadOrStartFresh();
             _config = config;
             WarnAboutUnknownSources(config);
             int interval = Math.Max(ConfigSanitizer.MinPollIntervalMs, config.PollIntervalMs);
+            RememberDiscovery();
 
             _ipc.CommandHandler = OnCommand;
             _ipc.ClientsChanged = OnClientsChanged;
-            await _ipc.StartAsync(ct).ConfigureAwait(false);
             await Task.Yield(); // Host-Start abschließen, bevor der erste Tick läuft
             _log.LogInformation("IPC-Server hört auf {Path}", _ipc.Path);
             _log.LogInformation(
                 "ControlLoop läuft · dryRun={DryRun} · {Fans} Lüfter, {Curves} Kurven · Intervall {Interval} ms · Config: {Path}",
-                dryRun, config.Fans.Count, config.Curves.Count, interval, _store.ConfigPath);
+                _dryRun, config.Fans.Count, config.Curves.Count, interval, _store.ConfigPath);
             LogDiscovery(config); // Diagnose: was das Backend sieht + welcher Tacho zu welchem Lüfter gehört
 
-            using var timer = new PeriodicTimer(_tickIntervalOverride ?? TimeSpan.FromMilliseconds(interval));
+            // The config as last mapped for the snapshot, and its revision: mapped again only when the loop swaps in a
+            // new config object (every change makes one), so clients can be sent the config only when it changed.
+            AppConfig? mappedConfig = null;
+            IpcConfig ipcConfig = IpcConfig.Empty;
+            long configRevision = 0;
+            IReadOnlyList<IpcHardwareChange>? hardwareChanges = null;
+
+            TimeSpan tickInterval = _tickIntervalOverride ?? TimeSpan.FromMilliseconds(interval);
+            CalibrationPlausibility plausibility = _calibrationPlausibility ?? new CalibrationPlausibility(tickInterval);
+            using var timer = new PeriodicTimer(tickInterval);
             do
             {
                 // Ein einzelner fehlgeschlagener Tick darf den Daemon nie beenden (er steuert Hardware).
+                // Each stage has its own guard: a config change that fails to apply (possibly re-sent by a
+                // client every few ms) must never skip loop.Tick, which carries the over-temperature watchdog.
                 try
                 {
                     AppConfig updated = ApplyPendingConfigChanges(config);
                     if (!ReferenceEquals(updated, config))
                     {
+                        if (updated.FailSafeTempC != config.FailSafeTempC)
+                            _log.LogWarning("Fail-Safe-Grenze geändert: {Old:0.#} °C → {New:0.#} °C.",
+                                config.FailSafeTempC, updated.FailSafeTempC);
                         config = updated;
                         _config = updated; // Live-Config aktuell halten (Kalibrier-Watchdog liest sie)
+                        // Every changed config has been saved (or, on reload, read back from the file) by now: the file
+                        // from the start is gone or replaced, or now in use.
+                        _configProblem = null;
+                        _configSetAsidePath = null;
                         loop.ResetFilters(); // neue Kurven sofort anwenden, nicht erst bei Temp-Drift
                         WarnAboutUnknownSources(updated); // z. B. nach Profilwechsel auf Kurven mit toter Quelle
                     }
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex, "Konfigurationsänderung fehlgeschlagen - bisherige Konfiguration bleibt aktiv.");
+                }
 
-                    ControlTick tick = loop.Tick(config);
-                    LogTick(tick);
+                ControlTick tick;
+                bool tickFailed = false;
+                try
+                {
+                    // No client, no manual control (see OnClientsChanged). Checked here rather than on the disconnect
+                    // event: a command still buffered from a client that has just gone can arrive after that event.
+                    if (_ipc.ClientCount == 0)
+                        loop.ClearAllManualOverrides();
+
+                    tick = loop.Tick(config);
+
+                    // A write wedged in the driver holds the hardware gate: the loop's writes time out, so its curves
+                    // can no longer raise a fan. Handled like a failed tick - every fan to hardware auto, past the
+                    // gate - until the gate is free again.
+                    if (_fans is SynchronizedFanController { GateStalled: true })
+                        throw new TimeoutException("Hardware-Gate blockiert (hängender Write) - Regelung nicht möglich.");
 
                     // Fail-Safe (Übertemperatur/blind) bricht laufende Kalibrierung UND Identifikation
                     // sofort ab, damit deren Writes den sicheren Zustand nicht gleich wieder übertrampeln.
@@ -172,16 +323,57 @@ internal sealed class ControlLoopService : BackgroundService
                         identify.Cancel();
                         tachMapping.Cancel();
                     }
+                }
+                catch (Exception ex)
+                {
+                    // A failed tick is an internal daemon error and must lead to the safe state (ARCHITECTURE
+                    // §7): otherwise fans keep their last manual PWM with no watchdog for as long as it fails.
+                    // Restore before logging: a blocked logger must not hold up the safe state.
+                    Exception? restoreFailure = null;
+                    try { ReturnAllFansToSafeAuto(); }
+                    catch (Exception restoreEx) { restoreFailure = restoreEx; }
+                    // Once per run of failing ticks - a cause that persists would otherwise log a trace every tick.
+                    LogLevel level = _ticksFailing ? LogLevel.Debug : LogLevel.Error;
+                    _log.Log(level, ex, "Tick fehlgeschlagen - Fail-Safe: Lüfter auf Hardware-Auto.");
+                    if (restoreFailure is not null)
+                        _log.Log(level, restoreFailure, "Fail-Safe nach Tick-Fehler fehlgeschlagen.");
+                    _ticksFailing = true;
+                    tick = FailedTick;
+                    tickFailed = true;
+                }
 
-                    DaemonStatus status = dryRun ? DaemonStatus.DryRun : DaemonStatus.Active;
+                if (!tickFailed && _ticksFailing)
+                {
+                    _ticksFailing = false;
+                    _log.LogInformation("Regel-Tick läuft wieder.");
+                }
+
+                if (!tickFailed)
+                    PingSystemdWatchdog();
+
+                try
+                {
+                    if (!tickFailed)
+                        LogTick(tick);
+                    if (!ReferenceEquals(mappedConfig, config))
+                    {
+                        ipcConfig = ConfigMapper.ToIpc(config);
+                        hardwareChanges = ReportHardwareChanges(config); // never throws: reporting must not cost the snapshot
+                        mappedConfig = config;
+                        configRevision++;
+                    }
+                    DaemonStatus status = _dryRun ? DaemonStatus.DryRun : DaemonStatus.Active;
                     IpcSnapshot snapshot = SnapshotBuilder.Build(
-                        _sensors, _fans, status, dryRun, tick.HottestTempC, config,
-                        loop.ManualFanIds(), calibration.Status, identify.Status, tachMapping.Status);
+                        _sensors, _fans, status, _dryRun, tick, config, ipcConfig, configRevision,
+                        loop.ManualFanIds(), calibration.Status, identify.Status, tachMapping.Status,
+                        _configProblem, _configSetAsidePath, hardwareChanges);
+                    // Never throws: a notice must not cost the snapshot.
+                    snapshot = WithCalibrationMismatches(snapshot, plausibility, tick, config);
                     await _ipc.BroadcastAsync(snapshot).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    _log.LogWarning(ex, "Tick fehlgeschlagen - übersprungen.");
+                    _log.LogWarning(ex, "Snapshot-Broadcast fehlgeschlagen - übersprungen.");
                 }
             }
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false));
@@ -192,38 +384,110 @@ internal sealed class ControlLoopService : BackgroundService
         }
         finally
         {
-            _fans.RestoreDefaults();
-            _log.LogInformation("ControlLoop gestoppt - Fail-Safe RestoreDefaults ausgeführt.");
+            TryRestoreDefaults("Loop-Ende-RestoreDefaults");
+            if (_fansAreOurs)
+                _log.LogInformation(_dryRun
+                    ? "ControlLoop gestoppt (Dry-Run, Lüfter unberührt)."
+                    : "ControlLoop gestoppt - Fail-Safe RestoreDefaults ausgeführt.");
+        }
+    }
+
+    /// <summary>
+    /// Tells systemd the loop is alive. Only after a tick in which the watchdog ran: a loop stuck in a hardware call
+    /// or failing every tick stops pinging, and the unit's WatchdogSec= restarts the daemon (its ExecStopPost= puts
+    /// the fans on hardware auto in between). Never lets a notification problem reach the loop.
+    /// </summary>
+    private void PingSystemdWatchdog()
+    {
+        try
+        {
+            if (_systemd is { IsEnabled: true })
+                _systemd.Notify(WatchdogPing);
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "systemd-Watchdog-Meldung fehlgeschlagen.");
         }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        // Laufende Kalibrierung erst sauber beenden (Rampe stoppt, Lüfter zurück auf Auto), BEVOR
-        // der ExecuteAsync-finally das abschließende RestoreDefaults ausführt - sonst könnte die
-        // weiterlaufende Rampe den sicheren Zustand wieder übertrampeln.
-        //
-        // Fail-Safe: je Stop nur BEGRENZT warten. Hängt ein Coordinator-Stop (z. B. hinter einem im
-        // EC/Treiber festhängenden Hardware-Write), käme sonst weder base.StopAsync (cancelt das
-        // Stopp-Token) noch das finally-RestoreDefaults in ExecuteAsync je dran - systemd SIGKILLt
-        // nach TimeoutStopSec und überspränge damit jedes Fail-Safe-Restore. Nach dem (ggf. abge-
-        // brochenen) Warten cancelt base.StopAsync das Token; der abgebrochene Coordinator-Lauf
-        // bricht dann selbst ab und das finally stellt den sicheren Zustand her.
-        if (_calibration is not null)
-            await StopBoundedAsync(_calibration.StopAsync, "Kalibrierung").ConfigureAwait(false);
-        if (_identify is not null)
-            await StopBoundedAsync(_identify.StopAsync, "Identifikation").ConfigureAwait(false);
-        if (_tachMapping is not null)
-            await StopBoundedAsync(_tachMapping.StopAsync, "Sensor-Kopplung").ConfigureAwait(false);
-        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        // From the stop request on, only the safe state may reach the hardware: a loop or coordinator write
+        // that wakes up late - after the bounded waits below gave up on it - must not undo the final
+        // restore. Restoring right away also reaches the safe state in ~0.5 s instead of after the waits.
+        _stopping = true;
+        (_fans as IManualWriteLatch)?.BlockManualWrites();
+        TryRestoreDefaults("Sofort-RestoreDefaults");
 
-        // Rest-Fenster schließen (Fail-Safe-Audit): ein nach dem Stop-Timeout spät aufwachender,
-        // verwaister Coordinator-Write könnte das finally-RestoreDefaults noch mit einem Rampenwert
-        // überschreiben. Ein idempotenter Abschluss-Restore als ALLERLETZTER Schritt stellt sicher,
-        // dass der zuletzt wirksame Write Hardware-Auto ist. RestoreDefaults ist gate-begrenzt (hängt
-        // nicht) und wirft laut Vertrag nicht - der Catch ist reine Vorsicht am äußersten Rand.
+        try
+        {
+            // Laufende Kalibrierung erst sauber beenden (Rampe stoppt, Lüfter zurück auf Auto), BEVOR
+            // der ExecuteAsync-finally das abschließende RestoreDefaults ausführt - sonst könnte die
+            // weiterlaufende Rampe den sicheren Zustand wieder übertrampeln.
+            //
+            // Fail-Safe: je Stop nur BEGRENZT warten. Hängt ein Coordinator-Stop (z. B. hinter einem im
+            // EC/Treiber festhängenden Hardware-Write), käme sonst weder base.StopAsync (cancelt das
+            // Stopp-Token) noch das finally-RestoreDefaults in ExecuteAsync je dran - systemd SIGKILLt
+            // nach TimeoutStopSec und überspränge damit jedes Fail-Safe-Restore. Nach dem (ggf. abge-
+            // brochenen) Warten cancelt base.StopAsync das Token; der abgebrochene Coordinator-Lauf
+            // bricht dann selbst ab und das finally stellt den sicheren Zustand her.
+            if (_calibration is not null)
+                await StopBoundedAsync(_calibration.StopAsync, "Kalibrierung").ConfigureAwait(false);
+            if (_identify is not null)
+                await StopBoundedAsync(_identify.StopAsync, "Identifikation").ConfigureAwait(false);
+            if (_tachMapping is not null)
+                await StopBoundedAsync(_tachMapping.StopAsync, "Sensor-Kopplung").ConfigureAwait(false);
+
+            // base.StopAsync returns (without throwing) once this token fires, even if ExecuteAsync is stuck.
+            using var executeStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            executeStop.CancelAfter(_executeStopTimeout);
+            await base.StopAsync(executeStop.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Rest-Fenster schließen (Fail-Safe-Audit): ein nach dem Stop-Timeout spät aufwachender,
+            // verwaister Coordinator-Write könnte das finally-RestoreDefaults noch mit einem Rampenwert
+            // überschreiben. Ein idempotenter Abschluss-Restore als ALLERLETZTER Schritt stellt sicher,
+            // dass der zuletzt wirksame Write Hardware-Auto ist - in a finally, so that nothing thrown
+            // above can skip it.
+            TryRestoreDefaults("Abschluss-RestoreDefaults");
+        }
+    }
+
+    /// <summary>
+    /// Another daemon holds the IPC endpoint, so the fans are its. One that serves keeps them as they are. One that holds
+    /// the endpoint without sending anything (stopped, stuck) may have left them on a low manual value with no watchdog:
+    /// they go to hardware auto - the safe direction, since that daemon takes them back with its next write if it
+    /// resumes. Either way this instance ends.
+    /// </summary>
+    private void StandDown(IpcEndpointInUseException ex)
+    {
+        if (ex.Serving)
+        {
+            _log.LogCritical("Auf {Path} läuft bereits ein LinFan-Daemon - diese Instanz beendet sich, ohne einen Lüfter "
+                + "anzufassen.", ex.Endpoint);
+            return;
+        }
+
+        _log.LogCritical("Den Endpunkt {Path} hält ein LinFan-Daemon, der nichts sendet (angehalten oder hängend?) - Lüfter "
+            + "auf Hardware-Auto, diese Instanz beendet sich. Den hängenden Prozess beenden und den Dienst neu starten.",
+            ex.Endpoint);
+        if (_dryRun)
+            return;
         try { _fans.RestoreDefaults(); }
-        catch (Exception ex) { _log.LogWarning(ex, "Abschluss-RestoreDefaults beim Shutdown fehlgeschlagen."); }
+        catch (Exception restoreEx) { _log.LogError(restoreEx, "RestoreDefaults für den hängenden Daemon fehlgeschlagen."); }
+    }
+
+    /// <summary>Whether this instance ended because another daemon holds the IPC endpoint (exit code, see DaemonHost).</summary>
+    internal bool AnotherDaemonHoldsTheEndpoint => _anotherDaemonHoldsTheEndpoint;
+
+    /// <summary>RestoreDefaults is gate-bounded and does not throw by contract - the catch is a last guard.</summary>
+    private void TryRestoreDefaults(string step)
+    {
+        if (_dryRun || !_fansAreOurs)
+            return;
+        try { _fans.RestoreDefaults(); }
+        catch (Exception ex) { _log.LogWarning(ex, "{Step} fehlgeschlagen.", step); }
     }
 
     /// <summary>
@@ -235,7 +499,9 @@ internal sealed class ControlLoopService : BackgroundService
     {
         try
         {
-            await stop().WaitAsync(_coordinatorStopTimeout).ConfigureAwait(false);
+            // Task.Run: stop() cancels synchronously, so the coordinator's cleanup (hardware writes) can run
+            // inline before stop() even returns a task - the timeout would then never get to apply.
+            await Task.Run(stop).WaitAsync(_coordinatorStopTimeout).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
@@ -261,11 +527,28 @@ internal sealed class ControlLoopService : BackgroundService
     /// </summary>
     private void ReturnAllFansToSafeAuto()
     {
-        _calibration?.Cancel();
-        _identify?.Cancel();
-        _tachMapping?.Cancel();
-        _loop?.ClearAllManualOverrides();
-        _fans.RestoreDefaults();
+        try
+        {
+            _calibration?.Cancel();
+            _identify?.Cancel();
+            _tachMapping?.Cancel();
+            _loop?.ClearAllManualOverrides();
+        }
+        finally
+        {
+            try
+            {
+                if (!_dryRun)
+                    _fans.RestoreDefaults(); // the safe state must not depend on the steps before it succeeding
+            }
+            finally
+            {
+                // Every fan is on firmware auto now: without this the hysteresis would keep the curves from
+                // writing again until the temperature drifts (after a failed tick there is no config change
+                // that would reset it).
+                _loop?.ResetFilters();
+            }
+        }
     }
 
     /// <summary>Übernimmt eine von der GUI gesendete bzw. eine angeforderte neu eingelesene Konfiguration.</summary>
@@ -280,15 +563,46 @@ internal sealed class ControlLoopService : BackgroundService
         }
         if (cal is { } c)
         {
-            AppConfig merged = Sanitized(ConfigMapper.ApplyCalibration(current, c.FanId, c.Cal));
+            HardwareDevice? device = _discoveredFans?.FirstOrDefault(f => f.Id.Value == c.FanId)?.Device;
+            AppConfig merged = Sanitized(ConfigMapper.ApplyCalibration(current, c.FanId, c.Cal, device));
             _store.Save(merged);
             _log.LogInformation("Kalibrierung übernommen: {Fan} · MinPwm={Pwm}.", c.FanId, c.Cal.StartPwm);
             return merged;
         }
 
+        // GUI hat eine Konfiguration gesendet → autoritativ zusammenführen, persistieren, übernehmen.
+        // The last profile or curve command wins, whichever order they arrive in: a full config carries the
+        // ActiveProfileId and every curve's Enabled flag, so OnCommand drops a profile switch or curve toggle still
+        // pending from before it. Whatever is pending next to it therefore arrived later and has to build on it -
+        // hence the save goes first, ahead of the switch and the toggles (a switch may also name a profile that only
+        // this config adds).
+        if (Interlocked.Exchange(ref _pendingSave, null) is { } incoming)
+        {
+            AppConfig candidate = ConfigMapper.Merge(current, incoming);
+            if (ExceedsLimits(candidate, "Konfiguration von der GUI"))
+                return current;
+            AppConfig merged = Normalize(candidate);
+            _store.Save(merged);
+            _log.LogInformation("Konfiguration von der GUI übernommen & gespeichert ({Fans} Lüfter, {Curves} Kurven).",
+                merged.Fans.Count, merged.Curves.Count);
+            return merged;
+        }
+
+        // Hardware changes the user resolved. Unlike a profile switch or toggle, a later save, import, reset or reload
+        // does not supersede them: each key is resolved against the config as it is now instead.
+        if (!_pendingHardware.IsEmpty)
+            return ApplyHardwareCommands(current);
+
         // Profilwechsel (Quick-Command) → Profil-Zuordnungen anwenden, persistieren.
         if (Interlocked.Exchange(ref _pendingActiveProfile, null) is { } profileId)
         {
+            // An unknown id would be persisted as the active profile, and the next start would silently fall
+            // back to whichever profile comes first.
+            if (!current.Profiles.Any(p => p.Id == profileId))
+            {
+                _log.LogWarning("Profilwechsel abgelehnt: unbekanntes Profil {Profile}.", profileId);
+                return current;
+            }
             AppConfig switched = Sanitized(ProfileService.Apply(current, profileId));
             _store.Save(switched);
             _log.LogInformation("Profil aktiviert: {Profile}.", profileId);
@@ -300,13 +614,16 @@ internal sealed class ControlLoopService : BackgroundService
         // sofort (ResetFilters nach dem Config-Swap in ExecuteAsync).
         if (!_pendingCurveToggles.IsEmpty)
         {
-            var toggles = new List<(string CurveId, bool Enabled)>();
-            while (_pendingCurveToggles.TryDequeue(out var t))
-                toggles.Add(t);
+            var toggles = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (string curveId in _pendingCurveToggles.Keys)
+            {
+                if (_pendingCurveToggles.TryRemove(curveId, out bool enabled))
+                    toggles[curveId] = enabled;
+            }
             AppConfig toggled = Sanitized(ApplyCurveToggles(current, toggles));
             _store.Save(toggled);
             _log.LogInformation("Kurven an/aus übernommen: {Toggles}.",
-                string.Join(", ", toggles.Select(t => $"{t.CurveId}={(t.Enabled ? "an" : "aus")}")));
+                string.Join(", ", toggles.Select(t => $"{t.Key}={(t.Value ? "an" : "aus")}")));
             return toggled;
         }
 
@@ -316,10 +633,13 @@ internal sealed class ControlLoopService : BackgroundService
         {
             AppConfig updated = current;
             var applied = new List<string>();
-            while (_pendingTachAssignments.TryDequeue(out var a))
+            foreach (string fanId in _pendingTachAssignments.Keys)
             {
-                updated = ConfigMapper.ApplyTachometer(updated, a.FanId, a.RpmSource);
-                applied.Add($"{a.FanId}={(string.IsNullOrWhiteSpace(a.RpmSource) ? "(keiner)" : a.RpmSource)}");
+                if (!_pendingTachAssignments.TryRemove(fanId, out string? rpmSource))
+                    continue;
+                updated = ConfigMapper.ApplyTachometer(updated, fanId, rpmSource, out string? previous);
+                applied.Add($"{fanId}={(string.IsNullOrWhiteSpace(rpmSource) ? "(keiner)" : rpmSource)}"
+                            + (previous is null ? "" : $" (vorher bei {previous})"));
             }
             AppConfig saved = Sanitized(updated);
             _store.Save(saved);
@@ -327,27 +647,18 @@ internal sealed class ControlLoopService : BackgroundService
             return saved;
         }
 
-        // GUI hat eine Konfiguration gesendet → autoritativ zusammenführen, persistieren, übernehmen.
-        if (Interlocked.Exchange(ref _pendingSave, null) is { } incoming)
-        {
-            AppConfig merged = ProfileService.EnsureProfiles(Sanitized(ConfigMapper.Merge(current, incoming)));
-            _store.Save(merged);
-            _log.LogInformation("Konfiguration von der GUI übernommen & gespeichert ({Fans} Lüfter, {Curves} Kurven).",
-                merged.Fans.Count, merged.Curves.Count);
-            return merged;
-        }
-
         // GUI hat einen Import geschickt → bestehende Config VOLLSTÄNDIG ersetzen (kein Merge), persistieren.
-        // MigrateHwmonIds macht ältere Backups robust (der Save-Pfad läuft sonst nicht durch die Migration).
         if (Interlocked.Exchange(ref _pendingReplace, null) is { } toReplace)
         {
-            // Fail-Safe: zuvor kurvengeregelte Lüfter, die im Import fehlen, würden sonst im Manual-Zustand
-            // hängen bleiben (nicht mehr in config.Fans → nie auf Auto zurückgestellt). Erst alle auf sicheres
-            // Firmware-Auto; der Tick nach dem Swap regelt die im Import enthaltenen Lüfter sofort wieder.
-            ReturnAllFansToSafeAuto();
-            AppConfig replaced = ProfileService.EnsureProfiles(
-                Sanitized(MigrateHwmonIds(ConfigMapper.Replace(current, toReplace), out _)));
+            AppConfig candidate = ConfigMapper.Replace(current, toReplace);
+            if (ExceedsLimits(candidate, "Import"))
+                return current;
+            AppConfig replaced = Normalize(candidate);
             _store.Save(replaced);
+            // Fail-Safe: zuvor kurvengeregelte Lüfter, die im Import fehlen, würden sonst im Manual-Zustand
+            // hängen bleiben (nicht mehr in config.Fans → nie auf Auto zurückgestellt). Alle auf sicheres
+            // Firmware-Auto; der Tick nach dem Swap regelt die im Import enthaltenen Lüfter sofort wieder.
+            ReleaseAllFansAfterSave("Import");
             _log.LogInformation("Konfiguration importiert & vollständig ersetzt ({Fans} Lüfter, {Curves} Kurven).",
                 replaced.Fans.Count, replaced.Curves.Count);
             return replaced;
@@ -359,12 +670,11 @@ internal sealed class ControlLoopService : BackgroundService
         if (_pendingReset)
         {
             _pendingReset = false;
+            AppConfig fresh = Normalize(ConfigMapper.Reset(current));
+            _store.Save(fresh);
             // Fail-Safe: leere Config ⇒ keine Lüfter mehr in config.Fans ⇒ ein zuvor kurvengeregelter Lüfter
             // würde ohne Rückstellung im Manual-Zustand (fixer PWM) hängen. Daher alle auf Firmware-Auto.
-            ReturnAllFansToSafeAuto();
-            AppConfig fresh = ProfileService.EnsureProfiles(
-                Sanitized(AppConfig.Empty with { OnboardingCompleted = true }));
-            _store.Save(fresh);
+            ReleaseAllFansAfterSave("Reset");
             _log.LogInformation("Konfiguration auf Werkszustand zurückgesetzt.");
             return fresh;
         }
@@ -382,16 +692,104 @@ internal sealed class ControlLoopService : BackgroundService
     }
 
     /// <summary>
+    /// Rejects a config from a client that exceeds <see cref="ConfigLimits"/>, before any per-entry work: the
+    /// current config stays and the fans are not touched.
+    /// </summary>
+    private bool ExceedsLimits(AppConfig candidate, string what)
+    {
+        if (ConfigLimits.Check(candidate) is not { } violation)
+            return false;
+        _log.LogWarning("{What} abgelehnt: {Violation} - bisherige Konfiguration bleibt aktiv.", what, violation);
+        return true;
+    }
+
+    /// <summary>
+    /// Returns every fan to hardware auto once an import or reset is persisted - only then, so a command that is
+    /// rejected or fails to save leaves the fans (and their manual overrides) alone. A failure here must not undo
+    /// the swap either: the new config is already on disk.
+    /// </summary>
+    private void ReleaseAllFansAfterSave(string what)
+    {
+        try
+        {
+            ReturnAllFansToSafeAuto();
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "{What}: Lüfter nicht vollständig auf Hardware-Auto zurückgestellt.", what);
+        }
+    }
+
+    /// <summary>
+    /// Applies the pending hardware commands in one save. Each key is resolved against <paramref name="current"/> and the
+    /// discovery: the entries a change covers now count, never the ones the GUI saw - one that left the change since
+    /// (a calibration recorded the new device) stays, and a key that no longer resolves or changes nothing saves
+    /// nothing. Fans whose entries are removed go back to hardware auto in the next tick, once the change is saved.
+    /// </summary>
+    private AppConfig ApplyHardwareCommands(AppConfig current)
+    {
+        AppConfig updated = current;
+        var handBack = new List<string>();
+        var applied = new List<string>();
+        foreach (string key in _pendingHardware.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList())
+        {
+            if (!_pendingHardware.TryRemove(key, out (bool Forget, bool ResetSensorNames) command))
+                continue;
+            HardwareChange? change = DetectHardwareChanges(updated).FirstOrDefault(c => c.Key == key);
+            if (change is null)
+            {
+                _log.LogInformation("Hardware-Änderung {Key} besteht nicht mehr - nichts übernommen.", key);
+                continue;
+            }
+
+            AppConfig next = command.Forget
+                ? HardwareChanges.Forget(updated, change)
+                : HardwareChanges.Accept(updated, change, command.ResetSensorNames);
+            if (ReferenceEquals(next, updated))
+            {
+                _log.LogInformation("Hardware-Änderung {Key}: nichts zu übernehmen ({Kind}).", key, change.Kind);
+                continue;
+            }
+            updated = next;
+            applied.Add(Describe(change, command.Forget, command.ResetSensorNames));
+            // A dry run touches no fan, not even to hand it back.
+            if (command.Forget && !_dryRun)
+                handBack.AddRange(change.FanIds.Where(id => _discoveredFanIds.Contains(id) && CanControl(id)));
+        }
+
+        if (ReferenceEquals(updated, current))
+            return current;
+        AppConfig resolved = Normalize(updated);
+        _store.Save(resolved);
+        if (handBack.Count > 0)
+            _loop?.HandBackToAuto(handBack);
+        _log.LogInformation("Hardware-Änderung gespeichert: {Changes}.", string.Join("; ", applied));
+        return resolved;
+    }
+
+    private static string Describe(HardwareChange change, bool forget, bool resetSensorNames)
+    {
+        string entries = $"{change.FanIds.Count} Lüfter, {change.SensorIds.Count} Sensoren";
+        if (forget)
+            return $"{DeviceText(change.Old)} vergessen ({entries} entfernt)";
+        return $"{DeviceText(change.Old)} → {DeviceText(change.New)} übernommen ({entries}"
+               + (resetSensorNames ? ", Sensornamen zurückgesetzt)" : ")");
+    }
+
+    // The fingerprint only where it says more than the name: on Windows both are LHM's hardware name.
+    private static string DeviceText(HardwareDevice? device) =>
+        device is null ? "(ohne Gerät)"
+        : device.Fingerprint is null ? $"{device.Name} (kein Fingerabdruck)"
+        : device.Fingerprint == device.Name ? device.Name
+        : $"{device.Name} ({device.Fingerprint})";
+
+    /// <summary>
     /// Setzt das <see cref="CurveConfig.Enabled"/>-Flag der genannten Kurven - sowohl in den aktiven
     /// <c>config.Curves</c> als auch in den Kurven des aktiven Profils, damit ein späterer Profilwechsel
     /// (<see cref="ProfileService.Apply"/>) den Stand nicht wieder überschreibt. Reine Funktion (testbar).
     /// </summary>
-    internal static AppConfig ApplyCurveToggles(AppConfig config, IReadOnlyList<(string CurveId, bool Enabled)> toggles)
+    internal static AppConfig ApplyCurveToggles(AppConfig config, IReadOnlyDictionary<string, bool> desired)
     {
-        var desired = new Dictionary<string, bool>();
-        foreach (var (id, enabled) in toggles)
-            desired[id] = enabled; // letzter Wert je Kurve gewinnt
-
         CurveConfig Flip(CurveConfig c) =>
             desired.TryGetValue(c.Id, out bool e) && e != c.Enabled ? c with { Enabled = e } : c;
 
@@ -405,14 +803,20 @@ internal sealed class ControlLoopService : BackgroundService
     }
 
     /// <summary>Lädt + sanitized + migriert Profile; persistiert einmalig, wenn die Migration etwas änderte.</summary>
-    private AppConfig LoadAndMigrate()
+    private AppConfig LoadAndMigrate() => LoadAndMigrate(_store.Load());
+
+    private AppConfig LoadAndMigrate(AppConfig loaded)
     {
-        // First-Run-Signal VOR dem Laden/Speichern festhalten: existiert noch keine Config-Datei,
+        // A file past the limits (an older version let a client inflate it, or a hand edit) is not used; at start
+        // LoadOrStartFresh sets it aside and keeps its daemon-owned limits.
+        if (ConfigLimits.Check(loaded) is { } violation)
+            throw new InvalidOperationException($"Konfiguration überschreitet die Grenzen: {violation}.");
+        // First-Run-Signal VOR dem Speichern festhalten: existiert noch keine Config-Datei,
         // ist dies eine frische Installation (der Daemon selbst legt die Datei gleich an).
         bool existed = _store.Exists;
-        AppConfig loaded = Sanitized(_store.Load());
-        AppConfig clean = MigrateHwmonIds(loaded, out bool idsRewritten);
-        bool migrate = idsRewritten                            // stabile Ids müssen persistiert werden
+        AppConfig clean = WithHardwareStamps(WithoutHardwareLabels(Sanitized(loaded), out int labels), out int stamped);
+        bool migrate = labels > 0
+                       || stamped > 0 // the first start after an update records the devices
                        || clean.Profiles.Count == 0
                        || clean.Profiles.Any(p => p.Curves.Count == 0)
                        || !clean.Profiles.Any(p => p.Id == clean.ActiveProfileId)
@@ -430,7 +834,7 @@ internal sealed class ControlLoopService : BackgroundService
             try
             {
                 _store.Save(ensured);
-                _log.LogInformation("Profile migriert/initialisiert ({Count} Profile).", ensured.Profiles.Count);
+                _log.LogInformation("Konfiguration migriert/initialisiert ({Count} Profile).", ensured.Profiles.Count);
             }
             catch (Exception ex)
             {
@@ -438,6 +842,113 @@ internal sealed class ControlLoopService : BackgroundService
             }
         }
         return ensured;
+    }
+
+    /// <summary>
+    /// Loads the config for the start. One the daemon cannot use must not keep it from starting: no client could
+    /// then reach it to repair or reset the config, and only root could fix the file. That file is set aside for
+    /// inspection and the daemon starts without curves - the start already returned every fan to hardware auto,
+    /// so the firmware keeps them, and the watchdog runs as always. If the file at least parsed, its daemon-owned
+    /// limits carry over: an operator's stricter over-temperature limit must not fall back to the default just
+    /// because, say, a curve list was over the limits.
+    /// <para>
+    /// A file that could not be read at all (I/O error, access denied) is different: its content may be fine, so
+    /// it stays where it is, nothing is saved, and the next start reads it again.
+    /// </para>
+    /// </summary>
+    private AppConfig LoadOrStartFresh()
+    {
+        AppConfig? parsed = null;
+        try
+        {
+            parsed = _store.Load();
+            return LoadAndMigrate(parsed);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogError(ex, "Konfiguration {Path} nicht lesbar - Daemon läuft ohne Kurven (Lüfter auf Hardware-Auto); "
+                              + "die Datei bleibt unangetastet, bis eine Änderung aus der GUI sie überschreibt.",
+                _store.ConfigPath);
+            _configProblem = ConfigLoadProblem.NotLoaded;
+            return Normalize(ConfigMapper.Reset(parsed ?? AppConfig.Empty));
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Konfiguration {Path} unbrauchbar - Daemon startet ohne Kurven (Lüfter auf Hardware-Auto).",
+                _store.ConfigPath);
+        }
+
+        // Not onboarded: as on a first install, the GUI offers the setup assistant.
+        AppConfig fresh = Normalize(ConfigMapper.Reset(parsed ?? AppConfig.Empty)) with { OnboardingCompleted = false };
+        if (parsed is null)
+            _log.LogError("Fail-Safe-Grenze der unbrauchbaren Konfiguration nicht lesbar - es gilt der Default {Limit:0.#} °C.",
+                fresh.FailSafeTempC);
+        _configProblem = ConfigLoadProblem.NotLoaded; // until the file is out of the way
+        try
+        {
+            string aside = _store.SetAside();
+            (_configProblem, _configSetAsidePath) = (ConfigLoadProblem.SetAside, aside);
+            _log.LogWarning("Unbrauchbare Konfiguration beiseitegelegt: {Path}.", aside);
+            _store.Save(fresh);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Ersatz-Konfiguration nur im Speicher - die nächste Änderung aus der GUI schreibt die Datei.");
+        }
+        return fresh;
+    }
+
+    /// <summary>
+    /// The one order every config from outside goes through - IPC, import, reset, and the file at start: sanitize, then
+    /// clear names that are just the hardware label, record the devices of new entries, then apply the active profile,
+    /// whose curves and assignments are sanitized by then too.
+    /// </summary>
+    private AppConfig Normalize(AppConfig raw) =>
+        ProfileService.EnsureProfiles(WithHardwareStamps(WithoutHardwareLabels(Sanitized(raw), out _), out _));
+
+    /// <summary>
+    /// Records the device behind each detected entry that has none yet (<see cref="HardwareStamps"/>). Best effort and
+    /// never throws: on the load path an exception here would get the user's config set aside - the entries then
+    /// simply stay without a device until the next try.
+    /// </summary>
+    private AppConfig WithHardwareStamps(AppConfig config, out int stamped)
+    {
+        try
+        {
+            AppConfig result = HardwareStamps.Stamp(config, _fans.DiscoverFans(), _sensors.DiscoverSensors(), out stamped);
+            if (stamped > 0)
+                _log.LogInformation("{Count} Einträgen das erkannte Gerät zugeordnet.", stamped);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stamped = 0;
+            _log.LogWarning(ex, "Geräte der Einträge nicht erfassbar - sie bleiben vorerst ohne Gerät.");
+            return config;
+        }
+    }
+
+    /// <summary>
+    /// Clears own names that are just the current hardware label (<see cref="OwnNames"/>) - older GUIs and the CLI saved
+    /// the label as the name, and it stayed when the hardware behind the id changed. Best effort: without a discovery the
+    /// names stay as they are.
+    /// </summary>
+    private AppConfig WithoutHardwareLabels(AppConfig config, out int cleared)
+    {
+        cleared = 0;
+        try
+        {
+            AppConfig result = OwnNames.WithoutHardwareLabels(
+                config, _sensors.DiscoverSensors(), _fans.DiscoverFans(), out cleared);
+            if (cleared > 0)
+                _log.LogInformation("{Count} Namen entfernt, die nur die Hardware-Bezeichnung waren.", cleared);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Hardware-Bezeichnungen für den Namensabgleich nicht lesbar.");
+            return config;
+        }
     }
 
     private AppConfig Sanitized(AppConfig config)
@@ -448,34 +959,26 @@ internal sealed class ControlLoopService : BackgroundService
         return clean;
     }
 
-    /// <summary>
-    /// Schema-2→3: instabile <c>hwmonN/…</c>-Ids einmalig auf das stabile <c>chip/channel</c>-Schema
-    /// umschreiben, sofern das Backend eine Legacy-Zuordnung liefert (Linux; Windows-LHM war schon
-    /// stabil → kein <see cref="ILegacyIdMap"/>). Best effort: Ids, die die aktuelle Enumeration nicht
-    /// mehr kennt, bleiben stehen und degradieren wie gehabt (NaN + einmalige Warnung in
-    /// <see cref="WarnAboutUnknownSources"/>, manuelle Neu-Zuordnung im Geräte-Tab).
-    /// </summary>
-    private AppConfig MigrateHwmonIds(AppConfig config, out bool changed)
-    {
-        changed = false;
-        if (_sensors is not ILegacyIdMap map)
-            return config;
-
-        AppConfig migrated = HwmonIdMigration.Apply(config, map.LegacyToStableIds(), out changed);
-        if (changed)
-            _log.LogInformation(
-                "hwmon-Ids auf stabiles Schema migriert (chip/channel) - übersteht künftige hwmonN-Umnummerierung.");
-        return migrated;
-    }
-
     private void OnCommand(IpcCommand command)
     {
+        // Before anything logs the strings: a peer's control characters would forge log or journal records.
+        if (!IsWellFormed(command.Command) || !IsWellFormed(command.Target) || !IsWellFormed(command.RpmSource))
+        {
+            _log.LogWarning("IPC-Kommando verworfen: Steuer-/Formatzeichen oder mehr als {Max} Zeichen in Command, Target "
+                            + "oder RpmSource.", ConfigLimits.MaxTextLength);
+            return;
+        }
+
         switch (command.Command)
         {
             case IpcCommand.Reload:
                 _reloadRequested = true;
                 break;
             case IpcCommand.SaveConfig when command.Config is { } cfg:
+                // Supersedes an older pending switch and toggles (see ApplyPendingConfigChanges): a GUI builds every
+                // config after its own switches and toggles, so this one already carries their result.
+                Interlocked.Exchange(ref _pendingActiveProfile, null);
+                _pendingCurveToggles.Clear();
                 Interlocked.Exchange(ref _pendingSave, cfg);
                 break;
             case IpcCommand.ReplaceConfig when command.Config is { } cfg:
@@ -500,6 +1003,10 @@ internal sealed class ControlLoopService : BackgroundService
             case IpcCommand.SetFanAuto when command.Target is { } fan:
                 _loop?.SetManualOverride(fan, null);
                 _log.LogInformation("Manuell aus: {Fan} → zurück auf Kurve/Auto", fan);
+                break;
+            case IpcCommand.StartCalibration or IpcCommand.Identify or IpcCommand.StartTachMapping when _dryRun:
+                // These drive a fan themselves, past the loop's dry run (see _dryRun).
+                _log.LogWarning("{Command} abgelehnt: Dry-Run - ohne Root steuert der Daemon keine Lüfter.", command.Command);
                 break;
             case IpcCommand.StartCalibration when command.Target is { } fan:
                 // Prüfen-dann-Starten atomar gegen eine parallele Identifikation (anderer IPC-Thread).
@@ -552,7 +1059,22 @@ internal sealed class ControlLoopService : BackgroundService
                 break;
             case IpcCommand.SetFanTachometer when command.Target is { } fan:
                 // Fail-safe-neutral (kein Antreiben): nur das RpmSource-Override in der Config setzen/löschen.
-                _pendingTachAssignments.Enqueue((fan, command.RpmSource));
+                // Each accepted id becomes a persisted fan entry, so only discovered fans and speed sensors count.
+                if (!_discoveredFanIds.Contains(fan)
+                    || (!string.IsNullOrWhiteSpace(command.RpmSource) && !_discoveredRpmSensorIds.Contains(command.RpmSource.Trim())))
+                {
+                    _log.LogWarning("Tacho-Zuordnung abgelehnt: Lüfter oder Drehzahl-Sensor nicht erkannt.");
+                    break;
+                }
+                // One sensor, one fan: the GUI offers no sensor another detected fan is coupled to. A measured coupling
+                // (QueueTachMappingResult) takes the sensor over instead - the measurement outranks an earlier choice.
+                if (CoupledToOtherDetectedFan(fan, command.RpmSource) is { } holder)
+                {
+                    _log.LogWarning("Tacho-Zuordnung abgelehnt: {Sensor} ist schon {Holder} zugeordnet.",
+                        command.RpmSource!.Trim(), holder);
+                    break;
+                }
+                _pendingTachAssignments[fan] = command.RpmSource;
                 _log.LogInformation("Tacho-Zuordnung: {Fan} → {Sensor}", fan,
                     string.IsNullOrWhiteSpace(command.RpmSource) ? "(keiner)" : command.RpmSource);
                 break;
@@ -560,7 +1082,15 @@ internal sealed class ControlLoopService : BackgroundService
                 Interlocked.Exchange(ref _pendingActiveProfile, profileId);
                 break;
             case IpcCommand.SetCurveEnabled when command.Target is { } curveId && command.Value is { } flag:
-                _pendingCurveToggles.Enqueue((curveId, flag != 0));
+                if (_config?.Curves.Any(c => c.Id == curveId) != true)
+                {
+                    _log.LogWarning("Kurve an/aus abgelehnt: keine Kurve mit dieser Id in der aktiven Konfiguration.");
+                    break;
+                }
+                _pendingCurveToggles[curveId] = flag != 0;
+                break;
+            case IpcCommand.AcceptHardware or IpcCommand.ForgetHardware when command.Target is { } key:
+                QueueHardwareCommand(command.Command == IpcCommand.ForgetHardware, key, command.Value);
                 break;
             default:
                 // Kein Zweig hat gegriffen: unbekanntes Kommando (z. B. Tippfehler) ODER ein bekanntes mit
@@ -575,32 +1105,199 @@ internal sealed class ControlLoopService : BackgroundService
         }
     }
 
+    private static bool IsWellFormed(string? field) =>
+        field is null || (field.Length <= ConfigLimits.MaxTextLength && UntrustedText.IsClean(field));
+
     /// <summary>Übergibt ein Kalibrier-Ergebnis (vom Coordinator-Thread) zur Persistenz an den Tick-Loop.</summary>
     private void QueueCalibrationResult(string fanId, FanCalibration cal)
     {
+        if (_stopping)
+            return;
         lock (_calLock)
             _pendingCalibration = (fanId, cal);
     }
 
-    /// <summary>
-    /// Effektiver Drehzahl-Sensor eines Lüfters für die Kalibrierung: das konfigurierte
-    /// <see cref="FanConfig.RpmSource"/>-Override, aber nur wenn es einen aktuell vorhandenen RPM-Sensor
-    /// benennt - ein veraltetes Override darf die Rampe nicht auf einen unbekannten Sensor messen lassen
-    /// (<c>ReadValue</c> würfe sonst). Sonst <c>null</c> ⇒ der Coordinator nimmt den Backend-Tacho.
-    /// </summary>
-    private SensorId? ResolveTachOverride(FanId fanId)
+    /// <summary>Übergibt eine Auto-Kopplung (vom Coordinator-Thread) zur Persistenz an den Tick-Loop.</summary>
+    private void QueueTachMappingResult(string fanId, string? tachId)
     {
-        if (_config?.Fans.FirstOrDefault(f => f.FanId == fanId.Value)?.RpmSource is not { Length: > 0 } rs)
-            return null;
-        bool known = _sensors.DiscoverSensors().Any(s => s.Kind == SensorKind.FanRpm && s.Id.Value == rs);
-        return known ? new SensorId(rs) : null;
+        if (_stopping)
+            return;
+        _pendingTachAssignments[fanId] = tachId;
     }
 
     /// <summary>
-    /// Diagnose-Dump beim Start: was das Backend entdeckt (Temp-/Drehzahl-Sensoren mit Momentanwert) und -
-    /// am wichtigsten - welcher Tacho je Lüfter-Kanal wirkt (zugeordnetes <see cref="FanConfig.RpmSource"/>
-    /// vor der Backend-Heuristik, sonst deren Paarung, sonst keiner). Genau das, was zum Ferndiagnostizieren
-    /// von „kein Tachosignal" fehlte. Best-effort - ein Fehler hier ist rein diagnostisch, nie kritisch.
+    /// Queues <c>acceptHardware</c>/<c>forgetHardware</c> for a change the last snapshot reported. A forget is refused
+    /// while a device action runs on one of the change's fans or its result waits to be saved: that result would put the
+    /// fan's entry right back, and the fan belongs to the action until it ends. Checked and queued under the lock the
+    /// starts of those actions take.
+    /// </summary>
+    private void QueueHardwareCommand(bool forget, string key, int? value)
+    {
+        string what = forget ? "Gerät vergessen" : "Gerät übernehmen";
+        if (value is not (null or 0 or 1))
+        {
+            _log.LogWarning("{What} abgelehnt: Wert {Value} ist weder 0 noch 1.", what, value);
+            return;
+        }
+        HardwareChange? change = _reportedChanges.FirstOrDefault(c => c.Key == key);
+        if (change is null)
+        {
+            _log.LogWarning("{What} abgelehnt: keine gemeldete Hardware-Änderung mit diesem Schlüssel.", what);
+            return;
+        }
+
+        lock (_controlLock)
+        {
+            if (forget && DeviceActionOn(change.FanIds) is { } action)
+            {
+                _log.LogWarning("Gerät vergessen abgelehnt: {Action} auf einem betroffenen Lüfter.", action);
+                return;
+            }
+            _pendingHardware[key] = (forget, value == 1);
+        }
+        _log.LogInformation("{What}: {Key} vorgemerkt.", what, key);
+    }
+
+    /// <summary>The device action that runs, or whose result waits, on one of <paramref name="fanIds"/>; <c>null</c> if none.</summary>
+    private string? DeviceActionOn(IReadOnlyList<string> fanIds)
+    {
+        if (fanIds.Count == 0)
+            return null;
+        if (_calibration is { IsRunning: true } calibration
+            && (calibration.Status?.FanId is not { } calibrating || fanIds.Contains(calibrating)))
+            return "Kalibrierung läuft";
+        lock (_calLock)
+        {
+            if (_pendingCalibration is { } result && fanIds.Contains(result.FanId))
+                return "Kalibrierung wird gespeichert";
+        }
+        // Identification and coupling take every controllable fan, not only their target.
+        if (fanIds.Any(_discoveredFanIds.Contains))
+        {
+            if (_identify?.IsRunning == true)
+                return "Identifikation läuft";
+            if (_tachMapping?.IsRunning == true)
+                return "Sensor-Kopplung läuft";
+        }
+        return null;
+    }
+
+    private IReadOnlyList<HardwareChange> DetectHardwareChanges(AppConfig config)
+    {
+        if (_detectHardwareChanges is { } detect)
+            return detect(config);
+        return _discoveredFans is { } fans && _discoveredSensors is { } sensors
+            ? HardwareChanges.Detect(config, fans, sensors, _dryRun)
+            : [];
+    }
+
+    /// <summary>
+    /// The hardware changes of <paramref name="config"/> for the snapshot, <c>null</c> when there are none. Logs each
+    /// change once per run. Never throws: a failure reports none (and is logged once), the tick and its snapshot go on.
+    /// </summary>
+    private IReadOnlyList<IpcHardwareChange>? ReportHardwareChanges(AppConfig config)
+    {
+        try
+        {
+            IReadOnlyList<HardwareChange> changes = DetectHardwareChanges(config);
+            List<IpcHardwareChange> reported = changes.Select(SnapshotBuilder.ToIpc).ToList();
+            _reportedChanges = changes;
+            foreach (HardwareChange change in changes)
+            {
+                if (!_loggedHardwareChanges.Add(change.Key))
+                    continue;
+                string fans = change.FanIds.Count == 0 ? "-" : string.Join(", ", change.FanIds);
+                if (change.Kind == HardwareChangeKind.Replaced)
+                    _log.LogWarning("Gerät ersetzt: {Old} → {New} · Lüfter: {Fans} · {Sensors} Sensoren - die GUI fragt, "
+                                    + "ob die Einträge übernommen oder neu eingerichtet werden.",
+                        DeviceText(change.Old), DeviceText(change.New), fans, change.SensorIds.Count);
+                else
+                    _log.LogInformation("Gerät nicht gefunden: {Old} · Lüfter: {Fans} · {Sensors} Sensoren.",
+                        DeviceText(change.Old), fans, change.SensorIds.Count);
+            }
+            return reported.Count == 0 ? null : reported;
+        }
+        catch (Exception ex)
+        {
+            _reportedChanges = [];
+            if (!_hardwareChangesFailed)
+                _log.LogWarning(ex, "Hardware-Änderungen nicht bestimmbar - es werden keine gemeldet.");
+            _hardwareChangesFailed = true;
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Adds the calibration check's findings to the snapshot (<see cref="SnapshotBuilder.WithCalibrationMismatches"/>).
+    /// A notice must not cost the snapshot: if the check fails, the snapshot goes out without findings, logged once per
+    /// run. The check only reads what the snapshot read, so the tick is long done and nothing here reaches a fan.
+    /// </summary>
+    private IpcSnapshot WithCalibrationMismatches(
+        IpcSnapshot snapshot, CalibrationPlausibility plausibility, ControlTick tick, AppConfig config)
+    {
+        try
+        {
+            return SnapshotBuilder.WithCalibrationMismatches(snapshot, plausibility, tick, config, _dryRun);
+        }
+        catch (Exception ex)
+        {
+            if (!_calibrationCheckFailed)
+                _log.LogWarning(ex, "Kalibrierung nicht mit der Drehzahl abgleichbar - es werden keine Abweichungen gemeldet.");
+            _calibrationCheckFailed = true;
+            return snapshot;
+        }
+    }
+
+    private void RememberDiscovery()
+    {
+        try
+        {
+            List<FanDescriptor> fans = _fans.DiscoverFans().ToList();
+            List<SensorDescriptor> sensors = _sensors.DiscoverSensors().ToList();
+            _discoveredFanIds = fans.Select(f => f.Id.Value).ToHashSet(StringComparer.Ordinal);
+            _discoveredRpmSensorIds = sensors
+                .Where(s => s.Kind == SensorKind.FanRpm)
+                .Select(s => s.Id.Value)
+                .ToHashSet(StringComparer.Ordinal);
+            (_discoveredFans, _discoveredSensors) = (fans, sensors);
+        }
+        catch (Exception ex)
+        {
+            // Without it no tach assignment is accepted and no hardware change reported - degraded, but the daemon keeps
+            // running.
+            _log.LogWarning(ex, "Discovery nicht lesbar - Tacho-Zuordnungen werden abgelehnt, Hardware-Änderungen nicht "
+                                + "gemeldet.");
+        }
+    }
+
+    /// <summary>The detected fan other than <paramref name="fanId"/> coupled to <paramref name="sensorId"/>, or <c>null</c>.</summary>
+    private string? CoupledToOtherDetectedFan(string fanId, string? sensorId)
+    {
+        if (string.IsNullOrWhiteSpace(sensorId))
+            return null;
+        string sensor = sensorId.Trim();
+        return CurrentCouplings().FirstOrDefault(f =>
+            f.FanId != fanId && f.RpmSource == sensor && _discoveredFanIds.Contains(f.FanId))?.FanId;
+    }
+
+    /// <summary>
+    /// The live config's fans with the tach assignments still waiting for the next tick laid over them (without taking
+    /// them out): the onboarding starts a calibration right after a coupling reports its match, and a second
+    /// assignment of the same sensor must see the first.
+    /// </summary>
+    private IReadOnlyList<FanConfig> CurrentCouplings()
+    {
+        AppConfig config = _config ?? AppConfig.Empty;
+        foreach ((string fanId, string? rpmSource) in _pendingTachAssignments)
+            config = ConfigMapper.ApplyTachometer(config, fanId, rpmSource, out _);
+        return config.Fans;
+    }
+
+    /// <summary>
+    /// Diagnostic dump at start: what the backend discovers (the devices behind the channels, temperature and speed
+    /// sensors with their current value) and - most important for diagnosing "no tach signal" remotely - which speed
+    /// sensor each fan channel is read from (<see cref="FanTachometers"/>: its own coupling, else the backend's pairing
+    /// unless another fan is coupled to it, else none). Best effort - a failure here is purely diagnostic.
     /// </summary>
     private void LogDiscovery(AppConfig config)
     {
@@ -613,18 +1310,29 @@ internal sealed class ControlLoopService : BackgroundService
 
             _log.LogInformation("Discovery: {Temps} Temp-Sensoren, {Rpms} Drehzahl-Sensoren, {Fans} Luefter-Kanaele.",
                 temps.Count, rpms.Count, fans.Count);
+            string devices = string.Join(", ", sensors.Select(s => s.Device).Concat(fans.Select(f => f.Device))
+                .OfType<HardwareDevice>()
+                .Distinct()
+                .OrderBy(d => d.Name, StringComparer.Ordinal).ThenBy(d => d.Fingerprint, StringComparer.Ordinal)
+                .Select(DeviceText));
+            if (devices.Length > 0)
+                _log.LogInformation("  Geräte: {Devices}", devices);
             foreach (SensorDescriptor s in temps)
                 _log.LogInformation("  Temp [{Id}] '{Name}' = {Value} °C", s.Id.Value, s.Name, Fmt(_sensors.ReadValue(s.Id)));
             foreach (SensorDescriptor s in rpms)
                 _log.LogInformation("  RPM  [{Id}] '{Name}' = {Value}", s.Id.Value, s.Name, Fmt(_sensors.ReadValue(s.Id)));
 
             var rpmIds = rpms.Select(s => s.Id.Value).ToHashSet();
+            var tachometers = new FanTachometers(config.Fans);
             foreach (FanDescriptor f in fans)
             {
-                string? overrideId = config.Fans.FirstOrDefault(c => c.FanId == f.Id.Value)?.RpmSource;
-                string tach = !string.IsNullOrEmpty(overrideId) && rpmIds.Contains(overrideId)
-                    ? $"{overrideId} (zugeordnet)"
-                    : f.Tachometer is { } t ? $"{t.Value} (Heuristik)" : "- kein Tacho";
+                string tach;
+                if (tachometers.Of(f) is { } t)
+                    tach = !tachometers.HasOwnCoupling(f) ? $"{t.Value} (Heuristik)"
+                        : rpmIds.Contains(t.Value) ? $"{t.Value} (zugeordnet)"
+                        : $"{t.Value} (zugeordnet, nicht erkannt)";
+                else
+                    tach = f.Tachometer is { } paired ? $"- kein Tacho ({paired.Value} ist einem anderen Lüfter zugeordnet)" : "- kein Tacho";
                 _log.LogInformation("  Fan  [{Id}] '{Name}' steuerbar={Ctl} · Tacho={Tach}",
                     f.Id.Value, f.Name, f.CanControl, tach);
             }
@@ -643,15 +1351,11 @@ internal sealed class ControlLoopService : BackgroundService
         catch { return false; } // unbekannter/fehlerhafter Kanal → nicht steuerbar
     }
 
-    // GUI-Disconnect: der Daemon regelt autonom über die Kurven weiter. ABER eine zuletzt manuell
-    // gesetzte Steuerung (GUI-getrieben) darf nicht ohne Aufsicht stehen bleiben → beim letzten
-    // getrennten Client alle manuellen Overrides verwerfen (Lüfter zurück auf Kurven-Regelung).
-    private void OnClientsChanged(int count)
-    {
-        _log.LogInformation("GUI-Clients verbunden: {Count}.", count);
-        if (count == 0)
-            _loop?.ClearAllManualOverrides();
-    }
+    // After the last GUI disconnects the daemon keeps regulating through the curves, but a manual value the GUI set
+    // must not stay unattended: the loop drops every manual override before each tick while no client is connected
+    // (ExecuteAsync) - overrides only take effect in the tick, so that is the one place that needs to.
+    // The IPC server logs each connection with its peer; the count is a detail.
+    private void OnClientsChanged(int count) => _log.LogDebug("GUI-Clients verbunden: {Count}.", count);
 
     private void LogTick(ControlTick tick)
     {
@@ -664,6 +1368,11 @@ internal sealed class ControlLoopService : BackgroundService
 
         foreach (FanAction a in tick.Actions)
         {
+            if (a.Kind != FanActionKind.Failed)
+                _failingFans.Remove(a.FanId);
+            if (a.Kind is not (FanActionKind.FullSpeed or FanActionKind.Failed))
+                _fullSpeedFans.Remove(a.FanId);
+
             switch (a.Kind)
             {
                 case FanActionKind.Applied:
@@ -681,27 +1390,47 @@ internal sealed class ControlLoopService : BackgroundService
                     _log.LogDebug("{Fan}: übersprungen ({Note})", a.FanId, a.Note);
                     break;
                 case FanActionKind.Failed:
-                    _log.LogWarning("{Fan}: Schreiben fehlgeschlagen ({Note})", a.FanId, a.Note);
+                    // Once per fan until it recovers (a fan that is gone fails every tick), and never during shutdown,
+                    // where the latch turns away every manual write on purpose.
+                    if (!_stopping && _failingFans.Add(a.FanId))
+                        _log.LogWarning("{Fan}: Schreiben fehlgeschlagen ({Note})", a.FanId, a.Note);
+                    else
+                        _log.LogDebug("{Fan}: Schreiben fehlgeschlagen ({Note})", a.FanId, a.Note);
+                    break;
+                case FanActionKind.FullSpeed:
+                    // The note says whether the channel has no auto mode at all or setting it failed this time.
+                    if (_fullSpeedFans.Add(a.FanId))
+                        _log.LogWarning("{Fan}: Hardware-Auto nicht setzbar ({Note}) - stattdessen Volllast.", a.FanId, a.Note);
+                    else
+                        _log.LogDebug("{Fan}: Volllast statt Hardware-Auto", a.FanId);
                     break;
             }
         }
     }
 
     /// <summary>
-    /// Warnt (einmalig je ID) über Kurven-Quellen, die das Backend nicht (mehr) kennt - typisch nach
-    /// hwmon-Neunummerierung (Reboot/Kernel-Update). Die Regelung läuft dann ohne diese Quelle weiter
+    /// Warnt (einmalig je ID) über Kurven-Quellen, die das Backend nicht (mehr) kennt - typisch nach einem
+    /// Hardware-Wechsel oder wenn ein Gerät nicht mehr erkannt wird. Die Regelung läuft dann ohne diese Quelle weiter
     /// (<see cref="SensorAggregator"/> → NaN, kein Crash); ohne diese Meldung bliebe der Grund unsichtbar.
     /// </summary>
     private void WarnAboutUnknownSources(AppConfig config)
     {
-        foreach (string id in UnknownSourceIds(config, _sensors.DiscoverSensors()))
+        try
         {
-            if (!_warnedUnknownSensors.Add(id))
-                continue; // diese ID wurde in diesem Daemon-Lauf bereits gemeldet
-            _log.LogWarning(
-                "Kurven-Quelle {Sensor} ist dem Backend nicht bekannt (hwmon-Nummerierung geändert?) - "
-                + "betroffene Kurve(n) regeln ohne diese Quelle. Bitte im Kurven-Tab neu zuordnen.",
-                id);
+            foreach (string id in UnknownSourceIds(config, _sensors.DiscoverSensors()))
+            {
+                if (!_warnedUnknownSensors.Add(id))
+                    continue; // diese ID wurde in diesem Daemon-Lauf bereits gemeldet
+                _log.LogWarning(
+                    "Kurven-Quelle {Sensor} ist dem Backend nicht bekannt (Hardware gewechselt oder nicht erkannt?) - "
+                    + "betroffene Kurve(n) regeln ohne diese Quelle. Bitte die Quelle der Kurve neu zuordnen.",
+                    id);
+            }
+        }
+        catch (Exception ex)
+        {
+            // A diagnostic: it runs before IPC is up at start and must not take the daemon down with it.
+            _log.LogWarning(ex, "Prüfung der Kurven-Quellen fehlgeschlagen (nicht kritisch).");
         }
     }
 

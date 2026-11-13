@@ -26,7 +26,7 @@ public class MainControllerCalibrationTests
     public void RunningCalibration_SetsMatchingFanRow_IsCalibrating()
     {
         var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot());
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
         try
         {
             UiTestHelpers.PumpUntil(() => ctrl.Fans.Count > 0);
@@ -45,11 +45,40 @@ public class MainControllerCalibrationTests
         finally { ctrl.Dispose(); }
     }
 
+    /// <summary>
+    /// A fan without a speed sensor to measure with: calibrate is locked, with the reason, in the overview and in
+    /// Settings › Fans (coupling stays) - and free again once the daemon reads the fan from a detected sensor.
+    /// </summary>
+    [AvaloniaFact]
+    public void NoSpeedSensor_LocksCalibrate_InTheOverviewAndTheSettings()
+    {
+        const string NoTach = "Gesperrt - dieser Lüfter hat keinen eigenen, erkannten Drehzahl-Sensor zum Messen. Zuerst einen Tacho koppeln.";
+        MonitorSnapshot sample = UiTestHelpers.SampleSnapshot() with { DaemonVersion = "0.5.0+abc1234" };
+        MonitorSnapshot ReadFrom(string? tachometer) =>
+            sample with { Fans = sample.Fans.Select(f => f with { Tachometer = tachometer }).ToArray() };
+        var fake = new FakeLiveMonitor(ReadFrom(null));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        try
+        {
+            UiTestHelpers.PumpUntil(() => ctrl.Fans.Count > 0 && ctrl.Editor.IsReady);
+            FanRow overview = ctrl.Fans.Single(f => f.FanId == "hwmon0/pwm1");
+            FanAssignRow settings = ctrl.Editor.Fans.Single(f => f.FanId == "hwmon0/pwm1");
+            UiTestHelpers.PumpUntil(() => !overview.CanCalibrate && !settings.CanCalibrate);
+            Assert.Equal(NoTach, overview.CalibrateTooltip);
+            Assert.Equal(NoTach, settings.CalibrateTooltip);
+            Assert.True(settings.CanCoupleSensor);
+
+            fake.Current = ReadFrom("hwmon0/fan1");
+            UiTestHelpers.PumpUntil(() => overview.CanCalibrate && settings.CanCalibrate);
+        }
+        finally { ctrl.Dispose(); }
+    }
+
     [AvaloniaFact]
     public void Banner_ShowsCalibrationCard_WithFriendlyHeadline()
     {
         var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot() with { Calibration = Running("hwmon0/pwm1") });
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
         var window = new MainWindow { DataContext = ctrl };
         window.Show();
         try

@@ -39,6 +39,37 @@ public class ControlLoopTests
     }
 
     [Fact]
+    public void Tick_ReadsEachSensorOncePerTick_HoweverManyCurvesUseIt()
+    {
+        // Audit run-2 #5: curves may list many sources, several curves the same ones, and the watchdog reads
+        // every sensor anyway - reading per use let a large config stretch the tick (and the watchdog's cadence).
+        var hw = new FakeHardware();
+        hw.AddTempSensor("t", 55);
+        CurveConfig Curve(string id) => new()
+        {
+            Id = id,
+            Name = id,
+            SourceSensorIds = new[] { "t", "t" },
+            SmoothingSeconds = 0,
+            Points = new[] { new CurvePoint(30, 0), new CurvePoint(80, 100) },
+        };
+        var config = new AppConfig
+        {
+            FailSafeTempC = 90,
+            Curves = new[] { Curve("a"), Curve("b"), Curve("c") },
+            Fans = new[] { "a", "b", "c" }.Select(id =>
+            {
+                hw.AddFan($"f{id}", canControl: true);
+                return new FanConfig { FanId = $"f{id}", AssignedCurveId = id };
+            }).ToArray(),
+        };
+
+        new ControlLoop(hw, hw, dryRun: true).Tick(config);
+
+        Assert.Equal(1, hw.ReadCounts["t"]);
+    }
+
+    [Fact]
     public void Tick_DryRun_ComputesPwm_DoesNotWrite()
     {
         var hw = Hw(55);                                   // Mitte 30..80 → 50 % → pwm 128
@@ -83,6 +114,21 @@ public class ControlLoopTests
         Assert.True(tick.FailSafeTriggered);
         Assert.Equal(1, hw.RestoreCount);
         Assert.Empty(hw.Writes);
+    }
+
+    /// <summary>
+    /// A dry run (no root, e.g. a dev build next to the live daemon) reports the fail-safe but writes nothing: the fans
+    /// are not its own, and where udev makes the PWM files group-writable it would act on the live daemon's.
+    /// </summary>
+    [Fact]
+    public void Tick_FailSafe_InADryRun_IsReported_ButRestoresNothing()
+    {
+        var hw = Hw(95);
+        var tick = new ControlLoop(hw, hw, dryRun: true).Tick(ConfigWith());
+
+        Assert.True(tick.FailSafeTriggered);
+        Assert.Equal(FailSafeState.OverTemperature, tick.FailSafe);
+        Assert.Equal(0, hw.RestoreCount);
     }
 
     [Fact]
@@ -205,7 +251,7 @@ public class ControlLoopTests
     {
         var hw = Hw(55);
         var loop = new ControlLoop(hw, hw, dryRun: false);
-        loop.Suspend("f");
+        loop.Suspend("f", FanControlState.Calibrating);
 
         var tick = loop.Tick(ConfigWith());
 

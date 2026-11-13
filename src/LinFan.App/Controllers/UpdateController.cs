@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-using System.Diagnostics;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -34,7 +33,7 @@ public partial class UpdateController : ObservableObject
         _service = service ?? new UpdateCheckService();
         _store = store ?? new UiSettingsStore();
         _current = current ?? (AppVersion.TryCurrent(out SemVer v) ? v : new SemVer(0, 0, 0, null));
-        _openUrl = openUrl ?? OpenInBrowser;
+        _openUrl = openUrl ?? UrlLauncher.OpenAsync;
         _marshal = marshal ?? (a => Dispatcher.UIThread.Post(a));
     }
 
@@ -83,18 +82,5 @@ public partial class UpdateController : ObservableObject
         if (_info is { } info)
             _store.Save(_store.Load() with { DismissedUpdateVersion = info.LatestVersion });
         UpdateAvailable = false;
-    }
-
-    private static Task<bool> OpenInBrowser(string url)
-    {
-        try
-        {
-            using Process? _ = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            return Task.FromResult(true);
-        }
-        catch
-        {
-            return Task.FromResult(false); // kein Browser/Handler verfügbar → still scheitern
-        }
     }
 }

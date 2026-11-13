@@ -11,7 +11,12 @@ namespace LinFan.App.Services;
 /// </summary>
 public interface ICommandSink
 {
-    Task<bool> SendConfigAsync(AppConfig config);
+    /// <summary>
+    /// Sends an edited config; the daemon merges it into its own. <paramref name="baseMinPwm"/> holds each fan's MinPwm as
+    /// the daemon reported it last: a sent MinPwm still equal to it counts as untouched, and the daemon keeps its own value
+    /// (a calibration may have changed it meanwhile). A fan without an entry has no base - its sent value wins.
+    /// </summary>
+    Task<bool> SendConfigAsync(AppConfig config, IReadOnlyDictionary<string, byte> baseMinPwm);
     Task SendManualPwmAsync(string fanId, byte pwm);
     Task SendFanAutoAsync(string fanId);
     Task SendStartCalibrationAsync(string fanId);
@@ -34,11 +39,27 @@ public interface ICommandSink
     Task SendSetCurveEnabledAsync(string curveId, bool enabled);
 
     /// <summary>
-    /// Ersetzt die Daemon-Config <b>vollständig</b> durch <paramref name="config"/> (Import/Restore) - anders
-    /// als <see cref="SendConfigAsync"/> (Merge) inkl. der mitgeschickten Kalibrierung. Liefert, ob es gelang.
+    /// Replaces the daemon config <b>wholesale</b> with <paramref name="config"/> (import/restore) - unlike
+    /// <see cref="SendConfigAsync"/> (merge) including the calibration sent along. Returns whether the command went out
+    /// - not whether the daemon took it (it may refuse it, e.g. past its limits); the config it reports next tells. A
+    /// config that cannot be put on the wire (a damaged backup) throws: that is the file's fault, not the connection's.
     /// </summary>
     Task<bool> SendReplaceConfigAsync(AppConfig config);
 
     /// <summary>Setzt die Daemon-Config auf Werkszustand zurück (leert alles; Hardware wird neu entdeckt).</summary>
     Task<bool> SendResetConfigAsync();
+
+    /// <summary>
+    /// Keeps the entries of a replaced device (<see cref="HardwareChangeReading.Key"/>) for the device behind them now;
+    /// <paramref name="resetSensorNames"/> also clears its sensors' own names. Returns whether the command went out - the
+    /// daemon answers only by no longer reporting the change.
+    /// </summary>
+    Task<bool> SendAcceptHardwareAsync(string key, bool resetSensorNames);
+
+    /// <summary>
+    /// Removes the entries of a replaced or missing device (<see cref="HardwareChangeReading.Key"/>) and its fans' profile
+    /// assignments. Returns whether the command went out; the daemon refuses it while a device action runs on one of the
+    /// fans (the change then stays).
+    /// </summary>
+    Task<bool> SendForgetHardwareAsync(string key);
 }

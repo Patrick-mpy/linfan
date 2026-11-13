@@ -25,19 +25,23 @@ public partial class MainController : ObservableObject, IDisposable
     private readonly bool _ownsMonitor; // true nur, wenn der Controller den Monitor selbst erzeugt hat
     private int _disposed;
     private readonly Dictionary<string, SensorRow> _sensorRows = new();
-    private readonly Dictionary<string, FanRow> _fanRows = new();
+    private readonly Dictionary<string, FanRow> _fanRows = new(); // every fan, hidden ones too (the loops show them)
+    private readonly List<FanRow> _fanOrder = new();               // the same rows in discovery order
+    private readonly TimeProvider _clock;
+    private readonly GuiErrorLog _errorLog;
 
     // Auto-Ausblenden des Kalibrier-Banners nach erfolgreichem Abschluss (Fehler bleiben bis manuell geschlossen).
     private CancellationTokenSource? _calibrationAutoHideCts;
     private static readonly TimeSpan CalibrationAutoHide = TimeSpan.FromSeconds(5);
 
+    /// <summary>The visible temperature sensors.</summary>
     public ObservableCollection<SensorRow> Temperatures { get; } = new();
-    public ObservableCollection<SensorGroup> SensorGroups { get; } = new();
-    public ObservableCollection<FanRow> Fans { get; } = new();
-    public ObservableCollection<FanGroup> FanGroups { get; } = new();
 
-    /// <summary>Aktive Kurven fürs Dashboard-Panel (Kurven, die mindestens einen sichtbaren Lüfter regeln).</summary>
-    public ObservableCollection<DashboardCurveRow> ActiveCurves { get; } = new();
+    /// <summary>The overview's temperature tiles: one per group in the saved order, "ungrouped" last.</summary>
+    public ObservableCollection<SensorGroup> SensorGroups { get; } = new();
+
+    /// <summary>The visible fans in the overview table's order (by position).</summary>
+    public ObservableCollection<FanRow> Fans { get; } = new();
 
     public CurveEditorController Editor { get; }
 
@@ -58,61 +62,43 @@ public partial class MainController : ObservableObject, IDisposable
     private bool _awaitingConfigResync;
     private string _preResyncSignature = "";
     private int _resyncGraceTicks;
+    private Func<MonitorSnapshot, bool>? _resyncUntil;   // a further condition of the rebuild - see ArmConfigResync
+    private TaskCompletionSource<bool>? _resyncOutcome; // whether the daemon reported the change - see ArmConfigResync
 
     /// <summary>
-    /// Wie viele Snapshots ein armierter Resync auf den erwarteten Config-Wechsel wartet (≈ Sekunden bei
-    /// 1-s-Poll). Danach wird entschärft: schrieb der Daemon nichts Neues (die gesendete Config war
-    /// inhaltsgleich), bliebe der Resync sonst dauerhaft scharf und ein viel späterer, fremder Wechsel
-    /// (Profilwechsel, Kurve an/aus) würde den Editor samt ungespeicherter Änderungen neu aufbauen.
+    /// How many fresh snapshots (daemon ticks) an armed resync waits for the expected config change. Then it is
+    /// disarmed: had the daemon written nothing new (the config sent was the same, or it refused it), the resync would
+    /// stay armed for good, and a much later, foreign change (profile switch, curve on/off) would rebuild the editor
+    /// together with its unsaved edits.
     /// </summary>
-    private const int ResyncGraceTicks = 10;
+    internal const int ResyncGraceTicks = 10;
 
     [ObservableProperty] private string _status = Localizer.Instance["MainCtrl.Connecting"];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowDisconnectedToast))]
+    [NotifyPropertyChangedFor(nameof(ShowNoSensors), nameof(ShowNoFans), nameof(OverviewFrozen))]
     private bool _connected;
 
-    /// <summary>Set when the user closes the disconnect toast with its X; the next disconnect re-shows it.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowDisconnectedToast))]
-    private bool _disconnectedToastHidden;
+    /// <summary>Offline and dry-run banners above the tabs, with "Reconnect" and the "reconnected" toast.</summary>
+    public ConnectionController Connection { get; }
 
-    /// <summary>Drives the daemon-unreachable toast: disconnected state minus an explicit user dismissal.</summary>
-    public bool ShowDisconnectedToast => !Connected && !DisconnectedToastHidden;
+    /// <summary>The version lines under the settings menu (this app, and the service when it runs another build).</summary>
+    public VersionController Version { get; } = new();
 
-    // Re-arm only on a true connected->disconnected transition (the generated setter no-ops on equal values).
-    partial void OnConnectedChanged(bool value)
-    {
-        if (!value)
-            DisconnectedToastHidden = false;
-    }
+    /// <summary>
+    /// The toast after the GUI caught an error it did not expect: it keeps running, but may show something half
+    /// updated. An error toast - it stays until closed - naming <see cref="ErrorLogPath"/>.
+    /// </summary>
+    public TransientStatus ErrorNotice { get; } = new();
 
-    /// <summary>Hides the disconnect toast until the next disconnect (the connection state itself is untouched).</summary>
-    [RelayCommand]
-    private void HideDisconnectedToast() => DisconnectedToastHidden = true;
+    /// <summary>Where caught errors are recorded - shown selectable in the error toast and the unreadable-data banner.</summary>
+    public string ErrorLogPath => _errorLog.FilePath;
 
     [ObservableProperty] private CalibrationStatus? _calibration;
     [ObservableProperty] private OnboardingController? _onboarding;
 
-    /// <summary>Aktiver Tab (0 = Übersicht, 1 = Kurven &amp; Zuordnung, 2 = Einstellungen) - für „Kurve bearbeiten" vom Dashboard.</summary>
+    /// <summary>The selected area (0 = overview, 1 = profiles &amp; curves, 2 = settings) - the header and the overview's links switch it.</summary>
     [ObservableProperty] private int _selectedTabIndex;
-
-    /// <summary>Dashboard-Karten ein-/ausklappen - reiner View-Zustand, In-Memory (nicht persistiert).</summary>
-    [ObservableProperty] private bool _temperaturesExpanded = true;
-    [ObservableProperty] private bool _fansExpanded = true;
-    [ObservableProperty] private bool _activeCurvesExpanded = true;
-
-    /// <summary>True, wenn mindestens eine Kurve einen sichtbaren Lüfter regelt - steuert die Sichtbarkeit des Panels.</summary>
-    [ObservableProperty] private bool _hasActiveCurves;
-
-    /// <summary>Kurzinfo im eingeklappten Temperatur-Header: der wärmste Sensor (z. B. „max 48.0 °C"); leer ohne Messwert.</summary>
-    [ObservableProperty] private string _maxTempDisplay = "";
-
-    /// <summary>True, sobald der erste Snapshot verarbeitet wurde - vorher zeigt das Dashboard keinen Leer-Hinweis.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowNoSensors), nameof(ShowNoFans))]
-    private bool _hasSnapshot;
 
     /// <summary>True, wenn das Dashboard mindestens einen sichtbaren Temperatursensor zeigt.</summary>
     [ObservableProperty]
@@ -130,11 +116,14 @@ public partial class MainController : ObservableObject, IDisposable
     /// <summary>Wie <see cref="DeviceLoadingText"/>, aber für den Kurven-Tab.</summary>
     [ObservableProperty] private string _curveLoadingText = Localizer.Instance["MainCtrl.ConnectingToService"];
 
-    /// <summary>Dashboard-Karte „Temperaturen": Leer-Platzhalter nur, wenn geladen UND keine Sensoren da sind.</summary>
-    public bool ShowNoSensors => HasSnapshot && !HasSensors;
+    /// <summary>
+    /// "No visible temperature sensors": only while connected and loaded - without the daemon nothing is known, so the
+    /// overview never claims there is nothing.
+    /// </summary>
+    public bool ShowNoSensors => HasLiveData && Connected && !HasSensors;
 
-    /// <summary>Dashboard-Karte „Lüfter": Leer-Platzhalter nur, wenn geladen UND keine Lüfter da sind.</summary>
-    public bool ShowNoFans => HasSnapshot && !HasFans;
+    /// <summary>"No visible fans" - the same rule as <see cref="ShowNoSensors"/>.</summary>
+    public bool ShowNoFans => HasLiveData && Connected && !HasFans;
 
     /// <summary>
     /// Geräte-Tab: „Keine Geräte erkannt", wenn der Daemon verbunden ist und einen Snapshot ohne jedes Gerät
@@ -159,22 +148,30 @@ public partial class MainController : ObservableObject, IDisposable
     private readonly Func<string, Task>? _sendAuto;
     private readonly Func<string, Task>? _sendCalibrate;
     private readonly Func<Task>? _cancelCalibrate;
-    private string _fanGroupSignature = "";
     private string _sensorGroupSignature = "";
-    private string _activeCurvesSignature = "";
     private bool _onboardingShown;
 
     /// <summary>Laufzeit-ctor (die App setzt diesen Controller als DataContext).</summary>
-    public MainController() : this(new IpcLiveMonitor()) => _ownsMonitor = true;
+    public MainController() : this(new IpcLiveMonitor(), GuiErrorLog.Default) => _ownsMonitor = true;
 
-    public MainController(ILiveMonitor monitor, ICommandSink? sink = null, TimeSpan? pollInterval = null,
-        SettingsController? settings = null)
+    /// <param name="errorLog">
+    /// Where caught errors are recorded. No default: a test must never write the user's log, and it should notice an
+    /// error <see cref="ApplyGuarded"/> swallowed.
+    /// </param>
+    /// <param name="clock">Time source of the overview's "as of" stamp while offline (tests pin it).</param>
+    public MainController(ILiveMonitor monitor, GuiErrorLog errorLog, ICommandSink? sink = null,
+        TimeSpan? pollInterval = null, SettingsController? settings = null, IReconnectable? reconnect = null,
+        TimeProvider? clock = null)
     {
         _monitor = monitor;
+        _clock = clock ?? TimeProvider.System;
+        _errorLog = errorLog;
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(1);
         // Default: der echte Per-User-Store; Tests reichen einen mit temporärem Pfad herein, damit sie die
         // Einstellungen des Nutzers nicht umschreiben.
         Settings = settings ?? new SettingsController();
+        // Like the sink below: the monitor itself if it can reconnect (IpcLiveMonitor).
+        Connection = new ConnectionController(reconnect ?? monitor as IReconnectable, _errorLog.FilePath);
 
         // Steuerbefehle laufen über die Sink-Abstraktion (Daemon/IPC), nicht direkt auf die Hardware.
         // Default: derselbe Monitor, falls er Befehle versteht (IpcLiveMonitor) - Tests injizieren einen Fake.
@@ -189,7 +186,17 @@ public partial class MainController : ObservableObject, IDisposable
             sendAuto: _sink is null ? null : _sink.SendFanAutoAsync,
             startTachMapping: _sink is null ? null : _sink.SendStartTachMappingAsync,
             cancelTachMapping: _sink is null ? null : _sink.SendCancelTachMappingAsync,
-            setFanTachometer: _sink is null ? null : _sink.SendSetFanTachometerAsync);
+            setFanTachometer: _sink is null ? null : _sink.SendSetFanTachometerAsync,
+            cancelCalibration: _sink is null ? null : _sink.SendCancelCalibrationAsync);
+        // Links of the airflow page: another settings section, or a profile/curve in the curves tab.
+        Editor.SettingsSectionRequested += (_, section) => Settings.OpenSection(section);
+        // A fan test belongs to the section it was started in (fans, airflow): another one ends it.
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsController.SelectedSection))
+                Editor.RevertAllManual();
+        };
+        Editor.EditorJumpRequested += (_, jump) => OpenInEditor(jump);
         _sendManual = _sink is null ? null : _sink.SendManualPwmAsync;
         _sendAuto = _sink is null ? null : _sink.SendFanAutoAsync;
         _sendCalibrate = _sink is null ? null : _sink.SendStartCalibrationAsync;
@@ -200,8 +207,11 @@ public partial class MainController : ObservableObject, IDisposable
             _sink is null ? _ => Task.FromResult(false) : _sink.SendReplaceConfigAsync,
             _sink is null ? () => Task.FromResult(false) : _sink.SendResetConfigAsync,
             Settings,
-            onConfigReplaced: ArmConfigResync);
+            ArmConfigResync,
+            CancelConfigResync);
 
+        Editor.PropertyChanged += OnEditorPropertyChanged; // the header's profile button names the running profile
+        RefreshProfileButton();
         _ = RunAsync(_loopCts.Token);
     }
 
@@ -231,10 +241,47 @@ public partial class MainController : ObservableObject, IDisposable
                 continue;
             }
 
-            Dispatcher.UIThread.Post(() => Apply(snapshot));
+            Dispatcher.UIThread.Post(() => ApplyGuarded(snapshot));
             if (!await DelayAsync(ct))
                 break;
         }
+    }
+
+    /// <summary>
+    /// A snapshot that fails to apply must not end the GUI - the next one may apply fine, and the daemon keeps the fans
+    /// on its curves regardless. But the failure may have left a view half updated (an editor half initialized), so it
+    /// goes to the GUI log and the user is told.
+    /// </summary>
+    private void ApplyGuarded(MonitorSnapshot snapshot)
+    {
+        try
+        {
+            Apply(snapshot);
+        }
+        catch (Exception ex)
+        {
+            ReportCaught("Snapshot", "Applying a snapshot from the service failed - the GUI keeps running", ex);
+        }
+    }
+
+    /// <summary>
+    /// An exception nobody caught on the UI thread - the app's dispatcher handler marks it handled and hands it here:
+    /// recorded, and the user told.
+    /// </summary>
+    public void ReportUnhandled(Exception exception) =>
+        ReportCaught("UI thread", "Unhandled exception - the GUI keeps running", exception);
+
+    /// <summary>
+    /// An error that needs no notice - the view handled it and told the user itself, or it has no bearing on what the
+    /// window shows (a failed task nobody awaited). Recorded only. Any thread.
+    /// </summary>
+    public void RecordError(string source, string message, Exception exception) =>
+        _errorLog.Error(source, message, exception);
+
+    private void ReportCaught(string source, string message, Exception exception)
+    {
+        if (_errorLog.Error(source, message, exception))
+            ErrorNotice.Set(Localizer.Instance["ErrorNotice.Text"], isError: true);
     }
 
     /// <summary>Wartet das Poll-Intervall ab; liefert <c>false</c>, wenn abgebrochen wurde.</summary>
@@ -251,6 +298,11 @@ public partial class MainController : ObservableObject, IDisposable
         }
     }
 
+    private MonitorSnapshot? _lastFanRowsSnapshot;
+
+    /// <summary>The window went to the tray: a fan test started in the settings ends - nobody sees it any more.</summary>
+    public void OnHiddenToTray() => Editor.RevertAllManual();
+
     /// <summary>
     /// Stoppt den Poll-Loop (vom App-Shutdown bzw. in Tests aufgerufen). Hat der Controller den Monitor
     /// selbst erzeugt, wird auch dessen IPC-Loop beendet (injizierte Fakes/Monitore bleiben unangetastet).
@@ -262,28 +314,65 @@ public partial class MainController : ObservableObject, IDisposable
         Editor.RevertAllManual(); // VOR dem Loop-Abbruch: aktive Geräte-Tab-Manuell-Steuerung sauber auf Auto (best effort)
         CancelCalibrationAutoHide();
         Settings.Dispose(); // löst das app-lebenslange Localizer-Abo des Einstellungs-Controllers
+        Editor.Dispose();   // same for the editor (its unsaved-changes summary follows the language)
+        Connection.Dispose(); // and the banner texts
+        Version.Dispose();
         _loopCts.Cancel();
         _loopCts.Dispose();
         if (_ownsMonitor && _monitor is IAsyncDisposable monitor)
             _ = monitor.DisposeAsync(); // Fire-and-forget: beim Shutdown genügt das Signalisieren des Abbruchs
     }
 
-    private void Apply(MonitorSnapshot snapshot)
+    // The last snapshot from the monitor and the same with „Lüfter N" names - see WithFanNames.
+    private MonitorSnapshot? _rawSnapshot;
+    private MonitorSnapshot? _namedSnapshot;
+
+    /// <summary>
+    /// Gives every fan without an own name its „Lüfter N" (<see cref="DefaultFanNames.ApplyTo"/>) before anything reads the
+    /// snapshot. The monitor hands out the same instance until the daemon ticks, and the rows tell a new tick from a repeat
+    /// by that identity - so a repeat gets the same renamed instance, not a new one (after a language switch the names
+    /// follow with the next tick).
+    /// </summary>
+    private MonitorSnapshot WithFanNames(MonitorSnapshot raw)
     {
+        if (!ReferenceEquals(raw, _rawSnapshot))
+        {
+            _rawSnapshot = raw;
+            _namedSnapshot = DefaultFanNames.ApplyTo(raw);
+        }
+        return _namedSnapshot!;
+    }
+
+    private void Apply(MonitorSnapshot raw)
+    {
+        bool fresh = !ReferenceEquals(raw, _rawSnapshot); // the monitor hands out the last one until the daemon ticks
+        MonitorSnapshot snapshot = WithFanNames(raw);
         ApplyConnectionState(snapshot);
-        ApplySensorRows(snapshot);
-        ApplyFanRows(snapshot);
-        ApplyDashboardSummary(snapshot);
-        FeedEditor(snapshot);
+        // Offline the snapshot is empty. The rows keep the last connected state (the overview shows it frozen and
+        // dimmed) instead of being blanked - a stale value with its time beats "no sensors detected".
+        if (snapshot.Connected)
+        {
+            _lastConfig = snapshot.Config; // autoritativer Daemon-Stand (inkl. Kalibrierung) für den Backup-Export
+            ApplySensorRows(snapshot);
+            ApplyFanRows(snapshot);
+        }
+        ApplyDashboardSummary();
+        FeedEditor(snapshot, fresh);
+        ApplyOverview(snapshot);
+        _hardwareChanges?.Apply(snapshot); // after the overview: its fan rows carry the device-action locks by now
+        RefreshProfileButton();
         MaybeShowOnboarding(snapshot);
     }
 
     private void ApplyConnectionState(MonitorSnapshot snapshot)
     {
-        Status = snapshot.Status;
         Connected = snapshot.Connected;
+        Connection.Apply(snapshot);
+        Version.Apply(snapshot);
+        // While the offline banner explains the problem, the profile button's tooltip only says that there is one.
+        Status = Connection.ShowOfflineBanner ? Connection.StatusText : snapshot.Status;
+        Editor.IsConnected = snapshot.Connected; // saving needs the daemon; the editor cannot tell on its own
         Calibration = snapshot.Calibration;
-        _lastConfig = snapshot.Config; // autoritativer Daemon-Stand (inkl. Kalibrierung) für den Backup-Export
     }
 
     private void ApplySensorRows(MonitorSnapshot snapshot)
@@ -302,50 +391,57 @@ public partial class MainController : ObservableObject, IDisposable
                 row.SetGroup(sc?.Group);
             });
         }
-        RebuildSensorGroupsIfChanged();
     }
 
     private void ApplyFanRows(MonitorSnapshot snapshot)
     {
+        bool fresh = !ReferenceEquals(snapshot, _lastFanRowsSnapshot); // the monitor hands out the last one until the next tick
+        _lastFanRowsSnapshot = snapshot;
+        var hidden = new HashSet<string>(StringComparer.Ordinal);
         foreach (FanReading f in snapshot.Fans)
         {
             FanConfig? cfg = snapshot.Config.Fans.FirstOrDefault(fc => fc.FanId == f.Id);
             if (cfg?.Hidden == true)
+                hidden.Add(f.Id);
+            if (!_fanRows.TryGetValue(f.Id, out FanRow? row))
             {
-                RemoveRow(_fanRows, Fans, f.Id);
-                continue;
+                row = CreateFanRow(f.Id, f.Name);
+                _fanRows[f.Id] = row;
+                _fanOrder.Add(row);
             }
-            Upsert(_fanRows, Fans, f.Id, () => CreateFanRow(f.Id, f.Name), row =>
-            {
-                row.Update(f);
-                row.SetPlacement(cfg?.Location ?? FanLocation.Unspecified);
-                row.SetCalibration(cfg?.Calibration);
-                row.IsCalibrating = snapshot.Calibration is { Running: true } rc && rc.FanId == f.Id;
-            });
+            row.Update(f, fresh);
+            row.SetPlacement(cfg?.Location ?? FanLocation.Unspecified);
+            row.SetCalibration(cfg?.Calibration);
+            row.IsCalibrating = snapshot.Calibration is { Running: true } rc && rc.FanId == f.Id;
         }
-        RebuildFanGroupsIfChanged();
+        SyncVisibleFans(hidden);
     }
 
-    private void ApplyDashboardSummary(MonitorSnapshot snapshot)
+    private void ApplyDashboardSummary()
     {
-        // Dashboard-Leer-Hinweise: nach dem ersten Snapshot zeigen, je nach Inhalt der Dashboard-Collections.
-        HasSnapshot = true;
-        HasSensors = SensorGroups.Count > 0;
-        HasFans = FanGroups.Count > 0;
-
-        // Kurzinfo für den eingeklappten Temperatur-Header: wärmster Sensor mit Messwert.
-        SensorRow? hottest = Temperatures
-            .Where(r => !double.IsNaN(r.Value))
-            .OrderByDescending(r => r.Value)
-            .FirstOrDefault();
-        MaxTempDisplay = hottest is null ? "" : Localizer.Instance.Format("MainCtrl.MaxTemp", hottest.Display);
+        HasSensors = Temperatures.Count > 0;
+        HasFans = Fans.Count > 0;
         // Pre-Load-Hinweise (Geräte-/Kurven-Tab) an den Verbindungszustand koppeln statt fix.
         DeviceLoadingText = Connected ? Localizer.Instance["MainCtrl.LoadingDevices"] : Localizer.Instance["MainCtrl.ConnectingToService"];
         CurveLoadingText = Connected ? Localizer.Instance["MainCtrl.LoadingCurves"] : Localizer.Instance["MainCtrl.ConnectingToService"];
     }
 
-    private void FeedEditor(MonitorSnapshot snapshot)
+    private void FeedEditor(MonitorSnapshot snapshot, bool fresh)
     {
+        if (!snapshot.Connected)
+        {
+            // The offline snapshot carries an empty config: feeding it would drop the running curves the overview
+            // shows (and, with a resync armed, rebuild the editor from nothing). The live state stays as last seen.
+            // A pending verdict cannot wait for the connection: unconfirmed. The rebuild itself stays armed - the
+            // daemon may have taken the change before the connection dropped.
+            ReportConfigResync(changed: false);
+            Editor.UpdateOffline();
+            ShowNoDevices = false;
+            OnPropertyChanged(nameof(ShowDeviceLoading));
+            OnPropertyChanged(nameof(ShowCurveLoading));
+            return;
+        }
+
         // Editor einmalig aus dem ersten echten Snapshot befüllen (Sensoren/Lüfter/Zuordnungen) …
         // ABER nicht, solange der Erststart-Assistent noch aussteht: dann wäre der erste Snapshot die leere
         // Vor-Onboarding-Config, und die einmalige Initialize-Sperre würde das spätere Nachladen der im
@@ -356,24 +452,23 @@ public partial class MainController : ObservableObject, IDisposable
         // Nach Reset/Import: sobald der Daemon die geänderte Config zurückspiegelt (Signatur ≠ Vorher), den
         // Editor vollständig neu aufbauen - sonst bliebe er stale und ein späteres Speichern schriebe die alte
         // Config zurück. Vor dem Onboarding-Gate, weil Resync selbst Initialize aus der frischen Config fährt.
-        if (_awaitingConfigResync && ConfigSignature(snapshot.Config) != _preResyncSignature)
+        if (_awaitingConfigResync && ConfigSignature(snapshot.Config) != _preResyncSignature
+            && (_resyncUntil?.Invoke(snapshot) ?? true))
         {
-            _awaitingConfigResync = false;
+            EndConfigResync(changed: true); // first: a rebuild that throws must not repeat on every tick
             Editor.Resync(snapshot);
         }
         else
         {
-            if (_awaitingConfigResync && --_resyncGraceTicks <= 0)
-                _awaitingConfigResync = false; // Frist abgelaufen (siehe ResyncGraceTicks)
+            // Only a new tick can bring the change; a repeat of the last snapshot does not use up the grace.
+            if (_awaitingConfigResync && fresh && --_resyncGraceTicks <= 0)
+                EndConfigResync(changed: false); // the grace ran out (see ResyncGraceTicks)
 
             if (snapshot.Config.OnboardingCompleted != false)
                 Editor.Initialize(snapshot);
         }
         // … und danach pro Tick mit Live-Temperaturen für den Arbeitspunkt im Kurven-Graph speisen.
         Editor.UpdateLive(snapshot);
-
-        // Dashboard-Panel „Aktive Kurven": aus dem Daemon-Stand ableiten (siehe RebuildActiveCurvesIfChanged).
-        RebuildActiveCurvesIfChanged(snapshot);
 
         // „Keine Geräte erkannt" im Geräte-Tab: verbunden, aber der Daemon meldet weder Sensoren noch Lüfter.
         // (Nicht an Editor.IsReady gekoppelt - der bleibt bei null Geräten absichtlich „nicht bereit".)
@@ -409,130 +504,8 @@ public partial class MainController : ObservableObject, IDisposable
         Onboarding?.Apply(snapshot);
     }
 
-    /// <summary>Gruppiert die Lüfter nach <see cref="FanRow.GroupKey"/> - nur neu, wenn sich die Zugehörigkeit ändert.</summary>
-    private void RebuildFanGroupsIfChanged()
-    {
-        // Wechsel-Gate zuerst, über die Sammlung in ihrer stabilen Einfügereihenfolge (Upsert hängt an, Remove
-        // entfernt - ohne Mitgliederwechsel keine Umordnung). Damit fällt die teure OrderBy/ThenBy-Sortierung pro
-        // Live-Tick weg; die Signatur ist eine Funktion derselben (GroupKey,Name)-Menge → dasselbe Gate wie zuvor.
-        string signature = string.Join("|", Fans.Select(f => $"{f.GroupKey}␟{f.Name}"));
-        if (signature == _fanGroupSignature)
-            return;
-        _fanGroupSignature = signature;
-
-        List<FanRow> ordered = Fans
-            .OrderBy(f => f.GroupKey == FanGroup.Ungrouped ? "￿" : f.GroupKey, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        FanGroups.Clear();
-        // Case-insensitive so "cpu"/"CPU" merge into one block (first-seen casing names the header).
-        foreach (IGrouping<string, FanRow> grp in ordered.GroupBy(f => f.GroupKey, StringComparer.OrdinalIgnoreCase))
-        {
-            var group = new FanGroup(grp.Key);
-            foreach (FanRow fan in grp)
-                group.Fans.Add(fan);
-            FanGroups.Add(group);
-        }
-    }
-
-    /// <summary>Gruppiert die Sensoren nach <see cref="SensorRow.GroupKey"/> - nur neu bei Zugehörigkeitsänderung.</summary>
-    private void RebuildSensorGroupsIfChanged()
-    {
-        // Wechsel-Gate zuerst, über die Sammlung in Einfügereihenfolge (wie bei den Lüftern) → OrderBy/ThenBy nur
-        // beim tatsächlichen Wechsel, nicht pro Live-Tick. Dieselbe (GroupKey,Name)-Menge, also dasselbe Gate.
-        string signature = string.Join("|", Temperatures.Select(s => $"{s.GroupKey}␟{s.Name}"));
-        if (signature == _sensorGroupSignature)
-            return;
-        _sensorGroupSignature = signature;
-
-        List<SensorRow> ordered = Temperatures
-            .OrderBy(s => s.GroupKey == SensorGroup.Ungrouped ? "￿" : s.GroupKey, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        // Doppelte Anzeigenamen unterscheidbar machen (z. B. zwei „amdgpu edge"): nur bei Kollision
-        // die Hardware-Id als dezenten Zusatz zeigen. Folgt der Signatur → nur bei Namens-/Gruppenwechsel.
-        HashSet<string> duplicateNames = ordered
-            .GroupBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (SensorRow s in ordered)
-            s.Disambiguator = duplicateNames.Contains(s.Name) ? s.Id : "";
-
-        SensorGroups.Clear();
-        // Case-insensitive so "cpu"/"CPU" merge into one block (first-seen casing names the header).
-        foreach (IGrouping<string, SensorRow> grp in ordered.GroupBy(s => s.GroupKey, StringComparer.OrdinalIgnoreCase))
-        {
-            var group = new SensorGroup(grp.Key);
-            foreach (SensorRow sensor in grp)
-                group.Sensors.Add(sensor);
-            SensorGroups.Add(group);
-        }
-    }
-
     /// <summary>
-    /// Baut das Dashboard-Panel „Aktive Kurven" neu, wenn sich Kurven, Zuordnungen oder Quellen ändern
-    /// (Signatur-Vergleich, wie bei den Gruppen). Aktiv = die Kurve regelt mindestens einen <b>sichtbaren</b>
-    /// Lüfter (versteckte sind aus dem Dashboard ausgeblendet). Jede Zeile referenziert Live-Objekte
-    /// (Kurve, Lüfter-Zeilen) → Arbeitstemperatur/PWM folgen per Binding ohne Neuaufbau.
-    /// </summary>
-    private void RebuildActiveCurvesIfChanged(MonitorSnapshot snapshot)
-    {
-        // Quelle ist der Daemon-Stand (Editor.LiveCurves + die Zuordnungen der Config), nicht der Editor:
-        // dort kann ein ganz anderes Profil zur Bearbeitung offen sein, und selbst beim aktiven liegen dort
-        // ungespeicherte Änderungen, die noch nichts regeln. Die Übersicht zeigt, was wirklich läuft.
-        var fansByCurve = new Dictionary<string, List<FanRow>>(StringComparer.Ordinal);
-        foreach (FanConfig fan in snapshot.Config.Fans)
-        {
-            if (fan.AssignedCurveId is not { } curveId || _fanRows.GetValueOrDefault(fan.FanId) is not { } row)
-                continue; // keine Kurve zugeordnet oder Lüfter im Dashboard ausgeblendet
-            if (!fansByCurve.TryGetValue(curveId, out List<FanRow>? list))
-                fansByCurve[curveId] = list = new List<FanRow>();
-            if (!list.Contains(row)) // doppelte Lüfter-Einträge einer hand-editierten Config nicht doppeln
-                list.Add(row);
-        }
-
-        var rows = new List<(CurveEditRow Curve, List<FanRow> Fans)>();
-        foreach (CurveEditRow curve in Editor.LiveCurves)
-        {
-            if (fansByCurve.TryGetValue(curve.Id, out List<FanRow>? fans) && fans.Count > 0)
-                rows.Add((curve, fans));
-        }
-
-        // Die Revision gehört in die Signatur: eine bearbeitete und gespeicherte Kurve behält ihre Id, ihre
-        // Zeile wird aber ersetzt - ohne sie hinge das Panel weiter an der verworfenen, toten Zeile.
-        string signature = Editor.LiveCurvesRevision + "␝" + string.Join("|", rows.Select(r =>
-            $"{r.Curve.Id}␟{string.Join(",", r.Fans.Select(f => f.FanId))}␟{string.Join(",", r.Curve.Sources.Select(s => s.Id))}"));
-        if (signature == _activeCurvesSignature)
-            return;
-        _activeCurvesSignature = signature;
-
-        ActiveCurves.Clear();
-        foreach (var (curve, fans) in rows)
-            ActiveCurves.Add(new DashboardCurveRow(
-                curve, fans,
-                enabled => Editor.SetCurveEnabled(curve, enabled),
-                () => EditCurve(curve)));
-        HasActiveCurves = ActiveCurves.Count > 0;
-    }
-
-    /// <summary>„Kurve bearbeiten" vom Dashboard: die Kurve im Editor auswählen und in den Kurven-Tab wechseln.</summary>
-    private void EditCurve(CurveEditRow curve)
-    {
-        // Die Dashboard-Zeile spiegelt den Daemon-Stand und liegt selbst nicht im Editor: erst das aktive
-        // Profil öffnen (dort gehört die Kurve hin), dann die zugehörige Editor-Zeile auswählen.
-        if (Editor.ActiveProfile is { } active && !ReferenceEquals(Editor.SelectedProfile, active))
-            Editor.SelectedProfile = active;
-        if (Editor.Curves.FirstOrDefault(c => c.Id == curve.Id) is { } row)
-            Editor.SelectedCurve = row;
-        Editor.Pane = CurveTabPane.Curve;
-        SelectedTabIndex = 1; // Kurven & Zuordnung (nach Entfernen des Geräte-Tabs: Index 1)
-    }
-
-    /// <summary>
-    /// Startet den Onboarding-Assistenten manuell (Einstellungen → Onboarding). Ohne Daemon-Sink (Tests)
+    /// Startet den Onboarding-Assistenten manuell (Einstellungen → Sicherung & Einrichtung). Ohne Daemon-Sink (Tests)
     /// oder bei bereits laufendem Assistenten ein No-op. Das Fenster zeigt <c>MainWindow</c> automatisch,
     /// sobald <see cref="Onboarding"/> ungleich null wird (gleicher Pfad wie der Erststart-Trigger).
     /// </summary>
@@ -541,6 +514,7 @@ public partial class MainController : ObservableObject, IDisposable
     {
         if (_sink is null || Onboarding is not null)
             return;
+        Editor.RevertAllManual(); // the assistant drives the fans itself; a test left on in the settings must not linger
         Onboarding = new OnboardingController(
             _sink.SendStartCalibrationAsync,
             _sink.SendCancelCalibrationAsync,
@@ -554,20 +528,53 @@ public partial class MainController : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Merkt den aktuellen Config-Stand und wartet auf dessen Änderung (Reset/Import), um dann den Editor
-    /// neu aufzubauen (<see cref="Apply"/>). Wird als Callback an den <see cref="BackupController"/> gereicht.
+    /// Remembers the current config and waits for it to change (reset, import, setup assistant), to rebuild the editor
+    /// then (<see cref="Apply"/>). Armed before the config goes out, so the baseline is the one from before. The task
+    /// tells whether the daemon took it: <c>true</c> once a snapshot reports a changed config, <c>false</c> after
+    /// <see cref="ResyncGraceTicks"/> ticks without one, when the connection is lost meanwhile, or when a newer arm
+    /// supersedes it (the daemon applies only the latest pending replace). Handed to the
+    /// <see cref="BackupController"/> as a callback.
     /// </summary>
-    private void ArmConfigResync()
+    private Task<bool> ArmConfigResync() => ArmConfigResync(until: null);
+
+    /// <param name="until">
+    /// What else the snapshot of the rebuild must show - the hardware dialog's change being resolved: a config change that
+    /// overtakes the command (a calibration landing) would otherwise rebuild the editor too early and leave it stale.
+    /// </param>
+    private Task<bool> ArmConfigResync(Func<MonitorSnapshot, bool>? until)
     {
+        ReportConfigResync(changed: false);
+        // Asynchronous continuations: the verdict is reached inside Apply, and what awaits it (the import's status and UI
+        // prefs, a language switch among them) must not run in the middle of it.
+        _resyncOutcome = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _preResyncSignature = ConfigSignature(_lastConfig);
         _awaitingConfigResync = true;
+        _resyncUntil = until;
         _resyncGraceTicks = ResyncGraceTicks;
+        return _resyncOutcome.Task;
+    }
+
+    /// <summary>Nothing went out after all: wait neither for a change nor rebuild on a foreign one later.</summary>
+    private void CancelConfigResync() => EndConfigResync(changed: false);
+
+    private void EndConfigResync(bool changed)
+    {
+        _awaitingConfigResync = false;
+        _resyncUntil = null;
+        ReportConfigResync(changed);
+    }
+
+    private void ReportConfigResync(bool changed)
+    {
+        TaskCompletionSource<bool>? outcome = _resyncOutcome;
+        _resyncOutcome = null;
+        outcome?.TrySetResult(changed);
     }
 
     /// <summary>
     /// Config-Sender des Assistenten: armiert den Editor-Neuaufbau, BEVOR gesendet wird (so ist die
     /// Signatur-Basis garantiert die Config von vor dem Assistenten). Ohne das bliebe ein bereits befüllter
-    /// Editor - der Fall „Einstellungen → Onboarding", also jede Wiederholung auf bestehender Config - auf
+    /// Editor - der Fall „Einstellungen → Sicherung & Einrichtung", also jede Wiederholung auf bestehender Config - auf
     /// dem alten Stand: die im Assistenten gewählten Positionen/Profile wären in den Tabs unsichtbar und das
     /// nächste Speichern schriebe sie stillschweigend wieder weg.
     /// </summary>
@@ -576,20 +583,26 @@ public partial class MainController : ObservableObject, IDisposable
         if (_sink is null)
             return false;
 
-        ArmConfigResync();
-        bool ok = await _sink.SendConfigAsync(config);
+        _ = ArmConfigResync();
+        // The assistant never edits a start point: its MinPwm values are the daemon's from when it built the config. As the
+        // base they leave the daemon's own in place - also one a calibration set after that.
+        var unchanged = new Dictionary<string, byte>(StringComparer.Ordinal);
+        foreach (FanConfig fan in config.Fans)
+            unchanged.TryAdd(fan.FanId, fan.MinPwm);
+        bool ok = await _sink.SendConfigAsync(config, unchanged);
         if (!ok)
-            _awaitingConfigResync = false; // nichts unterwegs → nicht auf einen fremden Wechsel warten
+            CancelConfigResync(); // nothing on its way - do not wait for a foreign change
         return ok;
     }
 
-    private static string ConfigSignature(AppConfig config) =>
+    /// <summary>What counts as a changed config - for the resync and for an import of the running config.</summary>
+    internal static string ConfigSignature(AppConfig config) =>
         System.Text.Json.JsonSerializer.Serialize(config);
 
     private FanRow CreateFanRow(string id, string name)
     {
         var row = new FanRow(id, name);
-        row.BindCommands(_sendManual, _sendAuto, _sendCalibrate);
+        row.BindCommands(_sendManual, _sendAuto, _sendCalibrate, EditCurve);
         return row;
     }
 

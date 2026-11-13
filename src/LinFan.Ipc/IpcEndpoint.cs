@@ -10,7 +10,7 @@ namespace LinFan.Ipc;
 /// <para>
 /// <see cref="SocketPath"/> ist der Endpunkt, auf dem der <b>Server</b> bindet (und der Default):
 /// <c>LINFAN_SOCKET</c> (Override, z. B. in der systemd-Unit) → <c>$XDG_RUNTIME_DIR/linfan.sock</c>
-/// (Linux-User-Session) → auf macOS je nach Rechten <c>/Library/Application Support/linfan/linfan.sock</c>
+/// (Linux-User-Session, nie für Root) → auf macOS je nach Rechten <c>/Library/Application Support/linfan/linfan.sock</c>
 /// (Root-Daemon, maschinenweit + traversierbar) bzw. <c>~/Library/Application Support/linfan/linfan.sock</c>
 /// (User-Daemon) → <c>/run/linfan/linfan.sock</c> (Linux-System-Dienst als Root).
 /// </para>
@@ -43,8 +43,10 @@ public static class IpcEndpoint
             if (OperatingSystem.IsWindows())
                 return WindowsPipeName;
 
+            // Not for root: a root login (/run/user/0) or `sudo -E` (the caller's runtime dir) would put a privileged
+            // daemon on another socket than the service's - two daemons writing PWM that do not see each other.
             string? xdg = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
-            if (!string.IsNullOrEmpty(xdg))
+            if (!string.IsNullOrEmpty(xdg) && !IsRootUnix())
                 return Path.Combine(xdg, "linfan.sock");
 
             // macOS kennt weder /run (read-only) noch XDG_RUNTIME_DIR. Bewusst NICHT $TMPDIR

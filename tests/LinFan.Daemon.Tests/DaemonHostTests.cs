@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+using System.Reflection;
 using LinFan.Ipc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -35,5 +38,35 @@ public class DaemonHostTests
         // ControlLoopService muss mit allen Ctor-Abhängigkeiten aus dem Container aktivierbar sein.
         using var svc = ActivatorUtilities.CreateInstance<ControlLoopService>(sp);
         Assert.NotNull(svc);
+    }
+
+    /// <summary>
+    /// The units set WatchdogSec=: if the hosted service did not get the notifier AddSystemd registers, nothing would
+    /// report WATCHDOG=1 and systemd would kill the daemon every 30 s. Read from the field, not by starting the service -
+    /// that would bind the default socket of the daemon running on this host.
+    /// </summary>
+    [Fact]
+    public async Task ConfigureServices_HandsTheSystemdNotifierToTheControlLoop()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILogger<ControlLoopService>>(NullLogger<ControlLoopService>.Instance);
+        var notifier = new NullNotifier();
+        services.AddSingleton<ISystemdNotifier>(notifier); // what AddSystemd registers under systemd
+        var hw = new FakeHardware();
+        DaemonHost.ConfigureServices(services, hw, hw);
+        await using ServiceProvider sp = services.BuildServiceProvider();
+
+        ControlLoopService svc = sp.GetServices<IHostedService>().OfType<ControlLoopService>().Single();
+
+        object? injected = typeof(ControlLoopService)
+            .GetField("_systemd", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(svc);
+        Assert.Same(notifier, injected);
+    }
+
+    private sealed class NullNotifier : ISystemdNotifier
+    {
+        public bool IsEnabled => false;
+        public void Notify(ServiceState state) { }
     }
 }

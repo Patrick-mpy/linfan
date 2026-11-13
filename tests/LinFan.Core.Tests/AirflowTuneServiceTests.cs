@@ -35,6 +35,7 @@ public sealed class AirflowTuneServiceTests
     [InlineData(FanLocation.GpuCooler, AirflowDirection.Internal)]
     [InlineData(FanLocation.Radiator, AirflowDirection.Internal)]
     [InlineData(FanLocation.Psu, AirflowDirection.Internal)]
+    [InlineData(FanLocation.FanWall, AirflowDirection.Internal)]
     [InlineData(FanLocation.Unspecified, AirflowDirection.Unknown)]
     [InlineData(FanLocation.Other, AirflowDirection.Unknown)]
     public void DirectionOf_MapsEveryLocation(FanLocation location, AirflowDirection expected)
@@ -54,7 +55,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Positive, result.Pressure);
+        Assert.Equal(PressureVerdict.SlightPositive, result.Verdict);
         Assert.Equal(2, result.IntakeWeight);
         Assert.Equal(1, result.ExhaustWeight);
     }
@@ -69,7 +70,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Negative, result.Pressure);
+        Assert.Equal(PressureVerdict.Negative, result.Verdict);
         Assert.Contains(AirflowHint.NegativePressure, result.Hints);
     }
 
@@ -82,7 +83,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Balanced, result.Pressure);
+        Assert.Equal(PressureVerdict.Balanced, result.Verdict);
     }
 
     [Fact]
@@ -94,7 +95,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Unknown, result.Pressure);
+        Assert.Equal(PressureVerdict.Unknown, result.Verdict);
         Assert.Contains(AirflowHint.NoCaseFans, result.Hints);
     }
 
@@ -105,7 +106,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Negative, result.Pressure);
+        Assert.Equal(PressureVerdict.OnlyExhaust, result.Verdict);
         Assert.Contains(AirflowHint.NoIntakeFan, result.Hints);
     }
 
@@ -116,7 +117,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Positive, result.Pressure);
+        Assert.Equal(PressureVerdict.OnlyIntake, result.Verdict);
         Assert.Contains(AirflowHint.NoExhaustFan, result.Hints);
     }
 
@@ -131,7 +132,7 @@ public sealed class AirflowTuneServiceTests
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(PressureBalance.Positive, result.Pressure);
+        Assert.Equal(PressureVerdict.SlightPositive, result.Verdict);
         Assert.Equal(3000, result.IntakeWeight);
         Assert.Equal(2000, result.ExhaustWeight);
     }
@@ -147,7 +148,7 @@ public sealed class AirflowTuneServiceTests
 
         Assert.Equal(1, result.IntakeWeight);
         Assert.Equal(1, result.ExhaustWeight);
-        Assert.Equal(PressureBalance.Balanced, result.Pressure);
+        Assert.Equal(PressureVerdict.Balanced, result.Verdict);
         Assert.Contains(AirflowHint.CountEstimateOnly, result.Hints);
     }
 
@@ -284,7 +285,7 @@ public sealed class AirflowTuneServiceTests
 
         Assert.Equal(new[] { "front" }, result.Fans.Select(f => f.FanId));
         Assert.Equal(0, result.ExhaustWeight); // der versteckte Auslass zählt nicht in die Bilanz
-        Assert.Equal(PressureBalance.Positive, result.Pressure);
+        Assert.Equal(PressureVerdict.OnlyIntake, result.Verdict);
         Assert.DoesNotContain(result.SuggestedCurves, c => c.Id == "airflow-gpu");
     }
 
@@ -336,26 +337,183 @@ public sealed class AirflowTuneServiceTests
     }
 
     [Fact]
-    public void Analyze_CpuCurve_AveragesAllCpuSensors_MatchedByNameOrGroup()
+    public void Analyze_GroupOnlyCpuSensor_StaysOutOfTheAverage_WhenOthersMatchByName()
     {
-        // Realer 5800X: Tctl/Tdie liegen konstant ~20 °C über SoC - die CPU-Kurve nimmt alle
-        // CPU-Sensoren und mittelt. „SoC" matcht kein Namens-Schlüsselwort, wohl aber die Gruppe.
+        // Windows/LHM 5800X after automatic grouping: the SoC sits in group "CPU" without a CPU keyword in its
+        // name and runs ~20 K below Tctl under load. Averaged in, it would push 100 % to Tctl ≈ 89.5 °C - right
+        // at the 90 °C fail-safe instead of with soft-ramp headroom below it.
+        const string tctl = "/amdcpu/0/temperature/2", ccd1 = "/amdcpu/0/temperature/3", soc = "/amdcpu/0/temperature/4";
         AppConfig config = AppConfig.Empty with
         {
             Sensors = new[]
             {
-                new SensorConfig { SensorId = "tctl", Name = "AMD Ryzen 7 5800X Core (Tctl/Tdie)", Group = "CPU" },
-                new SensorConfig { SensorId = "soc", Name = "AMD Ryzen 7 5800X SoC", Group = "CPU" },
-                new SensorConfig { SensorId = "ccd1", Name = "AMD Ryzen 7 5800X CCD1 (Tdie)", Group = "CPU" },
+                new SensorConfig { SensorId = tctl, Name = "AMD Ryzen 7 5800X Core (Tctl/Tdie)", Group = "CPU" },
+                new SensorConfig { SensorId = ccd1, Name = "AMD Ryzen 7 5800X CCD1 (Tdie)", Group = "CPU" },
+                new SensorConfig { SensorId = soc, Name = "AMD Ryzen 7 5800X SoC", Group = "CPU" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.CpuCooler) },
+        };
+
+        CurveConfig cpu = AirflowTuneService.Analyze(config).SuggestedCurves.Single(c => c.Id == "airflow-cpu");
+
+        Assert.Equal(new[] { tctl, ccd1 }, cpu.SourceSensorIds);
+        Assert.Equal(SensorAggregation.Avg, cpu.Aggregation);
+        double fullSpeedAt = FullSpeedHottestTemp(cpu, t => new Dictionary<string, double>
+        {
+            [tctl] = t,
+            [ccd1] = t - 2,
+            [soc] = t - 20,
+        });
+        // Tctl is the hottest sensor, so it must get the headroom of a Max curve (100 % by 86 °C): the Avg
+        // curves end 4 K earlier exactly so that the average may lag it by that much.
+        Assert.True(fullSpeedAt <= AppConfig.Empty.FailSafeTempC - 4, $"100 % only at Tctl {fullSpeedAt} °C");
+    }
+
+    [Theory]
+    [InlineData("nct6798 CPUTIN")] // Linux: chip + label
+    [InlineData("CPUTIN")]         // Windows/LHM
+    public void Analyze_SuperIoCputin_IsNoCpuSource(string cputinName)
+    {
+        // A board sensor next to the socket: it matches "cpu" by name, but runs far below Tctl under load.
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "k10temp/temp1", Name = "k10temp Tctl", Group = "CPU" },
+                new SensorConfig { SensorId = "nct6798/temp2", Name = cputinName, Group = "CPU" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.CpuCooler), Fan("f2", FanLocation.CaseFrontIntake) },
+        };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(new[] { "k10temp/temp1" }, result.SuggestedCurves.Single(c => c.Id == "airflow-cpu").SourceSensorIds);
+        Assert.All(result.SuggestedCurves, c => Assert.DoesNotContain("nct6798/temp2", c.SourceSensorIds));
+    }
+
+    [Fact]
+    public void Analyze_SuperIoCputin_IsTheLastCpuFallback_BeforeTheGpu()
+    {
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "amdgpu/temp1", Name = "amdgpu edge", Group = "GPU" },
+                new SensorConfig { SensorId = "nct6798/temp2", Name = "nct6798 CPUTIN", Group = "Mainboard" },
             },
             Fans = new[] { Fan("f1", FanLocation.CpuCooler) },
         };
 
         AirflowTuneResult result = AirflowTuneService.Analyze(config);
 
-        CurveConfig cpu = result.SuggestedCurves.Single(c => c.Id == "airflow-cpu");
-        Assert.Equal(new[] { "tctl", "soc", "ccd1" }, cpu.SourceSensorIds);
-        Assert.Equal(SensorAggregation.Avg, cpu.Aggregation);
+        Assert.Equal(new[] { "nct6798/temp2" }, result.SuggestedCurves.Single(c => c.Id == "airflow-cpu").SourceSensorIds);
+        Assert.Contains(AirflowHint.NoCpuSensorDetected, result.Hints); // still no real CPU sensor
+    }
+
+    // A sensor without an own name is called by its hardware label, which the config does not hold - the caller passes it.
+    // Without it every such sensor would fall back to its group, and the SoC would be averaged into the CPU curve again.
+    [Fact]
+    public void Analyze_NamesASensorWithoutAnOwnNameByItsLabel()
+    {
+        const string tctl = "/amdcpu/0/temperature/2", soc = "/amdcpu/0/temperature/4";
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = tctl, Name = "", Group = "CPU" },
+                new SensorConfig { SensorId = soc, Name = "", Group = "CPU" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.CpuCooler) },
+        };
+        var labels = new Dictionary<string, string>
+        {
+            [tctl] = "AMD Ryzen 7 5800X Core (Tctl/Tdie)",
+            [soc] = "AMD Ryzen 7 5800X SoC",
+        };
+
+        CurveConfig Cpu(IReadOnlyDictionary<string, string>? sensorLabels) =>
+            AirflowTuneService.Analyze(config, sensorLabels: sensorLabels).SuggestedCurves.Single(c => c.Id == "airflow-cpu");
+
+        Assert.Equal(new[] { tctl }, Cpu(labels).SourceSensorIds);
+        Assert.Equal(new[] { tctl, soc }, Cpu(null).SourceSensorIds); // the group fallback the labels prevent
+    }
+
+    [Fact]
+    public void Analyze_CpuSensors_FallBackToGroup_WhenNoneMatchesByName()
+    {
+        // A board sensor without a keyword in its name, filed under "CPU" by the user. The GPU's "… GPU Core"
+        // matches the CPU keyword "core" by name, but belongs to the GPU and must not suppress the fallback.
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "nct6798/temp3", Name = "nct6798 temp3", Group = "CPU" },
+                new SensorConfig { SensorId = "nct6798/temp1", Name = "nct6798 temp1", Group = "Mainboard" },
+                new SensorConfig { SensorId = "gpucore", Name = "NVIDIA GeForce RTX 3080 GPU Core", Group = "GPU" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.CpuCooler), Fan("f2", FanLocation.GpuCooler) },
+        };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(new[] { "nct6798/temp3" }, result.SuggestedCurves.Single(c => c.Id == "airflow-cpu").SourceSensorIds);
+        Assert.Equal(new[] { "gpucore" }, result.SuggestedCurves.Single(c => c.Id == "airflow-gpu").SourceSensorIds);
+        Assert.DoesNotContain(AirflowHint.NoCpuSensorDetected, result.Hints);
+    }
+
+    [Fact]
+    public void Analyze_GroupOnlyGpuSensor_StaysOutOfTheAverage_WhenOthersMatchByName()
+    {
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "amdgpu/edge", Name = "amdgpu edge", Group = "GPU" },
+                new SensorConfig { SensorId = "amdgpu/junction", Name = "amdgpu junction", Group = "GPU" },
+                new SensorConfig { SensorId = "nct6798/temp5", Name = "nct6798 temp5", Group = "GPU" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.GpuCooler) },
+        };
+
+        CurveConfig gpu = AirflowTuneService.Analyze(config).SuggestedCurves.Single(c => c.Id == "airflow-gpu");
+
+        Assert.Equal(new[] { "amdgpu/edge", "amdgpu/junction" }, gpu.SourceSensorIds);
+        Assert.Equal(SensorAggregation.Avg, gpu.Aggregation);
+    }
+
+    [Fact]
+    public void Analyze_GpuSensors_FallBackToGroup_WhenNoneMatchesByName()
+    {
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "cpu", Name = "CPU Package", Group = "CPU" },
+                new SensorConfig { SensorId = "it8688/temp4", Name = "it8688 temp4", Group = "GPU" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.GpuCooler) },
+        };
+
+        CurveConfig gpu = AirflowTuneService.Analyze(config).SuggestedCurves.Single(c => c.Id == "airflow-gpu");
+
+        Assert.Equal(new[] { "it8688/temp4" }, gpu.SourceSensorIds);
+    }
+
+    /// <summary>
+    /// The lowest temperature of the hottest sensor (0.5 K steps) at which <paramref name="curve"/>, fed with its
+    /// aggregated sources, demands 100 % - <see cref="double.PositiveInfinity"/> if it never does.
+    /// </summary>
+    private static double FullSpeedHottestTemp(CurveConfig curve, Func<double, IReadOnlyDictionary<string, double>> readingsAt)
+    {
+        var engineCurve = new Curve(curve.Name, curve.Points, curve.InterpolationMode);
+        for (double t = 30; t <= 110; t += 0.5)
+        {
+            IReadOnlyDictionary<string, double> readings = readingsAt(t);
+            double input = SensorAggregator.Aggregate(curve.SourceSensorIds.Select(id => readings[id]), curve.Aggregation);
+            if (CurveEngine.Evaluate(engineCurve, input) >= 100)
+                return t;
+        }
+        return double.PositiveInfinity;
     }
 
     [Fact]
@@ -377,6 +535,39 @@ public sealed class AirflowTuneServiceTests
 
         Assert.Equal(new[] { "cpu" }, result.SuggestedCurves.Single(c => c.Id == "airflow-cpu").SourceSensorIds);
         Assert.Equal(new[] { "gpucore" }, result.SuggestedCurves.Single(c => c.Id == "airflow-gpu").SourceSensorIds);
+    }
+
+    [Fact]
+    public void SensorKeywords_ArePinned()
+    {
+        // They are built on SensorClassifier's driver lists: a change there must show up here as a deliberate edit,
+        // since it changes which sensors feed the proposed CPU/GPU curves.
+        Assert.Equal(
+            new[] { "cpu", "coretemp", "k10temp", "zenpower", "package", "tctl", "tdie", "core" },
+            AirflowTuneService.CpuKeywords);
+        Assert.Equal(
+            new[] { "gpu", "radeon", "nvidia", "nouveau", "i915", "geforce", "edge", "junction" },
+            AirflowTuneService.GpuKeywords);
+    }
+
+    [Fact]
+    public void Analyze_KnowsTheDriverNamesOfTheSensorClassifier()
+    {
+        // Linux names an unlabelled channel "<chip> <channel>"; the keywords share the classifier's driver list.
+        AppConfig config = AppConfig.Empty with
+        {
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "zenpower/temp1", Name = "zenpower temp1" },
+                new SensorConfig { SensorId = "nouveau/temp1", Name = "nouveau temp1" },
+            },
+            Fans = new[] { Fan("f1", FanLocation.CpuCooler), Fan("f2", FanLocation.GpuCooler) },
+        };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(new[] { "zenpower/temp1" }, result.SuggestedCurves.Single(c => c.Id == "airflow-cpu").SourceSensorIds);
+        Assert.Equal(new[] { "nouveau/temp1" }, result.SuggestedCurves.Single(c => c.Id == "airflow-gpu").SourceSensorIds);
     }
 
     [Fact]
@@ -411,97 +602,226 @@ public sealed class AirflowTuneServiceTests
         Assert.Contains(AirflowHint.NoSensorsConfigured, result.Hints);
     }
 
-    // ── E · Apply ───────────────────────────────────────────────────────────────
+    // ── E · Proposal per target profile (Propose / ApplyTo / AsNewProfile) ──────────────
+
+    private static Profile ProfileWith(string id, IReadOnlyList<CurveConfig> curves, params ProfileAssignment[] assignments) =>
+        new() { Id = id, Name = id, Curves = curves, Assignments = assignments };
+
+    private static CurveConfig Curve(string id, string name = "Eigene") =>
+        new() { Id = id, Name = name, Points = new[] { new CurvePoint(40, 30), new CurvePoint(70, 80) } };
 
     [Fact]
-    public void Apply_SetsAssignedCurveAndInsertsCurves()
+    public void Propose_ComparesWithTheTargetProfile_NotWithTheConfigsActiveCurves()
     {
-        AppConfig config = ConfigWith(Fan("f1", FanLocation.CpuCooler));
-        AirflowTuneResult result = AirflowTuneService.Analyze(config);
-
-        AppConfig applied = AirflowTuneService.Apply(config, result);
-
-        Assert.Equal("airflow-cpu", applied.Fans.Single().AssignedCurveId);
-        Assert.Contains(applied.Curves, c => c.Id == "airflow-cpu");
-    }
-
-    [Fact]
-    public void Apply_PreservesCalibrationLimitsAndPlacement()
-    {
-        // Sichtbarer Lüfter (versteckte bekommen gar keinen Vorschlag mehr, siehe eigener Test):
-        // die Zuordnung muss ankommen, alles andere am Lüfter unangetastet bleiben.
-        var fan = new FanConfig
+        AppConfig config = ConfigWith(Fan("cpu", FanLocation.CpuCooler), Fan("front", FanLocation.CaseFrontIntake),
+            Fan("psu", FanLocation.Psu)) with
         {
-            FanId = "f1",
-            Name = "Test",
-            Location = FanLocation.CpuCooler,
-            MinPwm = 50,
-            MaxPwm = 200,
-            Calibration = Cal(2500),
+            Fans = new[]
+            {
+                Fan("cpu", FanLocation.CpuCooler) with { AssignedCurveId = "running-curve" },
+                Fan("front", FanLocation.CaseFrontIntake),
+                Fan("psu", FanLocation.Psu),
+            },
         };
-        AppConfig config = ConfigWith(fan);
-        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+        Profile target = ProfileWith("quiet", [Curve("airflow-cpu")],
+            new ProfileAssignment("cpu", "airflow-cpu"), new ProfileAssignment("front", "manual-curve"));
 
-        FanConfig applied = AirflowTuneService.Apply(config, result).Fans.Single();
+        AirflowProposal proposal = AirflowTuneService.Propose(config, target, ["cpu", "front", "psu"]);
 
-        Assert.Equal("airflow-cpu", applied.AssignedCurveId);
-        Assert.Equal((byte)50, applied.MinPwm);
-        Assert.Equal((byte)200, applied.MaxPwm);
-        Assert.Equal(FanLocation.CpuCooler, applied.Location);
-        Assert.Equal(2500, applied.Calibration!.MaxRpm);
+        Assert.Equal(
+            new[]
+            {
+                new AirflowChange("cpu", "airflow-cpu", "airflow-cpu"),
+                new AirflowChange("front", "manual-curve", "airflow-intake"),
+                new AirflowChange("psu", null, null),
+            },
+            proposal.Changes);
+        Assert.Equal(new[] { false, true, false }, proposal.Changes.Select(c => c.Changed));
     }
 
     [Fact]
-    public void Apply_IsIdempotent_NoDuplicateCurves()
+    public void Propose_SkipsHiddenAndUnknownFans()
     {
-        AppConfig config = ConfigWith(Fan("f1", FanLocation.CpuCooler));
-        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+        AppConfig config = ConfigWith(Fan("a", FanLocation.CaseRearExhaust), Fan("b", FanLocation.CpuCooler) with { Hidden = true });
 
-        AppConfig once = AirflowTuneService.Apply(config, result);
-        AppConfig twice = AirflowTuneService.Apply(once, AirflowTuneService.Analyze(once));
+        AirflowProposal proposal = AirflowTuneService.Propose(config, ProfileWith("p", []), ["a", "b", "ghost"]);
 
-        Assert.Equal(once.Curves.Count, twice.Curves.Count);
-        Assert.Single(twice.Curves, c => c.Id == "airflow-cpu");
+        Assert.Equal("a", Assert.Single(proposal.Changes).FanId);
+    }
+
+    [Theory]
+    [InlineData(FanLocation.Unspecified, "airflow-default")]
+    [InlineData(FanLocation.Other, "airflow-default")]
+    [InlineData(FanLocation.Psu, null)]
+    [InlineData(FanLocation.Radiator, "airflow-cpu")]
+    [InlineData(FanLocation.CaseTopIntake, "airflow-intake")]
+    public void Propose_MapsEveryPositionToItsRoleCurve(FanLocation location, string? curveId)
+    {
+        AirflowProposal proposal = AirflowTuneService.Propose(ConfigWith(Fan("f", location)), ProfileWith("p", []), ["f"]);
+
+        Assert.Equal(curveId, proposal.Changes.Single().ProposedCurveId);
     }
 
     [Fact]
-    public void Apply_SyncsActiveProfile()
+    public void Propose_KeepsTheProfilesOwnRoleCurve_AndTemplatesTheRest_InTheProfilesVariant()
     {
-        var fan = Fan("f1", FanLocation.CpuCooler);
-        var profile = new Profile
-        {
-            Id = "p1",
-            Name = "Profil",
-            Curves = Array.Empty<CurveConfig>(),
-            Assignments = new[] { new ProfileAssignment("f1", null) },
-        };
-        AppConfig config = AppConfig.Empty with
-        {
-            Fans = new[] { fan },
-            Profiles = new[] { profile },
-            ActiveProfileId = "p1",
-        };
-        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+        CurveConfig tuned = Curve("airflow-cpu", "Meine CPU-Kurve");
+        AirflowProposal proposal = AirflowTuneService.Propose(ConfigWith(Fan("f", FanLocation.CpuCooler)),
+            ProfileWith("silent", [tuned]), ["f"]);
 
-        AppConfig applied = AirflowTuneService.Apply(config, result);
+        Assert.Equal(new[] { "airflow-cpu", "airflow-gpu", "airflow-intake", "airflow-exhaust", "airflow-default" },
+            proposal.RoleCurves.Select(r => r.Curve.Id));
+        Assert.Same(tuned, proposal.RoleCurves[0].Curve);
+        Assert.True(proposal.RoleCurves[0].InProfile);
+        Assert.All(proposal.RoleCurves.Skip(1), r => Assert.False(r.InProfile));
 
-        Profile activeProfile = applied.Profiles.Single(p => p.Id == "p1");
-        Assert.Contains(activeProfile.Curves, c => c.Id == "airflow-cpu");
-        Assert.Equal("airflow-cpu", activeProfile.Assignments.Single(a => a.FanId == "f1").CurveId);
+        // "silent" gets the silent tables: the GPU template starts at 0 %, the balanced one at 20 %.
+        Assert.Equal(0, proposal.RoleCurves[1].Curve.Points[0].Percent);
+        AirflowProposal balanced = AirflowTuneService.Propose(ConfigWith(Fan("f", FanLocation.CpuCooler)),
+            ProfileWith("p-1234", []), ["f"]);
+        Assert.Equal(20, balanced.RoleCurves[1].Curve.Points[0].Percent);
+    }
+
+    [Theory]
+    [InlineData("silent", AirflowAggressiveness.Silent)]
+    [InlineData("performance", AirflowAggressiveness.Performance)]
+    [InlineData("balanced", AirflowAggressiveness.Balanced)]
+    [InlineData("profile-0f3a", AirflowAggressiveness.Balanced)]
+    public void VariantFor_FollowsTheOnboardingProfileIds(string profileId, AirflowAggressiveness expected) =>
+        Assert.Equal(expected, AirflowTuneService.VariantFor(profileId));
+
+    [Fact]
+    public void ApplyTo_AssignsThePickedFans_AddsOnlyNeededMissingCurves_AndLeavesTheRest()
+    {
+        CurveConfig own = Curve("airflow-cpu", "Meine CPU-Kurve");
+        AppConfig config = ConfigWith(Fan("cpu", FanLocation.CpuCooler), Fan("front", FanLocation.CaseFrontIntake),
+            Fan("rear", FanLocation.CaseRearExhaust));
+        Profile target = ProfileWith("p", [own, Curve("manual")],
+            new ProfileAssignment("cpu", "manual"), new ProfileAssignment("front", "manual"), new ProfileAssignment("rear", "manual"));
+        AirflowProposal proposal = AirflowTuneService.Propose(config, target, ["cpu", "front", "rear"]);
+
+        Profile applied = AirflowTuneService.ApplyTo(target, proposal, proposal.Changes.Where(c => c.FanId != "rear"));
+
+        Assert.Equal(new[] { ("cpu", (string?)"airflow-cpu"), ("front", "airflow-intake"), ("rear", "manual") },
+            applied.Assignments.Select(a => (a.FanId, a.CurveId)));
+        Assert.Equal(new[] { "airflow-cpu", "manual", "airflow-intake" }, applied.Curves.Select(c => c.Id));
+        Assert.Same(own, applied.Curves[0]); // the user's tuned role curve is not reset to the template
+        Assert.Equal(target.Id, applied.Id);
     }
 
     [Fact]
-    public void Apply_ReplacesExistingCurveWithSameId()
+    public void ApplyTo_AddsAnAssignmentForAFanTheProfileDidNotList()
     {
-        var stale = new CurveConfig { Id = "airflow-cpu", Name = "Alt", Points = new[] { new CurvePoint(0, 0) } };
-        AppConfig config = ConfigWith(Fan("f1", FanLocation.CpuCooler)) with { Curves = new[] { stale } };
-        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+        AppConfig config = ConfigWith(Fan("new", FanLocation.CaseRearExhaust));
+        Profile target = ProfileWith("p", []);
+        AirflowProposal proposal = AirflowTuneService.Propose(config, target, ["new"]);
 
-        AppConfig applied = AirflowTuneService.Apply(config, result);
+        Profile applied = AirflowTuneService.ApplyTo(target, proposal, proposal.Changes);
 
-        CurveConfig curve = applied.Curves.Single(c => c.Id == "airflow-cpu");
-        Assert.NotEqual("Alt", curve.Name);
-        Assert.True(curve.Points.Count > 1);
+        Assert.Equal(new ProfileAssignment("new", "airflow-exhaust"), Assert.Single(applied.Assignments));
+    }
+
+    [Fact]
+    public void AsNewProfile_LeavesTheSourceAlone_AndDropsCurvesThatLostAllTheirFans()
+    {
+        AppConfig config = ConfigWith(Fan("cpu", FanLocation.CpuCooler), Fan("front", FanLocation.CaseFrontIntake));
+        Profile source = ProfileWith("p", [Curve("manual"), Curve("spare")],
+            new ProfileAssignment("cpu", "manual"), new ProfileAssignment("front", "manual"));
+        AirflowProposal proposal = AirflowTuneService.Propose(config, source, ["cpu", "front"]);
+
+        Profile created = AirflowTuneService.AsNewProfile(source, proposal, proposal.Changes, "p-new", "p · Airflow");
+
+        Assert.Equal(("p-new", "p · Airflow"), (created.Id, created.Name));
+        // "manual" lost both fans and goes; "spare" never had one and stays.
+        Assert.Equal(new[] { "spare", "airflow-cpu", "airflow-intake" }, created.Curves.Select(c => c.Id));
+        Assert.Equal(new[] { "manual", "spare" }, source.Curves.Select(c => c.Id));
+        Assert.All(source.Assignments, a => Assert.Equal("manual", a.CurveId));
+    }
+
+    [Fact]
+    public void Proposal_NullArguments_Throw()
+    {
+        Profile target = ProfileWith("p", []);
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.Propose(null!, target, []));
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.Propose(AppConfig.Empty, null!, []));
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.ApplyTo(target, null!, []));
+        AirflowProposal proposal = AirflowTuneService.Propose(AppConfig.Empty, target, []);
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.Propose(AppConfig.Empty, target, null!));
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.ApplyTo(null!, proposal, []));
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.ApplyTo(target, proposal, null!));
+        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.AsNewProfile(null!, proposal, [], "p2", "Copy"));
+        Assert.ThrowsAny<ArgumentException>(() => AirflowTuneService.AsNewProfile(target, proposal, [], " ", "Copy"));
+        Assert.ThrowsAny<ArgumentException>(() => AirflowTuneService.AsNewProfile(target, proposal, [], "p2", ""));
+    }
+
+    [Fact]
+    public void ApplyTo_APickedPowerSupplyFan_GoesToHardwareAuto_WithoutAddingACurve()
+    {
+        AppConfig config = ConfigWith(Fan("psu", FanLocation.Psu));
+        Profile target = ProfileWith("p", [Curve("manual")], new ProfileAssignment("psu", "manual"));
+        AirflowProposal proposal = AirflowTuneService.Propose(config, target, ["psu"]);
+
+        Profile applied = AirflowTuneService.ApplyTo(target, proposal, proposal.Changes);
+
+        Assert.Equal(new ProfileAssignment("psu", null), Assert.Single(applied.Assignments));
+        Assert.Equal(new[] { "manual" }, applied.Curves.Select(c => c.Id)); // the curve stays, no role curve comes in
+    }
+
+    // ── F · Pressure verdict and its basis ────────────────────────────────
+
+    [Theory]
+    [InlineData(0, 0, PressureVerdict.Unknown)]
+    [InlineData(0, 1, PressureVerdict.OnlyExhaust)]
+    [InlineData(1, 0, PressureVerdict.OnlyIntake)]
+    [InlineData(1000, 1200, PressureVerdict.Negative)]     // ratio 0.83 ≤ 1/1.15
+    [InlineData(1000, 1100, PressureVerdict.Balanced)]     // ratio 0.91
+    [InlineData(1100, 1000, PressureVerdict.Balanced)]     // ratio 1.10 < 1.15
+    [InlineData(1150, 1000, PressureVerdict.SlightPositive)] // ratio 1.15, share 0.535
+    [InlineData(2000, 1000, PressureVerdict.SlightPositive)] // share 0.667
+    [InlineData(2200, 1000, PressureVerdict.StrongPositive)] // share 0.69 ≥ 0.68
+    public void Verdict_FollowsTheIntakeShare(int intakeRpm, int exhaustRpm, PressureVerdict expected)
+    {
+        var fans = new List<FanConfig>();
+        if (intakeRpm > 0)
+            fans.Add(Fan("in", FanLocation.CaseFrontIntake, Cal(intakeRpm)));
+        if (exhaustRpm > 0)
+            fans.Add(Fan("out", FanLocation.CaseRearExhaust, Cal(exhaustRpm)));
+
+        Assert.Equal(expected, AirflowTuneService.Analyze(ConfigWith([.. fans])).Verdict);
+    }
+
+    [Fact]
+    public void ShareAndBasis_ByCalibratedMaxRpm_WhenEveryCaseFanIsCalibrated()
+    {
+        AirflowTuneResult result = AirflowTuneService.Analyze(ConfigWith(
+            Fan("a", FanLocation.CaseFrontIntake, Cal(1500)), Fan("b", FanLocation.CaseBottomIntake, Cal(1500)),
+            Fan("c", FanLocation.CaseRearExhaust, Cal(2000)), Fan("cpu", FanLocation.CpuCooler)));
+
+        Assert.True(result.ByRpm);
+        Assert.Equal((2, 1), (result.IntakeFans, result.ExhaustFans));
+        Assert.Equal(0.6, result.IntakeShare!.Value, 6);
+        Assert.Empty(result.UncalibratedCaseFanIds); // the CPU cooler is no case fan
+    }
+
+    [Fact]
+    public void ShareAndBasis_ByCount_ListingTheUncalibratedCaseFans()
+    {
+        AirflowTuneResult result = AirflowTuneService.Analyze(ConfigWith(
+            Fan("a", FanLocation.CaseFrontIntake, Cal(1500)), Fan("b", FanLocation.CaseRearExhaust),
+            Fan("hidden", FanLocation.CaseTopExhaust) with { Hidden = true }));
+
+        Assert.False(result.ByRpm);
+        Assert.Equal(0.5, result.IntakeShare!.Value, 6);
+        Assert.Equal(new[] { "b" }, result.UncalibratedCaseFanIds);
+    }
+
+    [Fact]
+    public void Share_IsNull_WithoutCaseFans()
+    {
+        AirflowTuneResult result = AirflowTuneService.Analyze(ConfigWith(Fan("cpu", FanLocation.CpuCooler)));
+
+        Assert.Null(result.IntakeShare);
+        Assert.Equal(PressureVerdict.Unknown, result.Verdict);
     }
 
     // ── Grenzfälle & Guards ─────────────────────────────────────────────────────
@@ -511,7 +831,7 @@ public sealed class AirflowTuneServiceTests
     {
         AirflowTuneResult result = AirflowTuneService.Analyze(AppConfig.Empty);
 
-        Assert.Equal(PressureBalance.Unknown, result.Pressure);
+        Assert.Equal(PressureVerdict.Unknown, result.Verdict);
         Assert.Empty(result.Fans);
         Assert.Empty(result.SuggestedCurves);
     }
@@ -520,15 +840,6 @@ public sealed class AirflowTuneServiceTests
     public void Analyze_NullConfig_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => AirflowTuneService.Analyze(null!));
-    }
-
-    [Fact]
-    public void Apply_NullArguments_Throw()
-    {
-        AirflowTuneResult result = AirflowTuneService.Analyze(AppConfig.Empty);
-
-        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.Apply(null!, result));
-        Assert.Throws<ArgumentNullException>(() => AirflowTuneService.Apply(AppConfig.Empty, null!));
     }
 
     [Fact]
@@ -541,7 +852,7 @@ public sealed class AirflowTuneServiceTests
         AirflowTuneResult a = AirflowTuneService.Analyze(config);
         AirflowTuneResult b = AirflowTuneService.Analyze(config);
 
-        Assert.Equal(a.Pressure, b.Pressure);
+        Assert.Equal(a.Verdict, b.Verdict);
         Assert.Equal(a.SuggestedCurves.Count, b.SuggestedCurves.Count);
         Assert.Equal(
             a.Fans.Select(f => f.SuggestedCurveId),
@@ -620,6 +931,231 @@ public sealed class AirflowTuneServiceTests
 
         Assert.Throws<ArgumentNullException>(() => AirflowTuneService.FilterToFans(null!, Array.Empty<string>()));
         Assert.Throws<ArgumentNullException>(() => AirflowTuneService.FilterToFans(result, null!));
+    }
+
+    // ── Case type (tower / server / open bench / laptop) ─────────────────────────
+
+    [Theory]
+    [InlineData(FanLocation.CaseTopExhaust, CaseType.Tower, true)]
+    [InlineData(FanLocation.CaseSideIntake, CaseType.Tower, true)]
+    [InlineData(FanLocation.FanWall, CaseType.Tower, false)]
+    [InlineData(FanLocation.CaseFrontIntake, CaseType.Server, true)]
+    [InlineData(FanLocation.CaseFrontExhaust, CaseType.Server, true)]
+    [InlineData(FanLocation.CaseRearIntake, CaseType.Server, true)]
+    [InlineData(FanLocation.FanWall, CaseType.Server, true)]
+    [InlineData(FanLocation.CaseTopExhaust, CaseType.Server, false)]
+    [InlineData(FanLocation.CaseBottomIntake, CaseType.Server, false)]
+    [InlineData(FanLocation.CaseSideIntake, CaseType.Server, false)]
+    [InlineData(FanLocation.CaseFrontIntake, CaseType.Open, false)]
+    [InlineData(FanLocation.FanWall, CaseType.Open, false)]
+    [InlineData(FanLocation.CpuCooler, CaseType.Open, true)]
+    [InlineData(FanLocation.Psu, CaseType.Server, true)]
+    [InlineData(FanLocation.Unspecified, CaseType.Open, true)]
+    [InlineData(FanLocation.Other, CaseType.Server, true)]
+    [InlineData(FanLocation.CpuCooler, CaseType.Laptop, true)]
+    [InlineData(FanLocation.GpuCooler, CaseType.Laptop, true)]
+    [InlineData(FanLocation.Radiator, CaseType.Laptop, false)]
+    [InlineData(FanLocation.Psu, CaseType.Laptop, false)]
+    [InlineData(FanLocation.FanWall, CaseType.Laptop, false)]
+    [InlineData(FanLocation.CaseFrontIntake, CaseType.Laptop, false)]
+    [InlineData(FanLocation.CaseFrontExhaust, CaseType.Laptop, false)]
+    [InlineData(FanLocation.CaseRearExhaust, CaseType.Laptop, true)]
+    [InlineData(FanLocation.CaseRearIntake, CaseType.Laptop, true)]
+    [InlineData(FanLocation.CaseSideExhaust, CaseType.Laptop, true)]
+    [InlineData(FanLocation.CaseTopIntake, CaseType.Laptop, true)]
+    [InlineData(FanLocation.CaseBottomIntake, CaseType.Laptop, true)]
+    [InlineData(FanLocation.Other, CaseType.Laptop, true)]
+    [InlineData(FanLocation.Unspecified, CaseType.Laptop, true)]
+    public void IsInCase_KnowsThePositionsOfEachType(FanLocation location, CaseType caseType, bool expected) =>
+        Assert.Equal(expected, AirflowTuneService.IsInCase(location, caseType));
+
+    [Fact]
+    public void FanWall_GetsTheIntakeCurve_ButStaysOutOfTheBalance()
+    {
+        AppConfig config = ConfigWith(
+            Fan("front", FanLocation.CaseFrontIntake), Fan("wall", FanLocation.FanWall), Fan("rear", FanLocation.CaseRearExhaust))
+            with
+        { CaseType = CaseType.Server };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.Balanced, result.Verdict);
+        Assert.Equal(1, result.IntakeFans);
+        Assert.Equal(1, result.ExhaustFans);
+        Assert.Equal(AirflowTuneService.IntakeCurveId, result.Fans.Single(f => f.FanId == "wall").SuggestedCurveId);
+        Assert.Empty(result.OutOfCaseFanIds);
+    }
+
+    [Fact]
+    public void Server_LeavesATopFanOutOfTheBalance_AndSaysSo()
+    {
+        AppConfig config = ConfigWith(
+            Fan("front", FanLocation.CaseFrontIntake), Fan("rear", FanLocation.CaseRearExhaust), Fan("top", FanLocation.CaseTopExhaust))
+            with
+        { CaseType = CaseType.Server };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.Balanced, result.Verdict); // 1 : 1 - the top fan does not count
+        Assert.Equal(new[] { "top" }, result.OutOfCaseFanIds);
+        Assert.Contains(AirflowHint.PositionNotInCase, result.Hints);
+        // It keeps its role curve: the position is only missing from the schema.
+        Assert.Equal(AirflowTuneService.ExhaustCurveId, result.Fans.Single(f => f.FanId == "top").SuggestedCurveId);
+    }
+
+    [Fact]
+    public void Tower_CountsTheSameFans_AsBefore()
+    {
+        AppConfig config = ConfigWith(
+            Fan("front", FanLocation.CaseFrontIntake), Fan("rear", FanLocation.CaseRearExhaust), Fan("top", FanLocation.CaseTopExhaust));
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.Negative, result.Verdict);
+        Assert.Empty(result.OutOfCaseFanIds);
+        Assert.DoesNotContain(AirflowHint.PositionNotInCase, result.Hints);
+    }
+
+    [Fact]
+    public void OpenBench_HasNoBalance_AndNoCaseFanHints()
+    {
+        AppConfig config = ConfigWith(Fan("cpu", FanLocation.CpuCooler), Fan("front", FanLocation.CaseFrontIntake))
+            with
+        { CaseType = CaseType.Open };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.NotApplicable, result.Verdict);
+        Assert.Null(result.IntakeShare);
+        Assert.Equal(0, result.IntakeFans + result.ExhaustFans);
+        Assert.Equal(new[] { "front" }, result.OutOfCaseFanIds);
+        Assert.DoesNotContain(AirflowHint.NoCaseFans, result.Hints);
+        Assert.DoesNotContain(AirflowHint.NoExhaustFan, result.Hints);
+        Assert.Contains(AirflowHint.PositionNotInCase, result.Hints);
+    }
+
+    [Fact]
+    public void OpenBench_WithComponentFansOnly_HasNoCaseHint()
+    {
+        AppConfig config = ConfigWith(Fan("cpu", FanLocation.CpuCooler), Fan("gpu", FanLocation.GpuCooler))
+            with
+        { CaseType = CaseType.Open, Sensors = [new SensorConfig { SensorId = "k10temp/temp1", Name = "Tctl" }] };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.NotApplicable, result.Verdict);
+        Assert.Empty(result.Hints);
+    }
+
+    [Fact]
+    public void MixedSide_IsReported_AndEachFanCountsByItsOwnDirection()
+    {
+        AppConfig config = ConfigWith(
+            Fan("f1", FanLocation.CaseFrontIntake), Fan("f2", FanLocation.CaseFrontIntake), Fan("f3", FanLocation.CaseFrontExhaust),
+            Fan("rear", FanLocation.CaseRearExhaust));
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(2, result.IntakeFans);
+        Assert.Equal(2, result.ExhaustFans);
+        AirflowMixedSide front = Assert.Single(result.MixedSides);
+        Assert.Equal(CaseSide.Front, front.Side);
+        Assert.Equal(new[] { "f1", "f2" }, front.IntakeFanIds);
+        Assert.Equal(new[] { "f3" }, front.ExhaustFanIds);
+        Assert.Contains(AirflowHint.MixedSide, result.Hints);
+    }
+
+    [Fact]
+    public void Server_FlagsFansAgainstTheFrontToRearFlow()
+    {
+        AppConfig config = ConfigWith(
+            Fan("front", FanLocation.CaseFrontIntake), Fan("backwards", FanLocation.CaseRearIntake), Fan("rear", FanLocation.CaseRearExhaust))
+            with
+        { CaseType = CaseType.Server };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(new[] { "backwards" }, result.AgainstFlowFanIds);
+        Assert.Contains(AirflowHint.AgainstCaseFlow, result.Hints);
+        // The mixed rear is the same mistake - said once, as the more precise against-the-flow notice.
+        Assert.Empty(result.MixedSides);
+        Assert.DoesNotContain(AirflowHint.MixedSide, result.Hints);
+    }
+
+    [Fact]
+    public void Server_WithOnlyAFanWall_IsSetUp_NotMissingCaseFans()
+    {
+        AppConfig config = ConfigWith(Fan("wall", FanLocation.FanWall), Fan("cpu", FanLocation.CpuCooler))
+            with
+        { CaseType = CaseType.Server };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.FanWallOnly, result.Verdict);
+        Assert.DoesNotContain(AirflowHint.NoCaseFans, result.Hints);
+        Assert.DoesNotContain(AirflowHint.NoIntakeFan, result.Hints);
+    }
+
+    [Fact]
+    public void Laptop_HasNoBalance_AndNoMixedVents_ButNamesWhatItLacks()
+    {
+        AppConfig config = ConfigWith(
+            Fan("cpu", FanLocation.CpuCooler), Fan("gpu", FanLocation.GpuCooler), Fan("front", FanLocation.CaseFrontIntake),
+            Fan("in", FanLocation.CaseRearIntake), Fan("out", FanLocation.CaseRearExhaust))
+            with
+        { CaseType = CaseType.Laptop };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(CaseType.Laptop, result.CaseType);
+        Assert.Equal(PressureVerdict.NotApplicable, result.Verdict);
+        Assert.Null(result.IntakeShare);
+        Assert.DoesNotContain(AirflowHint.NoCaseFans, result.Hints);
+        Assert.DoesNotContain(AirflowHint.CountEstimateOnly, result.Hints);
+        Assert.Equal(new[] { "front" }, result.OutOfCaseFanIds);
+        Assert.Empty(result.MixedSides); // the schema still shows the rear as mixed; without a balance there is nothing to warn
+        Assert.DoesNotContain(AirflowHint.MixedSide, result.Hints);
+        Assert.Empty(result.AgainstFlowFanIds); // only a server has a usual flow direction
+        // The blowers keep their component curves, the vents their role curves.
+        Assert.Equal(AirflowTuneService.CpuCurveId, result.Fans.Single(f => f.FanId == "cpu").SuggestedCurveId);
+        Assert.Equal(AirflowTuneService.ExhaustCurveId, result.Fans.Single(f => f.FanId == "out").SuggestedCurveId);
+    }
+
+    [Fact]
+    public void Laptop_WithItsTwoBlowersOnly_HasNoCaseHint()
+    {
+        AppConfig config = ConfigWith(Fan("cpu", FanLocation.CpuCooler), Fan("gpu", FanLocation.GpuCooler))
+            with
+        { CaseType = CaseType.Laptop, Sensors = [new SensorConfig { SensorId = "k10temp/temp1", Name = "Tctl" }] };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Equal(PressureVerdict.NotApplicable, result.Verdict);
+        Assert.Empty(result.Hints);
+    }
+
+    [Fact]
+    public void Tower_HasNoUsualFlowDirection()
+    {
+        AppConfig config = ConfigWith(Fan("front", FanLocation.CaseFrontExhaust), Fan("rear", FanLocation.CaseRearIntake));
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Empty(result.AgainstFlowFanIds);
+        Assert.DoesNotContain(AirflowHint.AgainstCaseFlow, result.Hints);
+    }
+
+    [Fact]
+    public void HiddenFans_StayOutOfTheCaseTypeHints()
+    {
+        AppConfig config = ConfigWith(Fan("top", FanLocation.CaseTopExhaust) with { Hidden = true })
+            with
+        { CaseType = CaseType.Server };
+
+        AirflowTuneResult result = AirflowTuneService.Analyze(config);
+
+        Assert.Empty(result.OutOfCaseFanIds);
+        Assert.DoesNotContain(AirflowHint.PositionNotInCase, result.Hints);
     }
 
     // ── Aggressiveness variants + BuildProfiles (airflow-driven onboarding profiles) ────────────
@@ -813,28 +1349,5 @@ public sealed class AirflowTuneServiceTests
     public void HasRoleSpecificCurve_Matrix(FanLocation location, bool expected)
     {
         Assert.Equal(expected, AirflowTuneService.HasRoleSpecificCurve(location));
-    }
-
-    // ── Erkennung angewandter Airflow-Kurven ────────────────────────────────────
-
-    /// <summary>Bindet die Erkennung an die tatsächlich erzeugten Ids - sonst driften Präfix und Vorlagen auseinander.</summary>
-    [Fact]
-    public void IsAirflowCurveId_MatchesEveryGeneratedCurve()
-    {
-        AirflowTuneResult result = AirflowTuneService.Analyze(AllRolesConfig());
-
-        Assert.NotEmpty(result.SuggestedCurves);
-        Assert.All(result.SuggestedCurves, c => Assert.True(AirflowTuneService.IsAirflowCurveId(c.Id)));
-    }
-
-    [Theory]
-    [InlineData(null, false)]
-    [InlineData("", false)]
-    [InlineData("curve-1a2b3c", false)]
-    [InlineData("Airflow-cpu", false)] // Ordinal: Ids sind case-sensitiv
-    [InlineData("airflow-cpu", true)]
-    public void IsAirflowCurveId_ForeignIds(string? curveId, bool expected)
-    {
-        Assert.Equal(expected, AirflowTuneService.IsAirflowCurveId(curveId));
     }
 }

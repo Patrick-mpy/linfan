@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using LinFan.Core.Abstractions;
 using LinFan.Core.Models;
@@ -12,22 +13,27 @@ namespace LinFan.Hardware.Mac;
 /// <see cref="MacTemperatureKeys"/>) und Lüfterdrehzahlen (<c>F{i}Ac</c>) und steuert - wo verfügbar -
 /// Lüfter über Ziel-Drehzahl (<c>F{i}Tg</c>) und Modus (<c>F{i}Md</c>).
 /// <para>
-/// <b>Steuerbarkeit ist die Ausnahme, nicht die Regel:</b> Lesen geht ohne Root. Schreiben braucht Root
-/// <em>und</em> passende Hardware - auf <b>Apple Silicon</b> ist SMC-Lüftersteuerung nicht verfügbar, dort
-/// bleiben alle Kanäle <see cref="FanDescriptor.CanControl"/> == <c>false</c> (regulärer read-only-Zustand,
-/// kein Fehler). <see cref="RestoreDefaults"/>/<see cref="Dispose"/> fahren jeden steuerbaren Kanal in den
-/// sicheren Zustand (Firmware-Auto), bewusst NICHT in den bei Discovery gelesenen Zustand (Fail-Safe).
+/// Reading works without root. Writing needs root (<see cref="DetectControl"/> - Intel and Apple Silicon alike)
+/// plus control keys the channel actually has (<see cref="ScanFans"/>); a channel without them stays
+/// <see cref="FanDescriptor.CanControl"/> == <c>false</c>, a regular read-only state, not an error.
+/// <see cref="RestoreDefaults"/> puts every controllable channel into the safe state (firmware auto, else full
+/// speed), deliberately NOT the state read at discovery (fail-safe). <see cref="Dispose"/> restores every channel the
+/// same way once this instance has written one (<see cref="SetPwm"/>, <see cref="SetMode"/> to manual) - a read-only
+/// use such as the CLI's <c>list</c> as root leaves a running daemon's fans alone.
 /// </para>
 /// <para>
 /// Die native Interop lebt vollständig hinter <see cref="ISmc"/> (real: <see cref="AppleSmc"/>); die
 /// gesamte <b>Logik</b> dieses Backends (Discovery, Mapping, Fail-Safe) ist damit mit einem Fake-SMC
 /// testbar (Conformance INV-1..INV-10). Plattform berühren nur der reale Konstruktions-Pfad
-/// (IOKit-Adapter + Architektur-/Rechte-Erkennung in <see cref="DetectControl"/>); der injizierende
+/// (IOKit-Adapter + Rechte-Erkennung in <see cref="DetectControl"/>); der injizierende
 /// Ctor umgeht beides, sodass die Tests OS-unabhängig laufen.
 /// </para>
 /// </summary>
 public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiagnostics
 {
+    /// <summary>Every channel belongs to the one SMC, which offers no fingerprint short of a serial number.</summary>
+    private static readonly HardwareDevice Smc = new("SMC", null);
+
     private readonly ISmc _smc;
 
     private readonly Dictionary<SensorId, SensorChannel> _sensors = new();
@@ -35,7 +41,8 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
     private SensorDescriptor[] _sensorDescriptors = Array.Empty<SensorDescriptor>();
     private FanDescriptor[] _fanDescriptors = Array.Empty<FanDescriptor>();
 
-    private bool _disposed;
+    private volatile bool _disposed;
+    private volatile bool _tookOver; // see Dispose
 
     /// <summary>Realer Einstieg (Daemon): öffnet den echten SMC und bestimmt die Steuerbarkeit aus Architektur + Rechten.</summary>
     public MacSmcBackend() : this(CreateRealSmc(), DetectControl()) { }
@@ -79,8 +86,10 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
     public FanMode GetMode(FanId id)
     {
         var fan = Fan(id);
-        if (fan.ModeKey is null || !_smc.TryReadKey(fan.ModeKey, out var raw))
-            return FanMode.Auto; // nicht ermittelbar → sicherer Default
+        if (fan.ModeKey is null)
+            return FanMode.Auto; // no mode key: no control mode
+        if (!_smc.TryReadKey(fan.ModeKey, out var raw))
+            throw new IOException($"Steuermodus von {id} nicht lesbar (SMC-Key {fan.ModeKey}).");
         return SmcCodec.Decode(raw) >= 1 ? FanMode.Manual : FanMode.Auto;
     }
 
@@ -89,7 +98,17 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         var fan = Fan(id);
         if (!fan.CanControl || fan.ModeKey is null)
             throw new NotSupportedException($"Lüfter {id} ist nicht steuerbar.");
-        WriteMode(fan, mode);
+        if (mode == FanMode.Manual)
+        {
+            // Dispose has restored every channel already; a later manual write would run with nothing to undo it.
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _tookOver = true; // before the write: a failed write may still have reached the SMC
+        }
+        if (WriteMode(fan, mode))
+            return;
+        if (mode == FanMode.Manual)
+            Refuse(fan, $"den Modus-Write ({fan.ModeKey})");
+        throw new IOException($"SMC hat den Modus-Write ({fan.ModeKey}) für Lüfter {id} abgelehnt.");
     }
 
     public byte GetPwm(FanId id)
@@ -105,11 +124,27 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         var fan = Fan(id);
         if (!fan.CanControl || fan.TargetKey is null || fan.TargetType is null)
             throw new NotSupportedException(
-                $"Lüfter {id} ist nicht steuerbar (Apple Silicon oder ohne Root - read-only).");
+                $"Lüfter {id} ist nicht steuerbar (ohne Root oder ohne Steuer-Keys - read-only).");
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
+        _tookOver = true;
         // Vor dem Schreiben Manual erzwingen, sonst überschreibt die Firmware das Ziel sofort wieder.
-        WriteMode(fan, FanMode.Manual);
-        TryWriteTarget(fan, PwmToRpm(value, fan.MinRpm, fan.MaxRpm));
+        if (fan.ModeKey is not null && !WriteMode(fan, FanMode.Manual))
+            Refuse(fan, $"den Modus-Write ({fan.ModeKey})");
+        if (!TryWriteTarget(fan, PwmToRpm(value, fan.MinRpm, fan.MaxRpm)))
+            Refuse(fan, $"die Ziel-Drehzahl ({fan.TargetKey})");
+    }
+
+    /// <summary>
+    /// A manual write the SMC refused: hands the channel back, then throws like a failing sysfs write on Linux - the loop
+    /// reports the fan as failed instead of as driven. Switched to manual with its target refused, the fan would
+    /// otherwise hold its old target.
+    /// </summary>
+    [DoesNotReturn]
+    private void Refuse(FanChannel fan, string what)
+    {
+        HandBack(fan);
+        throw new IOException($"SMC hat {what} für Lüfter {fan.Id} abgelehnt.");
     }
 
     public void RestoreDefaults()
@@ -122,18 +157,26 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         // Best-effort: TryWriteKey schluckt Fehler je Kanal, wirft nie.
         foreach (var fan in _fans.Values)
         {
-            if (!fan.CanControl) continue;
-            bool auto = fan.ModeKey is not null && WriteMode(fan, FanMode.Auto);
-            if (!auto)
-                TryWriteTarget(fan, fan.MaxRpm);
+            if (fan.CanControl)
+                HandBack(fan);
         }
+    }
+
+    /// <summary>Puts one controllable channel into its safe state: firmware auto, else full speed. Never throws.</summary>
+    private void HandBack(FanChannel fan)
+    {
+        bool auto = fan.ModeKey is not null && WriteMode(fan, FanMode.Auto);
+        if (!auto)
+            TryWriteTarget(fan, fan.MaxRpm);
     }
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        RestoreDefaults();
+        // Restores every channel, but only if this instance wrote one; explicit RestoreDefaults calls always restore.
+        if (_tookOver)
+            RestoreDefaults();
         _smc.Dispose();
     }
 
@@ -167,10 +210,10 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
             .OrderBy(c => c.Kind)
             .ThenBy(c => c.Rank)
             .ThenBy(c => c.Name, StringComparer.Ordinal)
-            .Select(c => new SensorDescriptor(c.Id, c.Name, c.Kind, c.Unit, c.Key))
+            .Select(c => new SensorDescriptor(c.Id, c.Name, c.Kind, c.Unit, c.Key, Smc))
             .ToArray();
         _fanDescriptors = _fans.Values
-            .Select(f => new FanDescriptor(f.Id, f.Name, f.CanControl, f.Tachometer, f.Source))
+            .Select(f => new FanDescriptor(f.Id, f.Name, f.CanControl, f.Tachometer, f.Source, f.ReadOnlyReason, Smc))
             .OrderBy(d => d.Name, StringComparer.Ordinal)
             .ToArray();
 
@@ -197,7 +240,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
             _sensors[tachId] = new SensorChannel(tachId, $"Fan {i + 1}", SensorKind.FanRpm, "RPM", acKey, i);
 
             // Steuer-Keys: Ziel-Drehzahl (Tg) + Modus (Md), Grenzen (Mn/Mx). Steuerbar nur, wenn die
-            // Plattform Steuerung erlaubt (Intel + Root; Apple Silicon nie), alle Keys vorhanden sind,
+            // Plattform Steuerung erlaubt (Root, Intel wie Apple Silicon), alle Keys vorhanden sind,
             // die Grenzen plausibel sind UND Ziel/Modus tatsächlich KODIERBAR sind - sonst schaltete
             // SetPwm auf Manual (Firmware aus) und überspränge den Ziel-Write mangels Encoder.
             string? tgKey = KeyIfReadable($"F{i}Tg", out var tgType);
@@ -205,18 +248,22 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
             double min = ReadOr($"F{i}Mn", double.NaN);
             double max = ReadOr($"F{i}Mx", double.NaN);
 
-            bool controllable = control.Allowed
-                && tgKey is not null && mdKey is not null
+            bool hasControlKeys = tgKey is not null && mdKey is not null
                 && !double.IsNaN(min) && !double.IsNaN(max) && max > min
                 && SmcCodec.Encode(tgType!, min) is not null
                 && SmcCodec.Encode(mdType!, 0) is not null;
+            bool controllable = control.Allowed && hasControlKeys;
 
             var id = new FanId($"smc/F{i}");
+            // A channel without control keys stays read-only as root too, so it must not read "needs root".
+            FanReadOnlyReason? readOnly = controllable ? null
+                : !hasControlKeys ? FanReadOnlyReason.NoControlInterface
+                : FanReadOnlyReason.NoWriteAccess;
             _fans[id] = new FanChannel(
                 id, $"Fan {i + 1}", acKey,
                 controllable ? tgKey : null, controllable ? tgType : null,
                 controllable ? mdKey : null, controllable ? mdType : null,
-                min, max, controllable, tachId);
+                min, max, controllable, tachId, readOnly);
         }
     }
 
@@ -319,7 +366,7 @@ public sealed class MacSmcBackend : ISensorBackend, IFanController, IBackendDiag
         FanId Id, string Name, string AcKey,
         string? TargetKey, string? TargetType,
         string? ModeKey, string? ModeType,
-        double MinRpm, double MaxRpm, bool CanControl, SensorId? Tachometer)
+        double MinRpm, double MaxRpm, bool CanControl, SensorId? Tachometer, FanReadOnlyReason? ReadOnlyReason)
     {
         public string Source => AcKey;
     }

@@ -53,6 +53,14 @@
     <InternalsVisibleTo Include="LinFan.Daemon.Tests" />
   </ItemGroup>
 
+  <!-- On Unix, .NET emulates FileShare with advisory flock(). In the root daemon that lets any local user
+       block its sysfs PWM/temperature I/O (and with it the over-temperature fail-safe) or config.json by
+       holding a lock on a world-readable file. The daemon relies on no file locking of its own: the config
+       is written atomically (temp file + rename). No effect on Windows, where sharing is enforced by the OS. -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.IO.DisableFileLocking" Value="true" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>

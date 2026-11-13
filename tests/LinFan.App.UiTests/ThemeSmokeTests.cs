@@ -22,7 +22,7 @@ public class ThemeSmokeTests
     [AvaloniaFact]
     public void MainWindow_survives_theme_switch()
     {
-        var controller = new MainController(new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()));
+        var controller = UiTestHelpers.NewController(new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()));
         var window = new MainWindow { DataContext = controller };
         window.Show();
         UiTestHelpers.PumpUntil(() => controller.Editor.IsReady);

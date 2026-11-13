@@ -66,6 +66,28 @@ public class UpdateCheckServiceTests
         Assert.Equal("https://github.com/o/r/releases/latest", info!.ReleaseUrl);
     }
 
+    [Theory]
+    [InlineData("""\\attacker\share\setup.exe""")]
+    [InlineData("C:\\Windows\\System32\\calc.exe")]
+    [InlineData("file:///C:/Windows/System32/calc.exe")]
+    [InlineData("http://github.com/o/r/releases/tag/v0.2.0")]
+    [InlineData("https://github.com.evil.example/o/r/releases/tag/v0.2.0")]
+    [InlineData("https://evil.example/o/r/releases/tag/v0.2.0")]
+    [InlineData("https://user@github.com/o/r/releases/tag/v0.2.0")]
+    [InlineData("https://github.com:8443/o/r/releases/tag/v0.2.0")]
+    [InlineData("https://github.com/other/repo/releases/tag/v0.2.0")]
+    [InlineData("https://github.com/o/r/archive/v0.2.0.zip")]
+    [InlineData("releases/tag/v0.2.0")]
+    public async Task AReleaseUrlOutsideThisReposReleasePages_FallsBackToReleasesLatest(string htmlUrl)
+    {
+        var svc = With(HttpStatusCode.OK,
+            $$"""{ "tag_name": "0.2.0", "html_url": {{System.Text.Json.JsonSerializer.Serialize(htmlUrl)}} }""");
+
+        UpdateInfo? info = await svc.CheckAsync(Current);
+
+        Assert.Equal("https://github.com/o/r/releases/latest", info!.ReleaseUrl);
+    }
+
     [Fact]
     public async Task NetworkError_ReturnsNull()
     {

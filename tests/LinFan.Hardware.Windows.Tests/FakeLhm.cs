@@ -33,7 +33,13 @@ internal sealed class FakeLhmComputer : ILhmComputer
 
     public IReadOnlyList<ILhmSensor> EnumerateSensors() => _sensors.ToArray();
 
-    public void Dispose() => Disposed = true;
+    /// <summary>Like LHM's <c>Computer.Close()</c>: every Super-I/O channel gets <c>SetControl(i, null)</c>.</summary>
+    public void Dispose()
+    {
+        Disposed = true;
+        foreach (var sensor in _sensors)
+            (sensor.Control as FakeLhmControl)?.Close();
+    }
 }
 
 internal sealed class FakeLhmSensor : ILhmSensor
@@ -97,10 +103,17 @@ internal sealed class FakeLhmSensor : ILhmSensor
         };
 }
 
+/// <remarks>
+/// Besides LHM's software flag (<see cref="Mode"/>/<see cref="SoftwareValue"/>) the fake models the chip
+/// register (<see cref="RegisterManual"/>/<see cref="RegisterPercent"/>) the way LHM's Nct677X does: the first
+/// <see cref="SetSoftware"/> saves the register state, <see cref="SetDefault"/> and <see cref="Close"/> write that
+/// saved state back (and forget it). After a crashed predecessor the saved state is its manual value.
+/// </remarks>
 internal sealed class FakeLhmControl : ILhmControl
 {
     private LhmControlMode _mode;
     private float _softwareValue;
+    private (bool Manual, float Percent)? _saved;
 
     /// <summary>Lässt <see cref="SetDefault"/> werfen - simuliert einen beim Restore nicht erreichbaren Kanal (Best-Effort-Pfad).</summary>
     public bool ThrowOnSetDefault { get; init; }
@@ -113,10 +126,47 @@ internal sealed class FakeLhmControl : ILhmControl
 
     public int SetDefaultCalls { get; private set; }
 
+    public int SetSoftwareCalls { get; private set; }
+
+    /// <summary>The chip channel this LHM control drives; share one between two fakes to model two processes.</summary>
+    public FakeFanRegister Register { get; } = new();
+
+    /// <summary>Chip register: manual mode on (as the predecessor or this process left it).</summary>
+    public bool RegisterManual
+    {
+        get => Register.Manual;
+        private set => Register.Manual = value;
+    }
+
+    /// <summary>Chip register: the PWM the fan actually runs at while <see cref="RegisterManual"/> is on.</summary>
+    public float RegisterPercent
+    {
+        get => Register.Percent;
+        private set => Register.Percent = value;
+    }
+
     public FakeLhmControl(LhmControlMode initialMode = LhmControlMode.Default, float initialValue = 0f)
     {
         _mode = initialMode;
         _softwareValue = initialValue;
+        RegisterManual = initialMode == LhmControlMode.Software;
+        RegisterPercent = initialValue;
+    }
+
+    /// <summary>A second process's LHM control on the same chip channel: own LHM flag and saved state, shared register.</summary>
+    public FakeLhmControl(FakeFanRegister register)
+    {
+        Register = register;
+        _mode = LhmControlMode.Default;
+        _softwareValue = register.Percent;
+    }
+
+    /// <summary>Chip register left manual by a crashed predecessor; LHM's own flag still says Default.</summary>
+    public static FakeLhmControl LeftManualByCrashedPredecessor(float percent)
+    {
+        var control = new FakeLhmControl(LhmControlMode.Default, percent);
+        control.RegisterManual = true;
+        return control;
     }
 
     public LhmControlMode Mode =>
@@ -127,8 +177,26 @@ internal sealed class FakeLhmControl : ILhmControl
 
     public void SetSoftware(float percent)
     {
+        SetSoftwareCalls++;
+        _saved ??= (RegisterManual, RegisterPercent);
+        RegisterManual = true;
+        RegisterPercent = percent;
         _mode = LhmControlMode.Software;
         _softwareValue = percent;
+    }
+
+    /// <summary>LHM <c>SetControl(i, null)</c> from <c>Computer.Close()</c>.</summary>
+    public void Close()
+    {
+        if (!ThrowOnSetDefault && !IgnoreSetDefault)
+            RestoreSavedRegisters();
+    }
+
+    private void RestoreSavedRegisters()
+    {
+        if (_saved is { } saved)
+            (RegisterManual, RegisterPercent) = saved;
+        _saved = null;
     }
 
     public void SetDefault()
@@ -137,6 +205,16 @@ internal sealed class FakeLhmControl : ILhmControl
             throw new InvalidOperationException("Kanal beim Restore nicht erreichbar");
         SetDefaultCalls++;
         if (!IgnoreSetDefault)
+        {
             _mode = LhmControlMode.Default; // sonst bleibt der Modus (Board ignoriert die Umschaltung)
+            RestoreSavedRegisters();
+        }
     }
+}
+
+/// <summary>One fan channel's registers on the chip (shared across processes, unlike LHM's state).</summary>
+internal sealed class FakeFanRegister
+{
+    public bool Manual { get; set; }
+    public float Percent { get; set; }
 }

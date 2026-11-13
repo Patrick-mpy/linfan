@@ -47,13 +47,18 @@ public sealed class BrandMark : Control
         base.OnAttachedToVisualTree(e);
         ResolveColors();
         ActualThemeVariantChanged += OnThemeChanged;
+        ResourcesChanged += OnResourcesChanged;
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ActualThemeVariantChanged -= OnThemeChanged;
+        ResourcesChanged -= OnResourcesChanged;
         base.OnDetachedFromVisualTree(e);
     }
+
+    // A chosen accent colour arrives as a resource change, not as a change of the theme variant.
+    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => OnThemeChanged(sender, EventArgs.Empty);
 
     private void OnThemeChanged(object? sender, EventArgs e)
     {

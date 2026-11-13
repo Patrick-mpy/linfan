@@ -21,7 +21,7 @@ public class MainControllerOnboardingTests
     private static MonitorSnapshot FirstRun() => new(
         "Verbunden",
         new[] { new SensorReading("hwmon0/temp1", "CPU", SensorKind.Temperature, "°C", 45.0) },
-        new[] { new FanReading("hwmon0/pwm1", "CPU Fan", 1200, 120, FanMode.Auto, CanControl: true) },
+        new[] { new FanReading("hwmon0/pwm1", "CPU Fan", 1200, 120, CanControl: true) },
         AppConfig.Empty with { OnboardingCompleted = false },
         Connected: true);
 
@@ -61,7 +61,7 @@ public class MainControllerOnboardingTests
         return new MonitorSnapshot(
             "Verbunden",
             new[] { new SensorReading("hwmon0/temp1", "CPU", SensorKind.Temperature, "°C", 45.0) },
-            new[] { new FanReading("hwmon0/pwm1", "CPU Fan", 1200, 120, FanMode.Auto, CanControl: true) },
+            new[] { new FanReading("hwmon0/pwm1", "CPU Fan", 1200, 120, CanControl: true) },
             config,
             Connected: true);
     }
@@ -70,10 +70,10 @@ public class MainControllerOnboardingTests
     public void Editor_DefersInit_DuringFirstRunOnboarding_ThenLoadsChosenConfig()
     {
         var fake = new FakeLiveMonitor(FirstRun());
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
         try
         {
-            UiTestHelpers.PumpUntil(() => ctrl.HasSnapshot);
+            UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(ctrl));
 
             // Während des Erststart-Assistenten bleibt der Editor bewusst uninitialisiert - kein vorzeitiges
             // Befüllen aus der leeren Config (sonst Latch auf „nicht zugeordnet"/leere Kurven).
@@ -98,7 +98,7 @@ public class MainControllerOnboardingTests
     }
 
     /// <summary>
-    /// Regression: Assistent auf bestehender Config wiederholt („Einstellungen → Onboarding"). Da war der
+    /// Regression: Assistent auf bestehender Config wiederholt („Einstellungen → Sicherung & Einrichtung"). Da war der
     /// Editor bereits aus der ALTEN Config befüllt und die einmalige Initialisierung griff nicht mehr - die
     /// im Assistenten gewählten Positionen blieben unsichtbar und das nächste Speichern schrieb sie wieder
     /// weg. Der Assistent muss den Editor-Neuaufbau auslösen, sobald der Daemon die neue Config spiegelt.
@@ -107,7 +107,7 @@ public class MainControllerOnboardingTests
     public void RepeatedOnboarding_RebuildsEditor_FromChosenConfig()
     {
         var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()); // OnboardingCompleted == null ⇒ kein Erststart
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
         try
         {
             UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
@@ -131,6 +131,66 @@ public class MainControllerOnboardingTests
     }
 
     /// <summary>
+    /// The wizard never edits a start point, so it sends each fan's MinPwm as its own base: every one counts as untouched
+    /// and the daemon keeps its value - also one a calibration set after the wizard built its draft.
+    /// </summary>
+    [AvaloniaFact]
+    public void Onboarding_SendsItsOwnStartPointsAsTheBase()
+    {
+        var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot());
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        try
+        {
+            UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+            ctrl.StartOnboardingCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => ctrl.Onboarding?.Fans.Count > 0);
+
+            ctrl.Onboarding!.FinishCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => fake.ConfigCalls.Count > 0);
+
+            AppConfig sent = fake.ConfigCalls[^1];
+            Assert.NotEmpty(sent.Fans);
+            Assert.Equal(sent.Fans.ToDictionary(f => f.FanId, f => f.MinPwm), fake.ConfigBases[^1]);
+        }
+        finally { ctrl.Dispose(); }
+    }
+
+    /// <summary>
+    /// The groups the wizard suggests reach the daemon with Finish and, once the daemon mirrors the config, the
+    /// editor's own group list - which every later save from the editor sends back, so they do not get lost.
+    /// </summary>
+    [AvaloniaFact]
+    public void RepeatedOnboarding_SuggestedGroups_ReachDaemonAndEditor()
+    {
+        MonitorSnapshot start = UiTestHelpers.SampleSnapshot();
+        var fake = new FakeLiveMonitor(start with { Config = start.Config with { SensorGroups = ["Zeta"] } });
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        try
+        {
+            UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+
+            ctrl.StartOnboardingCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => ctrl.Onboarding?.TemperatureSensorGroups.Count > 0);
+
+            OnboardingController wizard = ctrl.Onboarding!;
+            Assert.Equal("Sonstige", Assert.Single(wizard.TemperatureSensorGroups).Name); // hwmon0 names no known chip
+            wizard.FinishCommand.Execute(null);
+            UiTestHelpers.PumpUntil(() => fake.ConfigCalls.Count > 0);
+
+            AppConfig sent = fake.ConfigCalls[^1];
+            Assert.Equal(new[] { "Zeta", "Sonstige" }, sent.SensorGroups);
+            Assert.Equal("Sonstige", sent.Sensors.Single(s => s.SensorId == "hwmon0/temp1").Group);
+
+            fake.Current = fake.Current with { Config = sent };
+            UiTestHelpers.PumpUntil(() => ctrl.Editor.SensorGroups.Count == 2);
+
+            Assert.Equal(new[] { "Zeta", "Sonstige" }, ctrl.Editor.SensorGroups);
+            Assert.Equal("Sonstige", Assert.Single(ctrl.Editor.Sensors).Group);
+        }
+        finally { ctrl.Dispose(); }
+    }
+
+    /// <summary>
     /// Regression: the manual re-run ("Settings → Onboarding") must wire the tach-mapping delegates just
     /// like the first-run path - without them the wizard silently falls back to the legacy no-coupling
     /// calibration and never pairs tach sensors.
@@ -139,7 +199,7 @@ public class MainControllerOnboardingTests
     public void RepeatedOnboarding_CalibrationStartsTachCoupling()
     {
         var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot());
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
         try
         {
             UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);

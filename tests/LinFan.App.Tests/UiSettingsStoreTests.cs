@@ -56,6 +56,45 @@ public sealed class UiSettingsStoreTests
     }
 
     [Fact]
+    public void Theme_and_accent_round_trip()
+    {
+        string path = TempPath();
+        try
+        {
+            var store = new UiSettingsStore(path);
+            var settings = new UiSettings { Theme = ThemeChoice.HighContrast, Accent = AccentChoice.Custom, AccentCustom = "#7C3AED" };
+
+            store.Save(settings);
+
+            Assert.Equal(settings, store.Load());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>A file from before accent colours has no such fields: the theme's own accent, no own colour.</summary>
+    [Fact]
+    public void A_file_without_accent_loads_the_themes_own()
+    {
+        string path = TempPath();
+        try
+        {
+            File.WriteAllText(path, """{ "Theme": 2, "Language": 1 }""");
+            UiSettings loaded = new UiSettingsStore(path).Load();
+
+            Assert.Equal(ThemeChoice.Dark, loaded.Theme);
+            Assert.Equal(AccentChoice.Standard, loaded.Accent);
+            Assert.Null(loaded.AccentCustom);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Load_corrupt_file_returns_defaults()
     {
         string path = TempPath();

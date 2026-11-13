@@ -49,12 +49,12 @@ public sealed class Localizer : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(IndexerName));
     }
 
-    private static CultureInfo Resolve(LanguageChoice choice) => choice switch
-    {
-        LanguageChoice.German => new CultureInfo("de"),
-        LanguageChoice.English => new CultureInfo("en"),
-        _ => CultureInfo.InstalledUICulture.TwoLetterISOLanguageName == "de"
+    /// <summary>The language <see cref="LanguageChoice.System"/> resolves to: German for a <c>de*</c> OS culture, else English.</summary>
+    public static LanguageChoice SystemLanguage =>
+        CultureInfo.InstalledUICulture.TwoLetterISOLanguageName == "de" ? LanguageChoice.German : LanguageChoice.English;
+
+    private static CultureInfo Resolve(LanguageChoice choice) =>
+        (choice == LanguageChoice.System ? SystemLanguage : choice) == LanguageChoice.German
             ? new CultureInfo("de")
-            : new CultureInfo("en"),
-    };
+            : new CultureInfo("en");
 }

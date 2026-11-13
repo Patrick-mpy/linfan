@@ -8,9 +8,14 @@ namespace LinFan.Core.Models;
 /// <param name="CanControl">Ob aktuell Schreibzugriff besteht (sonst read-only, z. B. ohne Root).</param>
 /// <param name="Tachometer">Verknüpfter Drehzahl-Sensor, falls vorhanden.</param>
 /// <param name="Source">Backend-spezifische Quelle (z. B. sysfs-Pfad) zur Diagnose.</param>
+/// <param name="ReadOnlyReason">Why the channel is read-only; <c>null</c> while it is controllable or the backend cannot
+/// tell.</param>
+/// <param name="Device">The physical device the channel belongs to; <c>null</c> if the backend does not say.</param>
 public sealed record FanDescriptor(
     FanId Id,
     string Name,
     bool CanControl,
     SensorId? Tachometer,
-    string Source);
+    string Source,
+    FanReadOnlyReason? ReadOnlyReason = null,
+    HardwareDevice? Device = null);

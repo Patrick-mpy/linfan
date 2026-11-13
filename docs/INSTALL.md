@@ -22,11 +22,16 @@ dotnet test                                         # test suite
 # Daemon CLI (Linux):
 dotnet run --project src/LinFan.Daemon -- list      # list sensors & fans
 dotnet run --project src/LinFan.Daemon -- monitor   # live RPM/temperatures (Ctrl+C)
-dotnet run --project src/LinFan.Daemon -- init      # generate a starter config from the hardware
+dotnet run --project src/LinFan.Daemon -- init      # generate a starter config from the hardware (not while a daemon runs)
 dotnet run --project src/LinFan.Daemon -- run       # control loop + IPC server (dry run without root)
-sudo dotnet run --project src/LinFan.Daemon -- calibrate <fanId>  # measure start-up point (root)
-sudo dotnet run --project src/LinFan.Daemon -- set <fanId> 128    # set PWM (with watchdog)
-sudo dotnet run --project src/LinFan.Daemon -- auto <fanId>       # back to hardware auto mode
+# As root: build first (dotnet build), then run the DLL against the service's configuration (see below).
+cli="dotnet src/LinFan.Daemon/bin/Debug/net8.0/LinFan.Daemon.dll"
+sudo LINFAN_CONFIG=/etc/linfan/config.json $cli calibrate <fanId>  # measure start-up point (root)
+sudo $cli set <fanId> 128                                          # set PWM (with watchdog)
+sudo $cli auto <fanId>                                             # back to hardware auto mode
+sudo $cli restore                                                  # every fan back to hardware auto mode
+# 'calibrate' and 'set' refuse (exit 3) while a daemon runs - stop the service first. 'auto'/'restore' always run,
+# but next to a daemon they only last until its next write.
 
 # IPC client (talks to a running 'run'):
 dotnet run --project src/LinFan.Daemon -- monitor-ipc  # live snapshots from the daemon (Ctrl+C)
@@ -52,17 +57,21 @@ lock writes by default:
   ```
 
 **Start the daemon as root** - build as your user first, then run the DLL with `sudo` (not
-`sudo dotnet run`, which creates root-owned `obj/bin`). Pass `HOME` along, otherwise root looks for the
-config under `/root/.config`:
+`sudo dotnet run`, which creates root-owned `obj/bin`). Point it at the service's configuration with
+`LINFAN_CONFIG`; do not pass your `HOME` along - root would then write its config and log into a folder your account
+controls:
 
 ```bash
 dotnet build
-sudo HOME=$HOME dotnet src/LinFan.Daemon/bin/Debug/net8.0/LinFan.Daemon.dll run
+sudo LINFAN_CONFIG=/etc/linfan/config.json dotnet src/LinFan.Daemon/bin/Debug/net8.0/LinFan.Daemon.dll run
 ```
 
-The loop then reports `dryRun=False` and writes PWM for real (`[Applied]` instead of `[DryRun]`).
+The loop then reports `dryRun=False` and writes PWM for real (`[Applied]` instead of `[DryRun]`). Config and log
+(`/etc/linfan/config.json`, `/etc/linfan/logs/`) are the ones the installed service uses; stop the service first,
+next to it the manual daemon exits with code 3 (see "One daemon at a time" below).
 
-**Fail-safe / back to auto:** Ctrl+C restores hardware auto mode. As a last resort,
+**Fail-safe / back to auto:** Ctrl+C restores hardware auto mode; `restore` does it from the CLI (the systemd
+unit runs it after every stop, a crash or kill included). As a last resort,
 `echo 2 | sudo tee /sys/class/hwmon/hwmon7/pwm1_enable`; `thinkpad_acpi` also reverts to auto on its own
 after ~120 s without an update.
 
@@ -95,10 +104,18 @@ sudo systemctl stop linfan-daemon       # stop
   only its members - not every local account - can send control commands. `install.sh` creates the group
   and adds you automatically; **log out and back in** (or `newgrp linfan`) for it to take effect. To grant
   another user later: `sudo usermod -aG linfan <user>`. If the group is missing the socket stays
-  root-only and the GUI reports the daemon as unreachable.
+  root-only and the GUI reports that access to the background service is denied.
 - **ThinkPad prerequisite:** `thinkpad_acpi fan_control=1` (see above), otherwise the service runs
-  read-only.
+  read-only; the app's overview, the service log and `LinFan.Daemon list` then show a notice with the fix.
 - **GUI autostart at login (optional):** `cp /usr/share/applications/linfan.desktop ~/.config/autostart/`.
+- **Sandbox:** the unit confines the root daemon to what it needs - sysfs, `/run/linfan`, `/etc/linfan` - with no
+  network and only `CAP_CHOWN`/`CAP_DAC_OVERRIDE` (`systemd-analyze security linfan-daemon` shows the rest). `/home`
+  and `/root` are hidden from it, so the .NET runtime the framework-dependent unit starts must live outside them
+  (`/usr/bin/dotnet` from the distribution or Microsoft feed; not a snap and not `~/.dotnet`). If a hwmon driver of yours
+  refuses a write under the sandbox, the journal shows it - please report it with the driver name.
+- **One daemon at a time:** a second daemon that finds the socket held exits with code 3 and leaves the fans to the
+  running one - `sudo … run` while the service runs, or the service started while a manual root daemon runs (the unit
+  then neither restores nor restarts). If the running daemon is stopped or stuck, the fans go to hardware auto first.
 
 ## Install as a service (Windows)
 
@@ -112,10 +129,11 @@ dotnet publish -c Release -r win-x64 --self-contained true src/LinFan.App    -o 
 ```
 
 Copy the `artifacts/LinFan-win-x64` folder to the Windows PC, then install from a PowerShell started
-**as administrator**:
+**as administrator**. Without `-Source` the script only installs from a repository checkout's
+`artifacts\LinFan-win-x64` (or, in a release ZIP, from the folder it sits in), so point it at a copied build:
 
 ```powershell
-.\packaging\windows\Install-LinFan.ps1            # registers the service + GUI Start-menu entry
+.\packaging\windows\Install-LinFan.ps1 -Source C:\path\to\LinFan-win-x64   # service + GUI Start-menu entry
 .\packaging\windows\Uninstall-LinFan.ps1          # remove again (config stays)
 ```
 
@@ -127,8 +145,8 @@ Windows) - it bundles the build and calls the same scripts. Details: `packaging/
   from the Start menu afterwards.
 - **Log out and back in once after the first install.** Access to the pipe is restricted to the local
   group `LinFan Users`, which the installer creates and adds you to - and Windows only applies group
-  membership at sign-in. Until then the GUI reports the service as unreachable although it is running
-  (same situation as the `linfan` group on Linux).
+  membership at sign-in. Until then the GUI reports that access to the service is denied, although it is
+  running (same situation as the `linfan` group on Linux).
 - Start the **GUI** as a **normal user** (Start menu → "LinFan"), **not** as admin - it connects to the
   service over the named pipe `\\.\pipe\linfan`.
 - **Machine-wide config** under `%ProgramData%\linfan\config.json`, so the SYSTEM service and the user
@@ -147,7 +165,7 @@ behind that link.
 Verify the download first - the release page carries a `SHA256SUMS.txt` next to the assets:
 
 ```powershell
-Get-FileHash .\LinFan-Setup-0.3.1-win-x64.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
+Get-FileHash .\LinFan-Setup-<version>-win-x64.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
 ```
 
 ```bash

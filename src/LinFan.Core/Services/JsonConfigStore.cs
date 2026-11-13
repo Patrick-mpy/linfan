@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+using System.Globalization;
 using System.Text.Json;
 using LinFan.Core.Abstractions;
 using LinFan.Core.Models;
+using Microsoft.Win32.SafeHandles;
 
 namespace LinFan.Core.Services;
 
@@ -22,6 +24,18 @@ public sealed class JsonConfigStore : IConfigStore
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
     };
+
+    /// <summary>
+    /// <see cref="Save"/> refuses a config larger than this, so no client can make the daemon persist - and relay to
+    /// every GUI on every tick - an inflated config. A real one stays far below it.
+    /// </summary>
+    public const int MaxSaveBytes = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// <see cref="Load"/> reads more than <see cref="Save"/> writes: a file an older version let grow still parses,
+    /// so its over-temperature limit carries over when the daemon sets the rest aside.
+    /// </summary>
+    public const int MaxLoadBytes = 64 * 1024 * 1024;
 
     public string ConfigPath { get; }
 
@@ -62,15 +76,52 @@ public sealed class JsonConfigStore : IConfigStore
         if (!File.Exists(ConfigPath))
             return AppConfig.Empty;
 
+        using var stream = new FileStream(ConfigPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        long length = stream.Length;
+        if (length > MaxLoadBytes)
+            throw new InvalidOperationException(
+                $"Konfiguration unter {ConfigPath} ist mit {length} Bytes zu groß (max. {MaxLoadBytes}).");
+
+        AppConfig config;
         try
         {
-            string json = File.ReadAllText(ConfigPath);
-            return JsonSerializer.Deserialize<AppConfig>(json, Options) ?? AppConfig.Empty;
+            // Through a reader, like File.ReadAllText before: it honors a UTF-16 byte order mark (a file a Windows editor
+            // saved as "Unicode"), which the serializer's own stream reading does not.
+            using var reader = new StreamReader(stream, leaveOpen: true);
+            config = JsonSerializer.Deserialize<AppConfig>(reader.ReadToEnd(), Options) ?? AppConfig.Empty;
         }
         catch (JsonException ex)
         {
             throw new InvalidOperationException(
                 $"Konfiguration unter {ConfigPath} ist beschädigt: {ex.Message}", ex);
+        }
+
+        NarrowToOwnerOnly(stream.SafeFileHandle);
+        return config;
+    }
+
+    /// <summary>
+    /// A config from before files were created owner-only (0644 under the default umask) turns owner-only once it has
+    /// been read, not only with the next save. Only group and other bits go, only after the file parsed, and only
+    /// through the handle it was read from - not when the path is a link, so a root daemon run with a user's HOME does
+    /// not change a file a link there points to. Best effort: a reader that does not own the file (a CLI without root)
+    /// or a read-only file system leaves it.
+    /// </summary>
+    private void NarrowToOwnerOnly(SafeFileHandle handle)
+    {
+        if (OperatingSystem.IsWindows() || new FileInfo(ConfigPath).LinkTarget is not null)
+            return;
+
+        try
+        {
+            UnixFileMode mode = File.GetUnixFileMode(handle);
+            UnixFileMode narrowed = mode & (UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            if (narrowed != mode)
+                File.SetUnixFileMode(handle, narrowed);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            // Not this reader's to change; the next save by the owner creates the file owner-only anyway.
         }
     }
 
@@ -84,8 +135,53 @@ public sealed class JsonConfigStore : IConfigStore
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        string tmp = ConfigPath + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(config, Options));
-        File.Move(tmp, ConfigPath, overwrite: true);
+        byte[] json = JsonSerializer.SerializeToUtf8Bytes(config, Options);
+        if (json.Length > MaxSaveBytes)
+            throw new InvalidOperationException(
+                $"Konfiguration mit {json.Length} Bytes zu groß (max. {MaxSaveBytes}) - nicht gespeichert.");
+
+        // A fresh, unpredictable temp name created exclusively: CreateNew refuses anything already there - a symlink
+        // a user planted in a config folder they own included (a root daemon run with the user's HOME; /etc/linfan is
+        // root's) - and the random name keeps such a plant from blocking every save. The rename then replaces
+        // config.json itself, never a file a link there points to.
+        string tmp = $"{ConfigPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            // Deliberately no fsync: the daemon saves on its loop thread before the watchdog's tick, and a flush on a
+            // congested or failing disk would hold the watchdog for as long. ext4 and btrfs flush a file replaced by
+            // rename on their own; elsewhere a power loss right after a save can leave an unusable file, which the next
+            // start sets aside - fans on hardware auto.
+            using (var stream = new FileStream(tmp, NewOwnerOnlyFile()))
+                stream.Write(json);
+            File.Move(tmp, ConfigPath, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(tmp); }
+            catch { /* the save failed already - that is what the caller hears about */ }
+            throw;
+        }
+    }
+
+    /// <summary>The config is the daemon's business: created owner-only (the default umask makes it world-readable).</summary>
+    private static FileStreamOptions NewOwnerOnlyFile()
+    {
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
+        if (!OperatingSystem.IsWindows())
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        return options;
+    }
+
+    /// <summary>
+    /// Renames the file to <c>config.json.invalid</c> - or, if one is already there, to a timestamped name: a file
+    /// set aside earlier may be the only copy of the operator's configuration.
+    /// </summary>
+    public string SetAside()
+    {
+        string aside = ConfigPath + ".invalid";
+        if (File.Exists(aside))
+            aside += "-" + DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff'Z'", CultureInfo.InvariantCulture);
+        File.Move(ConfigPath, aside); // never replaces an existing file
+        return aside;
     }
 }

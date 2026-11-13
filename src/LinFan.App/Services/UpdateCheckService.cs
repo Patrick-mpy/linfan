@@ -56,16 +56,29 @@ public sealed class UpdateCheckService : IUpdateCheckService
             if (!SemVer.TryParse(tag.GetString(), out SemVer latest) || latest.CompareTo(current) <= 0)
                 return null; // nicht parsbar ODER nicht neuer → nichts zu melden
 
-            string releaseUrl =
-                root.TryGetProperty("html_url", out JsonElement html) && html.ValueKind == JsonValueKind.String
-                    ? html.GetString()!
-                    : $"https://github.com/{_slug}/releases/latest";
-
-            return new UpdateInfo(latest.ToString(), releaseUrl);
+            string? html = root.TryGetProperty("html_url", out JsonElement h) && h.ValueKind == JsonValueKind.String
+                ? h.GetString()
+                : null;
+            return new UpdateInfo(latest.ToString(), ReleasePage(html) ?? $"https://github.com/{_slug}/releases/latest");
         }
         catch
         {
             return null; // Netz-/Parse-/Abbruchfehler → still
         }
     }
+
+    /// <summary>
+    /// <paramref name="url"/> if it is a release page of this repo on github.com, else <c>null</c>. The link goes to the
+    /// shell (<c>UseShellExecute</c>), which on Windows also runs a UNC or local program path - so only a page the
+    /// fallback could have named is accepted, whoever answers in place of the API.
+    /// </summary>
+    private string? ReleasePage(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase)
+        && uri.IsDefaultPort
+        && uri.UserInfo.Length == 0
+        && uri.AbsolutePath.StartsWith($"/{_slug}/releases/", StringComparison.OrdinalIgnoreCase)
+            ? uri.AbsoluteUri
+            : null;
 }

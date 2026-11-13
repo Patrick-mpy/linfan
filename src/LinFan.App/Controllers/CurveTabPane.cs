@@ -3,9 +3,9 @@
 namespace LinFan.App.Controllers;
 
 /// <summary>
-/// Which editor the curves tab shows on its right-hand side. The side menu lists profiles and the curves of
-/// the selected profile; both keep their selection, so what is being edited cannot be derived from the
-/// selections alone - the last click decides.
+/// Which editor the curves tab shows on its right-hand side. A selected profile always has a selected curve as
+/// well, so what is being edited cannot be derived from the two selections - the last click decides, and the side
+/// menu highlights its row (<see cref="CurveEditorController.SelectedNavItem"/>).
 /// </summary>
 public enum CurveTabPane
 {

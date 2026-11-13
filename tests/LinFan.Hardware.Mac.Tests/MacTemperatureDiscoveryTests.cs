@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using LinFan.Core.Models;
+using LinFan.Core.Services;
 
 namespace LinFan.Hardware.Mac.Tests;
 
@@ -49,6 +50,31 @@ public sealed class MacTemperatureDiscoveryTests
                 "Airport / Wi-Fi",
             },
             TempNames(b));
+    }
+
+    [Fact]
+    public void SensorIds_CarryTheSmcKey_WhereTheSensorClassifierReadsIt()
+    {
+        // The GUI groups sensors by the key behind "smc/"; the ids must stay "smc/<key>".
+        var smc = new FakeSmc();
+        smc.SetFloat("Tp1h", 38f); // M2 family (with Tp01, Tp09, Tg0f)
+        smc.SetFloat("Tp01", 52f);
+        smc.SetFloat("Tp09", 54f);
+        smc.SetFloat("Tg0f", 47f);
+        smc.SetFloat("TH0x", 40f);
+        smc.SetFloat("Tm0P", 36f);
+        smc.SetFloat("TB0T", 31f);
+
+        using var b = Backend(smc);
+
+        var categories = b.DiscoverSensors()
+            .Where(s => s.Kind == SensorKind.Temperature)
+            .ToDictionary(s => s.Id.Value, s => SensorClassifier.Classify(s.Id.Value));
+        Assert.Equal(SensorCategory.Cpu, categories["smc/Tp01"]);
+        Assert.Equal(SensorCategory.Gpu, categories["smc/Tg0f"]);
+        Assert.Equal(SensorCategory.Storage, categories["smc/TH0x"]);
+        Assert.Equal(SensorCategory.Mainboard, categories["smc/Tm0P"]);
+        Assert.Equal(SensorCategory.Other, categories["smc/TB0T"]);
     }
 
     [Fact]

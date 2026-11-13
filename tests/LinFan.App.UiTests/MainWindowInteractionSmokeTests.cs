@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -16,14 +18,14 @@ using LinFan.Core.Models;
 namespace LinFan.App.UiTests;
 
 /// <summary>
-/// Tier-2-Smoke-Tests: Interaktions-/Zustands-Bindings im Hauptfenster - Disconnect-Banner,
-/// Kalibrier-Button-Sichtbarkeit nach <c>CanControl</c> und die Löschen-Bestätigung (kein direkter Command).
+/// Tier-2-Smoke-Tests: Interaktions-/Zustands-Bindings im Hauptfenster - Verbindungs-Banner (offline, Dry-Run),
+/// Kalibrier-Button-Sichtbarkeit nach <c>CanControl</c> und Löschen ohne Rückfrage (mit „Rückgängig").
 /// </summary>
 public class MainWindowInteractionSmokeTests
 {
     private static (MainController ctrl, MainWindow window) ShowMain(MonitorSnapshot snapshot)
     {
-        var ctrl = new MainController(new FakeLiveMonitor(snapshot));
+        var ctrl = UiTestHelpers.NewController(new FakeLiveMonitor(snapshot));
         var window = new MainWindow { DataContext = ctrl };
         window.Show();
         return (ctrl, window);
@@ -48,57 +50,213 @@ public class MainWindowInteractionSmokeTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    [AvaloniaTheory]
-    [InlineData(true)]   // connected -> toast hidden
-    [InlineData(false)]  // disconnected -> toast shown
-    public void DisconnectToast_TracksConnected(bool connected)
+    private static MonitorSnapshot Offline(ConnectionProblem problem) => MonitorSnapshot.Unavailable("getrennt", problem);
+
+    private static Border Named(MainWindow window, string name) => window.Find<Border>().Single(b => b.Name == name);
+
+    private static Button NamedButton(MainWindow window, string name) => window.Find<Button>().Single(b => b.Name == name);
+
+    /// <summary>Clicks <paramref name="button"/> with the mouse - through hit testing, so a disabled or hidden button fails.</summary>
+    private static void Click(MainWindow window, Button button)
     {
-        MonitorSnapshot snap = connected
-            ? UiTestHelpers.SampleSnapshot()
-            : new MonitorSnapshot("getrennt", Array.Empty<SensorReading>(), Array.Empty<FanReading>(),
-                AppConfig.Empty, Connected: false);
-        var (ctrl, window) = ShowMain(snap);
-        UiTestHelpers.PumpUntil(() => ctrl.Status == (connected ? "Verbunden" : "getrennt"));
+        Point center = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)
+                       ?? throw new InvalidOperationException("Button is not rendered.");
+        window.MouseDown(center, MouseButton.Left);
+        window.MouseUp(center, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
 
-        TextBlock banner = window.Find<TextBlock>()
-            .Single(t => t.Text != null && t.Text.Contains("Hintergrunddienst nicht erreichbar"));
+    private static string ReconnectLabel(MainWindow window) =>
+        window.Find<TextBlock>().Single(t => t.Name == "ReconnectLabel").Text ?? "";
 
-        Assert.Equal(!connected, banner.IsEffectivelyVisible);
+    /// <summary>A reconnect request that stays open until the test settles it - like a running connection attempt.</summary>
+    private sealed class PendingReconnect : IReconnectable
+    {
+        private readonly TaskCompletionSource<bool> _attempt = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _requests;
+
+        public int Requests => Volatile.Read(ref _requests);
+
+        public Task<bool> RequestReconnectAsync()
+        {
+            Interlocked.Increment(ref _requests);
+            return _attempt.Task;
+        }
+
+        public void Settle(bool connected) => _attempt.TrySetResult(connected);
+    }
+
+    private static (MainController Ctrl, MainWindow Window, FakeLiveMonitor Monitor, PendingReconnect Reconnect) ShowOffline()
+    {
+        var monitor = new FakeLiveMonitor(Offline(ConnectionProblem.Unreachable));
+        var reconnect = new PendingReconnect();
+        var ctrl = UiTestHelpers.NewController(monitor, pollInterval: TimeSpan.FromMilliseconds(10), reconnect: reconnect);
+        var window = new MainWindow { DataContext = ctrl };
+        window.Show();
+        UiTestHelpers.PumpUntil(() => ctrl.Connection.ShowOfflineBanner);
+        return (ctrl, window, monitor, reconnect);
     }
 
     [AvaloniaFact]
-    public void DisconnectToast_HiddenByX_RearmsOnNextDisconnect()
+    public void OfflineBanner_Unreachable_NamesTheCause_AndTheCommandToCheckTheService()
     {
-        var snap = new MonitorSnapshot("getrennt", Array.Empty<SensorReading>(), Array.Empty<FanReading>(),
-            AppConfig.Empty, Connected: false);
-        var (ctrl, window) = ShowMain(snap);
+        var (ctrl, window) = ShowMain(Offline(ConnectionProblem.Unreachable));
+        UiTestHelpers.PumpUntil(() => ctrl.Connection.ShowOfflineBanner);
+
+        Assert.True(Named(window, "OfflineBanner").IsEffectivelyVisible);
+        Assert.False(Named(window, "DryRunBanner").IsEffectivelyVisible);
+        Assert.Equal("Nicht verbunden", ctrl.Status); // the header does not repeat the banner
+        Assert.Equal("Hintergrunddienst nicht erreichbar",
+            window.Find<TextBlock>().Single(t => t.Name == "OfflineBannerTitle").Text);
+        SelectableTextBlock command = window.Find<SelectableTextBlock>().Single(t => t.Name == "DiagnosticCommandText");
+        Assert.True(command.IsEffectivelyVisible);
+        Assert.Equal(ctrl.Connection.DiagnosticCommand, command.Text);
+        Assert.True(NamedButton(window, "CopyDiagnosticButton").IsEffectivelyVisible);
+        // The banner sits in its own row: the tabs start below it instead of being covered.
+        Assert.True(Named(window, "OfflineBanner").Bounds.Bottom
+                    <= window.Find<TabControl>().Single().Bounds.Top);
+        ctrl.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void OfflineBanner_AccessDenied_ShowsTheGroupHint_WithoutTheServiceCommand()
+    {
+        var (ctrl, window) = ShowMain(Offline(ConnectionProblem.AccessDenied));
+        UiTestHelpers.PumpUntil(() => ctrl.Connection.ShowOfflineBanner);
+
+        Assert.True(Named(window, "OfflineBanner").IsEffectivelyVisible);
+        // The long group hint shows once, in the banner - the header line only says that there is a problem.
+        Assert.Equal("Nicht verbunden", ctrl.Status);
+        Assert.Equal("Zugriff auf den Hintergrunddienst verweigert",
+            window.Find<TextBlock>().Single(t => t.Name == "OfflineBannerTitle").Text);
+        Assert.Contains(window.Find<TextBlock>(), t => t.IsEffectivelyVisible && t.Text != null
+                                                      && t.Text.Contains("melde dich danach ab und wieder an"));
+        Assert.False(window.Find<SelectableTextBlock>().Single(t => t.Name == "DiagnosticCommandText").IsEffectivelyVisible);
+        Assert.False(NamedButton(window, "CopyDiagnosticButton").IsEffectivelyVisible);
+        ctrl.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void OfflineBanner_StaysHidden_WhileTheFirstAttemptIsConnecting()
+    {
+        var (ctrl, window) = ShowMain(Offline(ConnectionProblem.Connecting));
         UiTestHelpers.PumpUntil(() => ctrl.Status == "getrennt");
 
-        TextBlock toast = window.Find<TextBlock>()
-            .Single(t => t.Text != null && t.Text.Contains("Hintergrunddienst nicht erreichbar"));
-        Assert.True(toast.IsEffectivelyVisible);
+        Assert.False(Named(window, "OfflineBanner").IsEffectivelyVisible); // no flash at start
+        Assert.False(Named(window, "DryRunBanner").IsEffectivelyVisible);
+        Assert.Equal("getrennt", ctrl.Status); // without a banner the header keeps the monitor's own status
+        ctrl.Dispose();
+    }
 
-        // X hides the toast while still disconnected.
-        ctrl.HideDisconnectedToastCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-        Assert.False(toast.IsEffectivelyVisible);
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Banners_WhileConnected_OnlyTheDryRunOne_AndOnlyInDryRun(bool dryRun)
+    {
+        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot() with { DryRun = dryRun });
+        UiTestHelpers.PumpUntil(() => ctrl.Connected);
 
-        // Reconnect, then the next disconnect transition re-arms the toast.
-        ctrl.Connected = true;
-        Dispatcher.UIThread.RunJobs();
-        Assert.False(toast.IsEffectivelyVisible);
+        Assert.False(Named(window, "OfflineBanner").IsEffectivelyVisible);
+        Assert.Equal(dryRun, Named(window, "DryRunBanner").IsEffectivelyVisible);
+        if (dryRun)
+            Assert.Contains(window.Find<TextBlock>(), t => t.IsEffectivelyVisible
+                                                          && t.Text == "Dry-Run - die Kurven steuern die Lüfter nicht");
+        ctrl.Dispose();
+    }
 
-        ctrl.Connected = false;
-        Dispatcher.UIThread.RunJobs();
-        Assert.True(toast.IsEffectivelyVisible);
+    [AvaloniaFact]
+    public void OfflineBanner_GoesAway_WhenTheConnectionComesBack()
+    {
+        var monitor = new FakeLiveMonitor(Offline(ConnectionProblem.Unreachable));
+        var ctrl = UiTestHelpers.NewController(monitor, pollInterval: TimeSpan.FromMilliseconds(10));
+        var window = new MainWindow { DataContext = ctrl };
+        window.Show();
+        UiTestHelpers.PumpUntil(() => ctrl.Connection.ShowOfflineBanner);
+        Assert.True(Named(window, "OfflineBanner").IsEffectivelyVisible);
+
+        monitor.Current = UiTestHelpers.SampleSnapshot();
+        UiTestHelpers.PumpUntil(() => ctrl.Connected);
+
+        Assert.False(Named(window, "OfflineBanner").IsEffectivelyVisible);
+        ctrl.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void ReconnectButton_SaysConnectingWhilePending_ThenToastsTheReconnect()
+    {
+        var (ctrl, window, monitor, reconnect) = ShowOffline();
+        Button button = NamedButton(window, "ReconnectButton");
+        Assert.Equal("Erneut verbinden", ReconnectLabel(window));
+
+        Click(window, button);
+
+        Assert.Equal(1, reconnect.Requests);
+        Assert.False(button.IsEffectivelyEnabled);
+        Assert.Equal("Verbinde …", ReconnectLabel(window));
+
+        monitor.Current = UiTestHelpers.SampleSnapshot();
+        reconnect.Settle(connected: true);
+        UiTestHelpers.PumpUntil(() => !ctrl.Connection.IsReconnecting);
+
+        // Checked in the same pass that ended the attempt: the toast fades out after 4 s on the real clock.
+        Assert.True(button.IsEffectivelyEnabled);
+        Assert.Equal("Wieder mit dem Hintergrunddienst verbunden.", ctrl.Connection.Status.Text);
+        Assert.True(Named(window, "ReconnectedToast").IsEffectivelyVisible);
+
+        UiTestHelpers.PumpUntil(() => ctrl.Connected);
+        Assert.False(Named(window, "OfflineBanner").IsEffectivelyVisible);
+        ctrl.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void ReconnectButton_KeepsItsWidth_AndSaysWhenTheAttemptFailed()
+    {
+        var (ctrl, window, _, reconnect) = ShowOffline();
+        Button button = NamedButton(window, "ReconnectButton");
+        TextBlock note = window.Find<TextBlock>().Single(t => t.Name == "ReconnectFeedback");
+        double width = button.Bounds.Width;
+        Assert.Equal("", note.Text);
+
+        Click(window, button);
+        window.UpdateLayout();
+        Assert.Equal("Verbinde …", ReconnectLabel(window));
+        Assert.Equal(width, button.Bounds.Width); // the shorter label does not shrink the button
+
+        reconnect.Settle(connected: false);
+        UiTestHelpers.PumpUntil(() => !ctrl.Connection.IsReconnecting);
+        window.UpdateLayout();
+
+        Assert.Equal("Weiterhin keine Verbindung", note.Text);
+        Assert.True(note.IsEffectivelyVisible);
+        Assert.Equal(width, button.Bounds.Width); // nor does the note appearing under it
+        Assert.Equal("", ctrl.Connection.Status.Text); // no success toast
+        ctrl.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void CopyButton_PutsTheCommandOnTheClipboard_AndSaysCopied()
+    {
+        var (ctrl, window) = ShowMain(Offline(ConnectionProblem.Unreachable));
+        UiTestHelpers.PumpUntil(() => ctrl.Connection.ShowOfflineBanner);
+        Button copy = NamedButton(window, "CopyDiagnosticButton");
+        Assert.Equal("Kopieren", UiTestHelpers.ButtonLabel(copy));
+
+        Click(window, copy);
+        UiTestHelpers.PumpUntil(() => ctrl.Connection.IsCopied);
+
+        Assert.Equal("Kopiert", UiTestHelpers.ButtonLabel(copy));
+        Task<string?> read = window.Clipboard!.TryGetTextAsync();
+        UiTestHelpers.PumpUntil(() => read.IsCompleted);
+        Assert.Equal(ctrl.Connection.DiagnosticCommand, read.Result);
+        ctrl.Dispose();
     }
 
     [AvaloniaFact]
     public void Geraete_CalibrateButton_VisibleOnlyForControllableFans()
     {
         var snap = UiTestHelpers.SnapshotWithFans(
-            new FanReading("pwm1", "Steuerbar", 1000, 120, FanMode.Auto, CanControl: true),
-            new FanReading("pwm2", "Nur lesbar", 800, 0, FanMode.Auto, CanControl: false));
+            new FanReading("pwm1", "Steuerbar", 1000, 120, CanControl: true),
+            new FanReading("pwm2", "Nur lesbar", 800, 0, CanControl: false));
         var (ctrl, window) = ShowMain(snap);
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
         SelectTab(window, TabSettings);
@@ -116,96 +274,11 @@ public class MainWindowInteractionSmokeTests
         foreach (Button b in calButtons)
         {
             var row = Assert.IsType<FanAssignRow>(b.DataContext);
-            // Der Kalibrier-Block steckt in einem StackPanel mit IsVisible="{Binding CanControl}".
+            // Die Aktionen von „Kalibrierung & Tacho" stecken in einem Panel mit IsVisible="{Binding CanControl}".
             Assert.Equal(row.CanControl, b.IsEffectivelyVisible);
         }
     }
 
-    /// <summary>
-    /// Der Airflow-Ergebnis-Block: unsichtbar ohne Tuning, danach mit Lüfter- und Kurvennamen aus den
-    /// Editor-Zeilen. Prüft die Bindings zur Laufzeit (Sichtbarkeit schaltet wirklich, Template realisiert).
-    /// </summary>
-    [AvaloniaFact]
-    public void Airflow_StatusCard_AppearsAfterTuning()
-    {
-        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabSettings);
-        SelectSettingsSection(ctrl, SettingsSection.Airflow);
-
-        TextBlock title = Assert.Single(window.Find<TextBlock>(), t => t.Text == "Bereits angewendet");
-        Assert.False(title.IsEffectivelyVisible); // SampleSnapshot trägt die Kurve „c1“, kein Airflow-Tuning
-        Assert.DoesNotContain(window.Find<TextBlock>(), t => t.DataContext is AirflowStatusRow);
-
-        ctrl.Editor.AnalyzeAirflowCommand.Execute(null);
-        ctrl.Editor.ApplyAirflowCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(title.IsEffectivelyVisible);
-        var rows = window.Find<TextBlock>().Where(t => t.DataContext is AirflowStatusRow).ToList();
-        Assert.Contains(rows, t => t.Text == "CPU Fan");           // Fan.DisplayName
-        Assert.Contains(rows, t => t.Text == "Airflow · Standard"); // Curve.Name (ohne Position → Default-Rolle)
-        Assert.All(rows, t => Assert.True(t.IsEffectivelyVisible));
-
-        // Druckbilanz: ohne positionierte Gehäuselüfter nicht bestimmbar - der Text steht trotzdem im Block.
-        Assert.Contains(window.Find<TextBlock>(),
-            t => t.Text != null && t.Text.StartsWith("Druckbilanz", StringComparison.Ordinal) && t.IsEffectivelyVisible);
-    }
-
-    /// <summary>
-    /// Der gesperrte Profilwechsel muss seinen Grund nennen: Warn-Icon neben der Kopf-Auswahl (Tooltip auf
-    /// einem <b>aktiven</b> Element, nicht auf der gesperrten ComboBox) und ein Hinweis unter dem Aktiv-Schalter.
-    /// </summary>
-    [AvaloniaFact]
-    public void ProfileSwitch_LockedByUnsavedChanges_NamesTheReason()
-    {
-        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabCurves);
-        ctrl.Editor.Pane = CurveTabPane.Profile; // Profil-Editor (dort sitzt der Aktiv-Schalter)
-        Dispatcher.UIThread.RunJobs();
-
-        const string reason = "Gesperrt, solange Änderungen nicht gespeichert sind - erst übernehmen oder verwerfen.";
-        PathIcon headerIcon = Assert.Single(window.Find<PathIcon>(), p => p.Name == "ProfileLockedIcon");
-        TextBlock hint = Assert.Single(window.Find<TextBlock>(), t => t.Text == reason);
-
-        // Frisch geladen: nichts offen, das gezeigte Profil ist das laufende → kein Hinweis.
-        Assert.False(headerIcon.IsEffectivelyVisible);
-        Assert.False(hint.IsEffectivelyVisible);
-
-        // Ein neues Profil anlegen: gezeigtes ≠ laufendes Profil UND ungespeicherte Änderungen.
-        ctrl.Editor.AddProfileCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(ctrl.Editor.HasUnsavedChanges);
-        Assert.False(ctrl.Editor.CanActivateSelectedProfile);
-        Assert.True(headerIcon.IsEffectivelyVisible);
-        Assert.True(hint.IsEffectivelyVisible);
-    }
-
-    /// <summary>
-    /// Die beiden Knöpfe, die nur noch ihr Symbol tragen, müssen ihre Beschriftung im Tooltip führen -
-    /// sonst sind sie stumm.
-    /// </summary>
-    [AvaloniaTheory]
-    [InlineData("HeaderSaveButton", "Übernehmen")]
-    [InlineData("HeaderRevertButton", "Verwerfen")]
-    public void IconOnlyButtons_CarryTheirLabelInTheTooltip(string name, string label)
-    {
-        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        ctrl.Editor.HasUnsavedChanges = true;
-        Dispatcher.UIThread.RunJobs();
-
-        Button button = Assert.Single(window.Find<Button>(), b => b.Name == name);
-        Assert.Null(UiTestHelpers.ButtonLabel(button)); // wirklich nur das Symbol
-        Assert.Contains(label, Assert.IsType<string>(ToolTip.GetTip(button)));
-    }
-
-    /// <summary>
-    /// Der Status-Toast wechselt seinen Schweregrad zur Laufzeit - Streifen und Icon (Farbe UND Symbol)
-    /// müssen mitziehen, nicht nur beim ersten Aufbau.
-    /// </summary>
     [AvaloniaFact]
     public void StatusToast_TurnsRed_OnError()
     {
@@ -242,35 +315,39 @@ public class MainWindowInteractionSmokeTests
 
     private static Color Brush(object? value) => Assert.IsAssignableFrom<ISolidColorBrush>(value).Color;
 
+    /// <summary>
+    /// Löschen fragt nicht mehr nach: die Knöpfe sind direkt an die Editor-Commands gebunden, der Toast bietet
+    /// „Rückgängig" an - und das holt das Gelöschte zurück.
+    /// </summary>
     [AvaloniaFact]
-    public void Delete_HasNoDirectCommand_AndDeleteCommandsWork()
+    public void Delete_IsBoundDirectly_AndTheToastUndoesIt()
     {
         var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabCurves); // Kurven & Zuordnung (Profil- und Kurven-Löschen leben hier)
+        SelectTab(window, TabCurves); // Profile & Kurven (Profil- und Kurven-Löschen leben hier)
 
-        // Über den Namen gesucht, nicht über die Beschriftung: der Profil-Knopf im Seitenmenü trägt nur
-        // noch sein Icon (die 240-px-Spalte fasst keine vier beschrifteten Knöpfe).
         Button profileDelete = Assert.Single(window.Find<Button>(), b => b.Name == "ProfileDeleteButton");
         Button curveDelete = Assert.Single(window.Find<Button>(), b => b.Name == "CurveDeleteButton");
-        var deleteButtons = new[] { profileDelete, curveDelete };
+        Assert.Same(ctrl.Editor.DeleteProfileCommand, profileDelete.Command);
+        Assert.Same(ctrl.Editor.DeleteCurveCommand, curveDelete.Command);
+        Assert.False(profileDelete.IsEffectivelyEnabled); // the only profile, and it is running
+        Assert.True(ToolTip.GetShowOnDisabled(profileDelete)); // so the tooltip can say why
 
-        // Löschen ist über einen modalen ConfirmDialog (Click-Handler im Code-Behind) bestätigungs-gegated,
-        // NICHT über einen direkten Command am Button. Ein versehentliches direktes Command-Binding (das ohne
-        // Nachfrage löschen würde) wäre die Regression, die dieser Test fängt.
-        Assert.All(deleteButtons, b => Assert.Null(b.Command));
+        curveDelete.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
 
-        // Die Aktionen, die der Dialog bei Bestätigung ausführt, löschen tatsächlich. Der modale Dialog selbst
-        // ist dünne Code-Behind-Verdrahtung (ConfirmThen) und wird headless nicht getrieben.
-        int curvesBefore = ctrl.Editor.Curves.Count;
-        int profilesBefore = ctrl.Editor.Profiles.Count;
-        Assert.True(curvesBefore >= 1 && profilesBefore >= 1);
+        Assert.Empty(ctrl.Editor.Curves);
+        Button undo = Assert.Single(window.Find<Button>(), b => b.Name == "StatusActionButton");
+        Assert.True(undo.IsEffectivelyVisible);
+        Assert.Equal("Rückgängig", undo.GetVisualDescendants().OfType<TextBlock>().Single().Text);
+        Assert.Contains(window.Find<TextBlock>(), t => t.Text == "Kurve „Quiet“ gelöscht." && t.IsEffectivelyVisible);
 
-        ctrl.Editor.DeleteCurveCommand.Execute(null);
-        Assert.Equal(curvesBefore - 1, ctrl.Editor.Curves.Count);
+        undo.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
 
-        ctrl.Editor.DeleteProfileCommand.Execute(null);
-        Assert.Equal(profilesBefore - 1, ctrl.Editor.Profiles.Count);
+        Assert.Equal("c1", Assert.Single(ctrl.Editor.Curves).Id);
+        Assert.False(ctrl.Editor.HasUnsavedChanges);
+        Assert.False(undo.IsEffectivelyVisible); // the toast now says „Rückgängig gemacht." without an action
     }
 
     [AvaloniaTheory]
@@ -278,21 +355,27 @@ public class MainWindowInteractionSmokeTests
     [InlineData(false)]  // getrennt → „Übernehmen" gesperrt (SaveConfig liefe sonst ins Leere)
     public void ApplyButton_IsEnabled_TracksConnected(bool connected)
     {
-        MonitorSnapshot snap = connected
-            ? UiTestHelpers.SampleSnapshot()
-            // getrennt, aber mit derselben Config: der Editor wird bereit, Connected=false
-            : UiTestHelpers.SampleSnapshot() with { Status = "getrennt", Connected = false };
-        var (ctrl, window) = ShowMain(snap);
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady && ctrl.Connected == connected);
-        ctrl.Editor.HasUnsavedChanges = true; // Übernehmen/Verwerfen in der Kopfzeile einblenden
+        // Offline after having been connected: the editor is ready and keeps its state, Connected=false.
+        var monitor = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot());
+        var ctrl = UiTestHelpers.NewController(monitor, pollInterval: TimeSpan.FromMilliseconds(10));
+        var window = new MainWindow { DataContext = ctrl };
+        window.Show();
+        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
+        if (!connected)
+            monitor.Current = Offline(ConnectionProblem.Unreachable);
+        UiTestHelpers.PumpUntil(() => ctrl.Connected == connected);
+        ctrl.Editor.SelectedCurve!.AddPointRow(95, 90); // eine echte Änderung blendet die Leiste ein
+        Dispatcher.UIThread.RunJobs();
 
-        // Bei getrenntem Dienst muss „Übernehmen" sperren, sonst liefe SaveConfig ins Leere. Über den
-        // Namen gesucht: der Knopf trägt nur noch sein Symbol, keine Beschriftung.
-        Button apply = Assert.Single(window.Find<Button>(), b => b.Name == "HeaderSaveButton");
+        // The editor learns the connection from the MainController; the button follows the command's CanExecute.
+        Assert.Equal(connected, ctrl.Editor.IsConnected);
+        Button apply = Assert.Single(window.Find<Button>(), b => b.Name == "ApplyButton");
+        Assert.True(apply.IsEffectivelyVisible);
+        Assert.Equal(connected, apply.IsEffectivelyEnabled);
 
-        // DataContext am Button ist der MainController: {Binding Connected} löst gegen ihn auf.
-        Assert.IsType<MainController>(apply.DataContext);
-        Assert.Equal(connected, apply.IsEnabled);
+        // Undo is no daemon call - it stays available offline.
+        Button undo = Assert.Single(window.Find<Button>(), b => b.Name == "UndoButton");
+        Assert.True(undo.IsEffectivelyEnabled);
     }
 
     [AvaloniaFact]
@@ -300,7 +383,7 @@ public class MainWindowInteractionSmokeTests
     {
         var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabCurves); // Kurven & Zuordnung
+        SelectTab(window, TabCurves); // Profile & Kurven
 
         CurveEditRow curve = ctrl.Editor.SelectedCurve!;
         TextBlock warning = window.Find<TextBlock>()
@@ -321,7 +404,7 @@ public class MainWindowInteractionSmokeTests
     {
         var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabCurves); // Kurven & Zuordnung
+        SelectTab(window, TabCurves); // Profile & Kurven
 
         CurveEditRow curve = ctrl.Editor.SelectedCurve!;
         TextBlock hint = window.Find<TextBlock>()
@@ -350,8 +433,8 @@ public class MainWindowInteractionSmokeTests
             Array.Empty<SensorReading>(), Array.Empty<FanReading>(),
             AppConfig.Empty, Connected: connected);
         var (ctrl, window) = ShowMain(snap);
-        UiTestHelpers.PumpUntil(() => ctrl.HasSnapshot);
-        SelectTab(window, TabCurves); // Kurven & Zuordnung
+        UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(ctrl));
+        SelectTab(window, TabCurves); // Profile & Kurven
 
         TextBlock noDevices = window.Find<TextBlock>()
             .Single(t => t.Text != null && t.Text.Contains("Keine Geräte erkannt - ohne Sensoren"));
@@ -386,81 +469,7 @@ public class MainWindowInteractionSmokeTests
         Assert.Single(ctrl.Editor.FilteredSensors);
     }
 
-    [AvaloniaFact]
-    public void Geraete_PwmAdjustHint_VisibilityTracksHint()
-    {
-        var snap = UiTestHelpers.SnapshotWithFans(
-            new FanReading("hwmon0/pwm1", "CPU Fan", 1000, 120, FanMode.Auto, CanControl: true));
-        var (ctrl, window) = ShowMain(snap);
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabSettings);
-        SelectSettingsSection(ctrl, SettingsSection.Fans); // Min/Max-PWM leben in der Lüfter-Sektion
-
-        // Min/Max-PWM samt Hinweis stecken in der „Erweitert"-Sektion - aufklappen, sonst nie effektiv sichtbar.
-        foreach (FanAssignRow f in ctrl.Editor.Fans)
-            f.ShowAdvanced = true;
-        Dispatcher.UIThread.RunJobs();
-
-        FanAssignRow fan = ctrl.Editor.Fans.Single();
-        fan.MinPwm = 30;
-        fan.MaxPwm = 200; // gültig → Hinweis bleibt leer
-        Dispatcher.UIThread.RunJobs();
-
-        // Der PWM-Hinweis-TextBlock dieser Zeile: einziger #FBBF24-TextBlock mit DataContext == fan.
-        TextBlock hint = window.Find<TextBlock>().Single(t =>
-            t.DataContext == fan
-            && t.Foreground is Avalonia.Media.ISolidColorBrush b
-            && b.Color == Avalonia.Media.Color.Parse("#FBBF24"));
-
-        Assert.Equal("", fan.PwmAdjustHint);
-        Assert.False(hint.IsEffectivelyVisible); // leerer Hinweis → über StringNotEmptyConverter ausgeblendet
-
-        // Min über Max anheben → Hinweis wird gesetzt und (über den Converter) sichtbar.
-        fan.MinPwm = 220;
-        Dispatcher.UIThread.RunJobs();
-        Assert.NotEqual("", fan.PwmAdjustHint);
-        Assert.Equal(fan.PwmAdjustHint, hint.Text);
-        Assert.True(hint.IsEffectivelyVisible);
-    }
-
-    [AvaloniaFact]
-    public void Geraete_GroupSelect_BindsToAvailableGroups_AndFansHaveNone()
-    {
-        // Only sensor groups feed the auto-completion now; fans group via their location.
-        var config = new AppConfig
-        {
-            Sensors = new[] { new SensorConfig { SensorId = "hwmon0/temp1", Name = "CPU", Group = "CPU" } },
-            Fans = new[] { new FanConfig { FanId = "hwmon0/pwm1", Name = "CPU Fan" } },
-        };
-        var snap = new MonitorSnapshot(
-            "Verbunden",
-            new[] { new SensorReading("hwmon0/temp1", "CPU", SensorKind.Temperature, "°C", 45.0) },
-            new[] { new FanReading("hwmon0/pwm1", "CPU Fan", 1200, 120, FanMode.Auto, CanControl: true) },
-            config, Connected: true);
-
-        var (ctrl, window) = ShowMain(snap);
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabSettings);
-
-        SelectSettingsSection(ctrl, SettingsSection.Sensors);
-        AutoCompleteBox sensorBox = window.Find<AutoCompleteBox>().Single(b => b.DataContext is SensorOption);
-        Assert.Same(ctrl.Editor.AvailableGroups, sensorBox.ItemsSource);
-        Assert.Equal(new[] { "CPU" }, ctrl.Editor.AvailableGroups);
-
-        // The fan group field is gone - a reappearing AutoCompleteBox in the fans section would be a regression.
-        SelectSettingsSection(ctrl, SettingsSection.Fans);
-        Assert.DoesNotContain(window.Find<AutoCompleteBox>(), b => b.DataContext is FanAssignRow);
-    }
-
-    /// <summary>Opens the sensors section and returns the group chip together with its sensor row.</summary>
-    private static (AutoCompleteBox box, SensorOption row) FindGroupChip(MainController ctrl, MainWindow window)
-    {
-        SelectSettingsSection(ctrl, SettingsSection.Sensors);
-        AutoCompleteBox box = window.Find<AutoCompleteBox>().First(b => b.DataContext is SensorOption);
-        return (box, (SensorOption)box.DataContext!);
-    }
-
-    /// <summary>Two sensors: one ungrouped (the chip under test), one with existing group "Zone A" (the suggestion).</summary>
+    /// <summary>Two sensors: one ungrouped, one in group "Zone A" - the group whose name field the tests edit.</summary>
     private static MonitorSnapshot SnapshotWithGroupedSensor()
     {
         var config = new AppConfig
@@ -482,53 +491,9 @@ public class MainWindowInteractionSmokeTests
             config, Connected: true);
     }
 
-    [AvaloniaFact]
-    public void Geraete_GroupChip_CommitsSuggestion_OnDropDownClose()
-    {
-        var (ctrl, window) = ShowMain(SnapshotWithGroupedSensor());
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabSettings);
-        SelectSettingsSection(ctrl, SettingsSection.Sensors);
-        AutoCompleteBox box = window.Find<AutoCompleteBox>()
-            .First(b => b.DataContext is SensorOption { Group: "" });
-        var row = (SensorOption)box.DataContext!;
-
-        // Deterministic stand-in for a popup click: type a prefix, open the popup, let the adapter
-        // write the picked suggestion into Text (SelectedItem), then the popup closes -> the
-        // DropDownClosed handler must commit the SUGGESTION, not the typed prefix.
-        box.Focus();
-        box.Text = "Zo";
-        Dispatcher.UIThread.RunJobs();
-        box.IsDropDownOpen = true;
-        Dispatcher.UIThread.RunJobs();
-        box.SelectedItem = "Zone A";
-        box.IsDropDownOpen = false; // raises DropDownClosed
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal("Zone A", row.Group);
-    }
-
-    [AvaloniaFact]
-    public void Geraete_GroupChip_CommitsFreeText_OnFocusLoss()
-    {
-        var (ctrl, window) = ShowMain(UiTestHelpers.SampleSnapshot());
-        UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        SelectTab(window, TabSettings);
-        (AutoCompleteBox box, SensorOption row) = FindGroupChip(ctrl, window);
-
-        box.Focus();
-        box.Text = "Zone neu";
-        Dispatcher.UIThread.RunJobs();
-
-        // Click-away: focus moves to another focusable control. Depending on whether typing opened the
-        // popup, the commit runs via LostFocus (closed) or via the DropDownClosed that the focus loss
-        // triggers - either path must land the typed text in the row.
-        window.Find<TextBox>().First(t => t.Name == "SensorSearchBox").Focus();
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal("Zone neu", row.Group);
-        Assert.Contains("Zone neu", ctrl.Editor.AvailableGroups);
-    }
+    /// <summary>The name field in the header of group <paramref name="name"/>.</summary>
+    private static TextBox GroupNameBox(MainWindow window, string name) =>
+        window.Find<TextBox>().Single(t => t.Name == "GroupNameBox" && t.DataContext is SensorGroupSection s && s.Name == name);
 
     [AvaloniaFact]
     public void ClickOnEmptySpace_ReleasesInputFocus()
@@ -553,27 +518,27 @@ public class MainWindowInteractionSmokeTests
     }
 
     [AvaloniaFact]
-    public void ClickOnEmptySpace_CommitsPendingGroupEdit()
+    public void ClickOnEmptySpace_CommitsPendingGroupRename()
     {
         var (ctrl, window) = ShowMain(SnapshotWithGroupedSensor());
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
         SelectTab(window, TabSettings);
         SelectSettingsSection(ctrl, SettingsSection.Sensors);
-        AutoCompleteBox box = window.Find<AutoCompleteBox>()
-            .First(b => b.DataContext is SensorOption { Group: "" });
-        var row = (SensorOption)box.DataContext!;
+        TextBox box = GroupNameBox(window, "Zone A");
 
         box.Focus();
         box.Text = "Zone frei";
         Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Zone A", ctrl.Editor.Sensors.Single(s => s.Id == "hwmon0/temp2").Group); // typing only drafts
 
-        // Click-away must both release the focus AND land the typed group in the row (end to end:
-        // global press handler -> window focus -> chip LostFocus/DropDownClosed commit).
+        // Click-away must both release the focus AND rename the group (end to end: global press handler ->
+        // window focus -> the field's LostFocus commit).
         window.MouseDown(new Point(500, 30), MouseButton.Left);
         window.MouseUp(new Point(500, 30), MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("Zone frei", row.Group);
+        Assert.Equal("Zone frei", ctrl.Editor.Sensors.Single(s => s.Id == "hwmon0/temp2").Group);
+        Assert.Equal(new[] { "Zone frei" }, ctrl.Editor.SensorGroups);
     }
 
     [AvaloniaFact]
@@ -597,7 +562,7 @@ public class MainWindowInteractionSmokeTests
             Array.Empty<FanReading>(),
             config, Connected: true);
 
-        using var ctrl = new MainController(new FakeLiveMonitor(snap));
+        using var ctrl = UiTestHelpers.NewController(new FakeLiveMonitor(snap));
         UiTestHelpers.PumpUntil(() => ctrl.SensorGroups.Count > 0);
 
         // "CPU" and "cpu" must merge into ONE dashboard block (first-seen casing names the header).

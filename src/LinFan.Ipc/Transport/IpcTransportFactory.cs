@@ -32,6 +32,21 @@ public static class IpcTransportFactory
         throw Unsupported();
     }
 
+    /// <summary>
+    /// Whether anything holds the endpoint - a daemon that serves and one that is stopped or stuck alike; on Windows
+    /// whoever owns the pipe, a squatter included. The CLI asks before it writes a fan itself: next to a daemon it
+    /// would fight that daemon's control loop, while a false alarm only refuses the command. Without a transport
+    /// nothing can hold one.
+    /// </summary>
+    public static bool IsEndpointHeld(string endpoint)
+    {
+        if (IsUnix)
+            return UnixSocketServerTransport.IsHeld(endpoint);
+        if (OperatingSystem.IsWindows())
+            return NamedPipeServerTransport.IsHeld(endpoint);
+        return false;
+    }
+
     private static bool IsUnix => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
 
     private static PlatformNotSupportedException Unsupported() => new(

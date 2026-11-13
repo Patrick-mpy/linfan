@@ -117,7 +117,7 @@ public sealed class SingleInstanceGuardTests
     [Fact]
     public void Unix_endpoint_prefers_the_runtime_dir()
     {
-        string path = SingleInstanceGuard.UnixSocketPath("/run/user/1000", "/home/u/.config", uid: 1000);
+        string? path = SingleInstanceGuard.UnixSocketPath("/run/user/1000", "/home/u/.config");
 
         Assert.Equal(Path.Combine("/run/user/1000", "linfan-gui.sock"), path);
     }
@@ -125,30 +125,32 @@ public sealed class SingleInstanceGuardTests
     [Fact]
     public void Unix_endpoint_falls_back_to_the_config_dir()
     {
-        string path = SingleInstanceGuard.UnixSocketPath(runtimeDir: null, "/home/u/.config", uid: 1000);
+        string? path = SingleInstanceGuard.UnixSocketPath(runtimeDir: null, "/home/u/.config");
 
         Assert.Equal(Path.Combine("/home/u/.config", "linfan", "gui.sock"), path);
     }
 
     [Fact]
-    public void Unix_endpoint_stays_absolute_without_a_home_directory()
+    public void Without_a_runtime_or_home_dir_there_is_no_endpoint_and_the_guard_stays_inert()
     {
-        // Ohne HOME liefert GetFolderPath einen leeren Pfad; ein relativer Endpunkt hinge am
-        // Arbeitsverzeichnis und jeder Startort bekäme seine eigene „Einzel"-Instanz.
-        string path = SingleInstanceGuard.UnixSocketPath(runtimeDir: null, appData: "", uid: 0);
+        // A relative endpoint would hang off the working directory, and one in the shared temp dir could be planted by
+        // another account to make this GUI exit on every launch - so none, and the app starts without the guard.
+        Assert.Null(SingleInstanceGuard.UnixSocketPath(runtimeDir: null, appData: ""));
+        Assert.Null(SingleInstanceGuard.UnixSocketPath(runtimeDir: "", appData: null));
 
-        Assert.True(Path.IsPathRooted(path), $"Endpunkt ist relativ: {path}");
-        Assert.Contains("linfan-gui-0", path); // uid im Namen: das Temp-Verzeichnis ist geteilt
+        using SingleInstanceGuard? guard = SingleInstanceGuard.AcquireOrActivate(endpoint: null);
+        Assert.NotNull(guard); // inert, never "another instance is running"
     }
 
     [Fact]
     public void Default_endpoint_is_stable_within_a_user_session()
     {
-        string endpoint = SingleInstanceGuard.DefaultEndpoint();
+        string? endpoint = SingleInstanceGuard.DefaultEndpoint();
 
-        Assert.False(string.IsNullOrWhiteSpace(endpoint));
         Assert.Equal(endpoint, SingleInstanceGuard.DefaultEndpoint()); // beide Prozesse müssen dasselbe ableiten
-        if (!OperatingSystem.IsWindows())
+        if (OperatingSystem.IsWindows())
+            Assert.False(string.IsNullOrWhiteSpace(endpoint));
+        else if (endpoint is not null) // none without XDG_RUNTIME_DIR and home (CI containers, service accounts)
         {
             // Absolut - sonst hinge der Endpunkt am Arbeitsverzeichnis und jeder Startort bekäme seine
             // eigene „Einzel"-Instanz. Ohne Home und ohne XDG_RUNTIME_DIR (CI-Container, Dienstkonten)

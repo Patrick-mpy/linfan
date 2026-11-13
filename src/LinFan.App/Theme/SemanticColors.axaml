@@ -1,10 +1,15 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:svc="using:LinFan.App.Services">
     <!--
         Semantische Farb-Tokens für hell/dunkel. Views referenzieren ausschließlich diese Keys per
         {DynamicResource …}; nie wieder Hex-Literale in der View. ThemeVariant.Default (System-Modus)
         braucht kein eigenes Dictionary - Avalonia löst dann auf die OS-Variante (Light/Dark) auf.
         Die *Color*-Keys am Ende sind für die selbstgezeichneten Controls (CurveChart baut daraus Pens).
+        Terminal and HighContrast inherit Dark: their dictionaries only list what differs, the rest falls back to the
+        dark one. Services/AccentPalette repeats the surfaces, OnAccent and AccentColor of all four (it derives accents
+        without an application) - SemanticColorTokenTests keeps both in step. A chosen accent colour overrides the
+        accent keys from a dictionary added after this one (Services/AccentResources).
     -->
     <ResourceDictionary.ThemeDictionaries>
 
@@ -14,6 +19,10 @@
             <SolidColorBrush x:Key="BgCardAlt" Color="#1E1E24" />
             <SolidColorBrush x:Key="BgInset" Color="#0E0E11" />
             <SolidColorBrush x:Key="Divider" Color="#2E2E38" />
+            <SolidColorBrush x:Key="TempCool" Color="#22C55E" />
+            <SolidColorBrush x:Key="TempWarm" Color="#F59E0B" />
+            <SolidColorBrush x:Key="TempHot" Color="#F87171" />
+            <SolidColorBrush x:Key="TempNone" Color="#71717A" />
             <SolidColorBrush x:Key="TextPrimary" Color="#FAFAFA" />
             <SolidColorBrush x:Key="TextHeading" Color="#E4E4E7" />
             <SolidColorBrush x:Key="TextSecondary" Color="#C7C7CC" />
@@ -30,6 +39,23 @@
             <SolidColorBrush x:Key="InfoBg" Color="#1E3A5F" />
             <SolidColorBrush x:Key="InfoText" Color="#BFDBFE" />
             <SolidColorBrush x:Key="InfoAccent" Color="#93C5FD" />
+            <!-- Warning banner surface; WarningText stays readable on it (≈5:1). -->
+            <SolidColorBrush x:Key="WarningBg" Color="#78350F" />
+            <!-- Faint accent wash (8 %) for a highlighted area, e.g. the group a row is dragged over. -->
+            <SolidColorBrush x:Key="AccentTint" Color="#1438BDF8" />
+            <!-- Translucent hover fill for flat in-control buttons (segment items, stepper +/-); translucent so it
+                 shows on any surface below it, like FluentTheme's own control fills. -->
+            <SolidColorBrush x:Key="ControlHover" Color="#24FFFFFF" />
+            <!-- Unfilled track of a control (pending steps of the setup assistant's step indicator); translucent like
+                 ControlHover, so it reads on the window and on cards alike. -->
+            <SolidColorBrush x:Key="ControlTrack" Color="#47FFFFFF" />
+            <!-- Shadow of floating surfaces above the content (unsaved-changes bar). -->
+            <BoxShadows x:Key="ShadowLg">0 20 50 0 #8C000000</BoxShadows>
+            <!-- Lift of a small raised element on its track (selected segment). -->
+            <BoxShadows x:Key="ShadowSm">0 1 2 0 #2E000000</BoxShadows>
+            <!-- Frame of a filled card where its surface alone does not set it apart (terminal, high contrast): the theme
+                 tiles draw it, Layout.axaml frames the cards with it in those themes. None here. -->
+            <SolidColorBrush x:Key="CardOutline" Color="Transparent" />
 
             <!-- Gefüllte Aktions-Buttons (Button.primary/.danger). Eigene Füll-Töne statt Accent/DangerAccent:
                  die sind im Dunkel-Theme hell (sie dienen als Schrift-/Streifenfarbe auf dunklem Grund) und
@@ -53,10 +79,32 @@
             <Color x:Key="ClampColor">#356C82</Color>
             <Color x:Key="LiveColor">#F59E0B</Color>
 
-            <!-- Luftrichtung der Gehäuse-Vorschau (FanLocationDiagram): Einlass kühl, Auslass warm, intern neutral. -->
+            <!-- Air direction in the case schema (Controls/CaseSchemaView): intake cool, exhaust warm, internal neutral. -->
             <Color x:Key="IntakeColor">#38BDF8</Color>
             <Color x:Key="ExhaustColor">#F59E0B</Color>
             <Color x:Key="InternalColor">#6B7280</Color>
+            <!-- The same directions as brushes, for icons (the direction mark of the fan position sections). -->
+            <SolidColorBrush x:Key="IntakeBrush" Color="{StaticResource IntakeColor}" />
+            <SolidColorBrush x:Key="ExhaustBrush" Color="{StaticResource ExhaustColor}" />
+            <SolidColorBrush x:Key="InternalBrush" Color="{StaticResource InternalColor}" />
+
+            <!-- Fluent draws checks, radio dots and the switch knob white on the accent; the dark theme's accent is light
+                 (white on it about 2:1), so they are dark here - any accent derived for this theme carries it (≥ 5:1). -->
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#0E0E11" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#0E0E11" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#0E0E11" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#0E0E11" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#0E0E11" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#0E0E11" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#0E0E11" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#0E0E11" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#0E0E11" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#0E0E11" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#0E0E11" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#0E0E11" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#0E0E11" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#0E0E11" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#0E0E11" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="{x:Static ThemeVariant.Light}">
@@ -65,6 +113,11 @@
             <SolidColorBrush x:Key="BgCardAlt" Color="#EFEFF3" />
             <SolidColorBrush x:Key="BgInset" Color="#ECECF1" />
             <SolidColorBrush x:Key="Divider" Color="#D9D9DF" />
+            <!-- The 700 steps: on white the dark theme's temperature colours would not read (green 2.3:1). -->
+            <SolidColorBrush x:Key="TempCool" Color="#15803D" />
+            <SolidColorBrush x:Key="TempWarm" Color="#B45309" />
+            <SolidColorBrush x:Key="TempHot" Color="#DC2626" />
+            <SolidColorBrush x:Key="TempNone" Color="#71717A" />
             <SolidColorBrush x:Key="TextPrimary" Color="#18181B" />
             <SolidColorBrush x:Key="TextHeading" Color="#27272A" />
             <SolidColorBrush x:Key="TextSecondary" Color="#3F3F46" />
@@ -81,6 +134,15 @@
             <SolidColorBrush x:Key="InfoBg" Color="#DBEAFE" />
             <SolidColorBrush x:Key="InfoText" Color="#1E40AF" />
             <SolidColorBrush x:Key="InfoAccent" Color="#2563EB" />
+            <SolidColorBrush x:Key="WarningBg" Color="#FEF3C7" />
+            <SolidColorBrush x:Key="AccentTint" Color="#140284C7" />
+            <SolidColorBrush x:Key="ControlHover" Color="#0F000000" />
+            <SolidColorBrush x:Key="ControlTrack" Color="#38000000" />
+            <!-- Lighter than in the dark theme: a dark-tuned shadow reads as a smudge on a light window. -->
+            <BoxShadows x:Key="ShadowLg">0 20 50 0 #40000000</BoxShadows>
+            <!-- Same as dark for now (the canvas .seg uses 18 % in both themes); a token so it can diverge. -->
+            <BoxShadows x:Key="ShadowSm">0 1 2 0 #2E000000</BoxShadows>
+            <SolidColorBrush x:Key="CardOutline" Color="Transparent" />
 
             <!-- Siehe Dunkel-Variante: identische Füll-Töne, damit eine Aktion in beiden Themes gleich
                  aussieht (hier fallen sie ohnehin mit Accent/DangerAccent zusammen). -->
@@ -102,10 +164,255 @@
             <Color x:Key="ClampColor">#7DD3FC</Color>
             <Color x:Key="LiveColor">#D97706</Color>
 
-            <!-- Luftrichtung der Gehäuse-Vorschau (FanLocationDiagram): Einlass kühl, Auslass warm, intern neutral. -->
+            <!-- Air direction in the case schema (Controls/CaseSchemaView): intake cool, exhaust warm, internal neutral. -->
             <Color x:Key="IntakeColor">#0284C7</Color>
             <Color x:Key="ExhaustColor">#D97706</Color>
             <Color x:Key="InternalColor">#9CA3AF</Color>
+            <SolidColorBrush x:Key="IntakeBrush" Color="{StaticResource IntakeColor}" />
+            <SolidColorBrush x:Key="ExhaustBrush" Color="{StaticResource ExhaustColor}" />
+            <SolidColorBrush x:Key="InternalBrush" Color="{StaticResource InternalColor}" />
+        </ResourceDictionary>
+
+        <!-- Terminal: phosphor green on black. What sits on the bright accent (buttons, checks, switch knobs) carries dark
+             ink. -->
+        <ResourceDictionary x:Key="{x:Static svc:ThemeVariantMap.Terminal}">
+            <SolidColorBrush x:Key="BgWindow" Color="#050805" />
+            <SolidColorBrush x:Key="BgCard" Color="#0A100B" />
+            <SolidColorBrush x:Key="BgCardAlt" Color="#0F1A11" />
+            <SolidColorBrush x:Key="BgInset" Color="#030503" />
+            <SolidColorBrush x:Key="Divider" Color="#1E3A25" />
+            <SolidColorBrush x:Key="TempCool" Color="#4ADE80" />
+            <SolidColorBrush x:Key="TempWarm" Color="#FACC15" />
+            <SolidColorBrush x:Key="TempHot" Color="#F87171" />
+            <SolidColorBrush x:Key="TempNone" Color="#5A8A66" />
+            <SolidColorBrush x:Key="TextPrimary" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="TextHeading" Color="#DDFBE3" />
+            <SolidColorBrush x:Key="TextSecondary" Color="#A6DDB1" />
+            <SolidColorBrush x:Key="TextMuted" Color="#7DB58A" />
+            <SolidColorBrush x:Key="TextFaint" Color="#5A8A66" />
+            <SolidColorBrush x:Key="TextFaintest" Color="#3E6248" />
+            <SolidColorBrush x:Key="Accent" Color="#39FF6A" />
+            <SolidColorBrush x:Key="Success" Color="#4ADE80" />
+            <SolidColorBrush x:Key="Warning" Color="#FACC15" />
+            <SolidColorBrush x:Key="WarningText" Color="#FDE047" />
+            <SolidColorBrush x:Key="DangerBg" Color="#3B0A0A" />
+            <SolidColorBrush x:Key="DangerText" Color="#FCA5A5" />
+            <SolidColorBrush x:Key="InfoBg" Color="#0B2A16" />
+            <SolidColorBrush x:Key="InfoText" Color="#A7F3D0" />
+            <SolidColorBrush x:Key="InfoAccent" Color="#6EE7B7" />
+            <SolidColorBrush x:Key="WarningBg" Color="#2B2405" />
+            <SolidColorBrush x:Key="AccentTint" Color="#1439FF6A" />
+            <!-- The phosphor green of hovers, tracks and control frames is the terminal's chrome, like its text - it stays
+                 when another accent is chosen (only the Accent* tokens follow the choice). -->
+            <SolidColorBrush x:Key="ControlHover" Color="#2639FF6A" />
+            <SolidColorBrush x:Key="ControlTrack" Color="#4039FF6A" />
+            <!-- A hairline instead of a soft shadow - deliberately no glow. -->
+            <BoxShadows x:Key="ShadowLg">0 0 0 1 #2E5A3A</BoxShadows>
+            <BoxShadows x:Key="ShadowSm">0 0 0 0 #00000000</BoxShadows>
+            <SolidColorBrush x:Key="CardOutline" Color="#1E3A25" />
+
+            <SolidColorBrush x:Key="AccentFill" Color="#39FF6A" />
+            <SolidColorBrush x:Key="AccentHover" Color="#7CFF9C" />
+            <SolidColorBrush x:Key="AccentPressed" Color="#22C55E" />
+            <SolidColorBrush x:Key="OnAccent" Color="#050805" />
+            <SolidColorBrush x:Key="DangerFill" Color="#F87171" />
+            <SolidColorBrush x:Key="DangerHover" Color="#FCA5A5" />
+            <SolidColorBrush x:Key="DangerPressed" Color="#EF4444" />
+            <SolidColorBrush x:Key="OnDanger" Color="#050805" />
+
+            <Color x:Key="GridColor">#12261A</Color>
+            <Color x:Key="AxisColor">#5A8A66</Color>
+            <Color x:Key="HandleColor">#C8F7D0</Color>
+            <Color x:Key="AccentColor">#39FF6A</Color>
+            <Color x:Key="AccentShadeColor">#22C55E</Color>
+            <Color x:Key="ClampColor">#1C6B34</Color>
+            <Color x:Key="LiveColor">#FACC15</Color>
+
+            <!-- Intake cyan, so it does not read as the green accent; exhaust stays amber. -->
+            <Color x:Key="IntakeColor">#22D3EE</Color>
+            <Color x:Key="InternalColor">#6B8F73</Color>
+            <SolidColorBrush x:Key="IntakeBrush" Color="{StaticResource IntakeColor}" />
+            <SolidColorBrush x:Key="InternalBrush" Color="{StaticResource InternalColor}" />
+
+            <!-- FluentTheme controls: dark ink on the bright accent, green-tinted strokes, fields and buttons. Fluent's
+                 accent itself cannot be set in this dictionary - see Services/AccentResources. -->
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#050805" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#050805" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#050805" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#050805" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#050805" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#050805" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#050805" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#050805" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#050805" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#050805" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#050805" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#050805" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#050805" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#050805" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#050805" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#B339FF6A" />
+            <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#B339FF6A" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#B339FF6A" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#7DB58A" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#A6DDB1" />
+            <SolidColorBrush x:Key="SliderTrackFill" Color="#4039FF6A" />
+            <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="TextControlBackground" Color="#030503" />
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#030503" />
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#030503" />
+            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#B339FF6A" />
+            <SolidColorBrush x:Key="TextControlForeground" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#7DB58A" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#7DB58A" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#5A8A66" />
+            <SolidColorBrush x:Key="ButtonBackground" Color="#1439FF6A" />
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#2639FF6A" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0D39FF6A" />
+            <SolidColorBrush x:Key="ButtonBorderBrush" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#B339FF6A" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#6639FF6A" />
+            <SolidColorBrush x:Key="ButtonForeground" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#DDFBE3" />
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="ToggleButtonBackground" Color="#1439FF6A" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#2639FF6A" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#0D39FF6A" />
+            <SolidColorBrush x:Key="ToggleButtonForeground" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#DDFBE3" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#C8F7D0" />
+            <SolidColorBrush x:Key="ToolTipBackground" Color="#0F1A11" />
+            <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#2E5A3A" />
+            <SolidColorBrush x:Key="ToolTipForeground" Color="#C8F7D0" />
+        </ResourceDictionary>
+
+        <!-- High contrast: black and white, every text at least 7:1 - the faint ones too. Accent cyan, so yellow stays the
+             warning (and the focus ring). Frames instead of surfaces: cards, buttons and fields get light outlines. -->
+        <ResourceDictionary x:Key="{x:Static svc:ThemeVariantMap.HighContrast}">
+            <SolidColorBrush x:Key="BgWindow" Color="#000000" />
+            <SolidColorBrush x:Key="BgCard" Color="#000000" />
+            <SolidColorBrush x:Key="BgCardAlt" Color="#121212" />
+            <SolidColorBrush x:Key="BgInset" Color="#000000" />
+            <SolidColorBrush x:Key="Divider" Color="#A3A3A3" />
+            <SolidColorBrush x:Key="TempCool" Color="#4ADE80" />
+            <SolidColorBrush x:Key="TempWarm" Color="#FFD60A" />
+            <SolidColorBrush x:Key="TempHot" Color="#FF7A7A" />
+            <SolidColorBrush x:Key="TempNone" Color="#A3A3A3" />
+            <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextHeading" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextSecondary" Color="#F5F5F5" />
+            <SolidColorBrush x:Key="TextMuted" Color="#E5E5E5" />
+            <SolidColorBrush x:Key="TextFaint" Color="#D4D4D4" />
+            <SolidColorBrush x:Key="TextFaintest" Color="#A3A3A3" />
+            <SolidColorBrush x:Key="Accent" Color="#3FE0FF" />
+            <SolidColorBrush x:Key="Success" Color="#4ADE80" />
+            <SolidColorBrush x:Key="Warning" Color="#FFD60A" />
+            <SolidColorBrush x:Key="WarningText" Color="#FFE45C" />
+            <SolidColorBrush x:Key="DangerBg" Color="#3A0000" />
+            <SolidColorBrush x:Key="DangerText" Color="#FFC2C2" />
+            <SolidColorBrush x:Key="DangerAccent" Color="#FF7A7A" />
+            <SolidColorBrush x:Key="InfoBg" Color="#00262E" />
+            <SolidColorBrush x:Key="InfoText" Color="#C2F5FF" />
+            <SolidColorBrush x:Key="InfoAccent" Color="#3FE0FF" />
+            <SolidColorBrush x:Key="WarningBg" Color="#3A2E00" />
+            <SolidColorBrush x:Key="AccentTint" Color="#263FE0FF" />
+            <SolidColorBrush x:Key="ControlHover" Color="#38FFFFFF" />
+            <SolidColorBrush x:Key="ControlTrack" Color="#A3A3A3" />
+            <!-- A frame instead of a shadow. -->
+            <BoxShadows x:Key="ShadowLg">0 0 0 2 #FFFFFF</BoxShadows>
+            <BoxShadows x:Key="ShadowSm">0 0 0 0 #00000000</BoxShadows>
+            <SolidColorBrush x:Key="CardOutline" Color="#A3A3A3" />
+
+            <SolidColorBrush x:Key="AccentFill" Color="#3FE0FF" />
+            <SolidColorBrush x:Key="AccentHover" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentPressed" Color="#9AEFFF" />
+            <SolidColorBrush x:Key="OnAccent" Color="#000000" />
+            <SolidColorBrush x:Key="DangerFill" Color="#FF6B6B" />
+            <SolidColorBrush x:Key="DangerHover" Color="#FF9A9A" />
+            <SolidColorBrush x:Key="DangerPressed" Color="#FF4D4D" />
+            <SolidColorBrush x:Key="OnDanger" Color="#000000" />
+
+            <Color x:Key="GridColor">#525252</Color>
+            <Color x:Key="AxisColor">#D4D4D4</Color>
+            <Color x:Key="HandleColor">#FFFFFF</Color>
+            <Color x:Key="AccentColor">#3FE0FF</Color>
+            <Color x:Key="AccentShadeColor">#9AEFFF</Color>
+            <Color x:Key="ClampColor">#1C6A78</Color>
+            <Color x:Key="LiveColor">#FFD60A</Color>
+
+            <Color x:Key="IntakeColor">#5CC8FF</Color>
+            <Color x:Key="ExhaustColor">#FFA826</Color>
+            <Color x:Key="InternalColor">#BDBDBD</Color>
+            <SolidColorBrush x:Key="IntakeBrush" Color="{StaticResource IntakeColor}" />
+            <SolidColorBrush x:Key="ExhaustBrush" Color="{StaticResource ExhaustColor}" />
+            <SolidColorBrush x:Key="InternalBrush" Color="{StaticResource InternalColor}" />
+
+            <!-- FluentTheme controls: black ink on the accent, white strokes and frames, a yellow focus ring (its 3 px
+                 width comes from Layout.axaml). -->
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#000000" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#000000" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#000000" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#000000" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#000000" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#000000" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#000000" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#000000" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#000000" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#000000" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#000000" />
+            <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#000000" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#000000" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#000000" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#000000" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="SliderTrackFill" Color="#A3A3A3" />
+            <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#D4D4D4" />
+            <SolidColorBrush x:Key="TextControlBackground" Color="#000000" />
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#000000" />
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#000000" />
+            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextControlForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#D4D4D4" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#D4D4D4" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#D4D4D4" />
+            <SolidColorBrush x:Key="ButtonBackground" Color="#1FFFFFFF" />
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#38FFFFFF" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#14FFFFFF" />
+            <SolidColorBrush x:Key="ButtonBorderBrush" Color="#FFFFFF" />
+            <!-- The hover frame is the accent - the chosen one too (AccentColor comes from the accent override). -->
+            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{DynamicResource AccentColor}" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ButtonForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackground" Color="#1FFFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#38FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#14FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToolTipBackground" Color="#000000" />
+            <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToolTipForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="#FFD60A" />
+            <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="#000000" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

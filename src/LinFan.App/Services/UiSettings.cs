@@ -3,9 +3,9 @@
 namespace LinFan.App.Services;
 
 /// <summary>
-/// GUI-lokale Oberflächen-Einstellungen (per-User), bewusst getrennt vom Daemon-Config. Derzeit nur die
-/// Fenster-Geometrie; <see cref="UiSettingsStore"/> persistiert sie als JSON. Felder sind nullable, damit
-/// „nicht gesetzt" (erster Start) sauberer von „auf 0" unterscheidbar ist.
+/// GUI-local interface settings (per user), kept apart from the daemon's config: window geometry, theme, accent,
+/// language, tray and update checks; <see cref="UiSettingsStore"/> persists them as JSON. The geometry fields are
+/// nullable so that "not set yet" (first start) differs from "0".
 /// </summary>
 public sealed record UiSettings
 {
@@ -26,6 +26,15 @@ public sealed record UiSettings
 
     /// <summary>Gewählter Theme-Modus; Default <see cref="ThemeChoice.System"/> (folgt dem OS).</summary>
     public ThemeChoice Theme { get; init; } = ThemeChoice.System;
+
+    /// <summary>The accent colour: the theme's own (default), a preset, or <see cref="AccentCustom"/>.</summary>
+    public AccentChoice Accent { get; init; } = AccentChoice.Standard;
+
+    /// <summary>
+    /// The user's own accent as "#RRGGBB"; <c>null</c> until they entered one. Kept while another accent is chosen,
+    /// so switching back to "custom" brings it back.
+    /// </summary>
+    public string? AccentCustom { get; init; }
 
     /// <summary>Gewählte UI-Sprache; Default <see cref="LanguageChoice.System"/> (folgt der OS-Kultur).</summary>
     public LanguageChoice Language { get; init; } = LanguageChoice.System;

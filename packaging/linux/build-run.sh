@@ -11,27 +11,14 @@ set -euo pipefail
 VERSION="${1:?usage: build-run.sh <version> [out-dir]}"
 OUT="${2:-.}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
-# Mirror the release-tarball layout so install-bin.sh finds bin/ at ../../bin from packaging/linux/.
-echo "==> publish self-contained (Daemon + App) into bin/"
-mkdir -p "$STAGE/bin" "$STAGE/packaging"
-dotnet publish "$REPO/src/LinFan.Daemon" -c Release -r linux-x64 --self-contained \
-  -p:Version="$VERSION" -p:PublishSingleFile=true -o "$STAGE/bin"
-dotnet publish "$REPO/src/LinFan.App" -c Release -r linux-x64 --self-contained \
-  -p:Version="$VERSION" -p:PublishSingleFile=true -o "$STAGE/bin"
+# The release-tarball layout, so install-bin.sh finds bin/ at ../../bin from packaging/linux/.
+bash "$SCRIPT_DIR/stage-tarball.sh" "$STAGE" "$VERSION"
+# Debug symbols stay in the tarball but not in the installer - they only make the download bigger.
 find "$STAGE/bin" -name '*.pdb' -delete
-
-echo "==> stage packaging/ (installer + assets + uninstaller)"
-cp -r "$SCRIPT_DIR" "$STAGE/packaging/linux"
-cp "$REPO/packaging/linfan.desktop" "$STAGE/packaging/linfan.desktop"
-# The archive has no src/ tree - stage the app icon next to the desktop entry for install-bin.sh.
-cp "$REPO/src/LinFan.App/Assets/linfan-icon.svg" "$STAGE/packaging/linfan.svg"
-cp "$REPO/packaging/uninstall.sh" "$STAGE/packaging/uninstall.sh"
-chmod +x "$STAGE/packaging/linux/install-bin.sh"
 
 echo "==> makeself self-extracting archive"
 mkdir -p "$OUT"

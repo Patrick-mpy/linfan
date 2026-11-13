@@ -24,6 +24,8 @@ public sealed record FanLocationOption(FanLocation Value, string Key)
         new FanLocationOption(FanLocation.CaseSideIntake, "FanLocationOption.CaseSideIntake"),
         new FanLocationOption(FanLocation.CaseTopIntake, "FanLocationOption.CaseTopIntake"),
         new FanLocationOption(FanLocation.CaseRearIntake, "FanLocationOption.CaseRearIntake"),
+        // Moves the air on like an intake (server); sorts with the intakes.
+        new FanLocationOption(FanLocation.FanWall, "FanLocationOption.FanWall"),
         // Auslass-Varianten
         new FanLocationOption(FanLocation.CaseRearExhaust, "FanLocationOption.CaseRearExhaust"),
         new FanLocationOption(FanLocation.CaseTopExhaust, "FanLocationOption.CaseTopExhaust"),
@@ -36,6 +38,20 @@ public sealed record FanLocationOption(FanLocation Value, string Key)
 
     public static FanLocationOption For(FanLocation value) =>
         All.FirstOrDefault(o => o.Value == value) ?? All[0];
+
+    /// <summary>
+    /// Where a position sorts in lists grouped by position: coolers, intakes, exhausts, PSU, other - the order of
+    /// <see cref="All"/> -, and „no position" last.
+    /// </summary>
+    public static int Rank(FanLocation value)
+    {
+        if (value == FanLocation.Unspecified)
+            return All.Count;
+        for (int i = 0; i < All.Count; i++)
+            if (All[i].Value == value)
+                return i;
+        return All.Count;
+    }
 
     /// <summary>Lokalisierter Anzeigetext (berechnet aus <see cref="Key"/>).</summary>
     public string Display => Localizer.Instance[Key];
@@ -68,6 +84,7 @@ public sealed record FanLocationOption(FanLocation Value, string Key)
         FanLocation.CaseFrontExhaust => Localizer.Instance["FanLocationOption.Group.FrontExhaust"],
         FanLocation.CaseBottomExhaust => Localizer.Instance["FanLocationOption.Group.BottomExhaust"],
         FanLocation.CaseSideExhaust => Localizer.Instance["FanLocationOption.Group.SideExhaust"],
+        FanLocation.FanWall => Localizer.Instance["FanLocationOption.Group.FanWall"],
         FanLocation.Psu => Localizer.Instance["FanLocationOption.Group.Psu"],
         FanLocation.Other => Localizer.Instance["FanLocationOption.Group.Other"],
         _ => "",

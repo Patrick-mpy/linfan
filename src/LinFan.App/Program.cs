@@ -31,6 +31,10 @@ internal static class Program
             return;
 
         Instance = guard;
+        // Ends the process whatever a handler does - recorded at least, startup included. The handlers that let the GUI
+        // keep running are installed by App, which has a window to tell the user in.
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            GuiErrorLog.Default.Fatal("Process", "Unhandled exception - the GUI ends", e.ExceptionObject as Exception);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

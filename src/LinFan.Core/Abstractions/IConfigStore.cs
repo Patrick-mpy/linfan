@@ -20,4 +20,10 @@ public interface IConfigStore
 
     /// <summary>Speichert die Konfiguration atomar.</summary>
     void Save(AppConfig config);
+
+    /// <summary>
+    /// Moves a persisted config the daemon cannot use out of the way, so the next <see cref="Load"/> starts fresh
+    /// while the file stays available for inspection. Returns where it went.
+    /// </summary>
+    string SetAside();
 }

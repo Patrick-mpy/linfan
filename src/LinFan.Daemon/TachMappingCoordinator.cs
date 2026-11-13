@@ -32,7 +32,7 @@ internal sealed class TachMappingCoordinator
     private readonly ISensorBackend _sensors;
     private readonly IFanController _fans;
     private readonly ILogger _log;
-    private readonly Action<string> _suspend;
+    private readonly Action<string, FanControlState> _suspend;
     private readonly Action<string> _resume;
     private readonly Action<string, string> _onMatched; // (fanId, tachId) → Persistenz des Overrides
     private readonly Func<ISensorBackend, IFanController, TachometerMappingService> _mappingFactory;
@@ -53,7 +53,7 @@ internal sealed class TachMappingCoordinator
     /// <param name="delay">Wartefunktion für den Cooldown (injizierbar für Tests); <c>null</c> ⇒ <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
     public TachMappingCoordinator(
         ISensorBackend sensors, IFanController fans, ILogger log,
-        Action<string> suspend, Action<string> resume, Action<string, string> onMatched,
+        Action<string, FanControlState> suspend, Action<string> resume, Action<string, string> onMatched,
         CancellationToken hostToken,
         Func<ISensorBackend, IFanController, TachometerMappingService>? mappingFactory = null,
         Func<double>? failSafeTempC = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null,
@@ -188,6 +188,11 @@ internal sealed class TachMappingCoordinator
             _status = Fail(target, TachMappingFailReason.NotControllable);
             _log.LogInformation("Sensor-Kopplung nicht möglich: {Fan} - {Reason}", target.Value, ex.Message);
         }
+        catch (ManualWritesBlockedException)
+        {
+            _status = Fail(target, TachMappingFailReason.Canceled);
+            _log.LogInformation("Sensor-Kopplung beim Herunterfahren beendet: {Fan}.", target.Value);
+        }
         catch (Exception ex)
         {
             _status = Fail(target, TachMappingFailReason.Unknown);
@@ -207,8 +212,8 @@ internal sealed class TachMappingCoordinator
     /// </summary>
     private async Task<TachMappingResult> DriveAsync(FanId target, IReadOnlyList<FanId> fans, CancellationToken ct)
     {
-        foreach (FanId f in fans)
-            _suspend(f.Value); // take every controllable fan off the tick loop BEFORE the service writes
+        foreach (FanId f in fans) // take every controllable fan off the tick loop BEFORE the service writes
+            _suspend(f.Value, f == target ? FanControlState.Coupling : FanControlState.CouplingThrottled);
 
         try
         {

@@ -49,4 +49,82 @@ public sealed class IpcConfigPayloadTests
         Assert.Null(fan.RpmSource);
         Assert.Null(fan.Calibration);
     }
+
+    [Fact]
+    public void Save_CarriesEachFansBaseMinPwm()
+    {
+        AppConfig config = ConfigWithFan() with
+        {
+            Fans = new[] { ConfigWithFan().Fans[0] with { MinPwm = 60 }, new FanConfig { FanId = "new", MinPwm = 30 } },
+        };
+        var baseMinPwm = new Dictionary<string, byte> { ["/lpc/nct6797d/0/control/2"] = 40 };
+
+        IReadOnlyList<IpcFanAssignment> fans = IpcLiveMonitor.ToIpcConfig(config, baseMinPwm: baseMinPwm).Fans;
+
+        Assert.Equal(60, fans[0].MinPwm);
+        Assert.Equal(40, fans[0].BaseMinPwm); // the daemon sees the user changed 40 → 60
+        Assert.Null(fans[1].BaseMinPwm);      // no base: the sent value wins
+    }
+
+    [Fact]
+    public void Replace_SendsNoBase()
+    {
+        IpcFanAssignment fan = Assert.Single(IpcLiveMonitor.ToIpcConfig(ConfigWithFan(), withDaemonOwned: true).Fans);
+
+        Assert.Null(fan.BaseMinPwm);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SaveAndReplace_CarryTheSensorGroupsInOrder(bool withDaemonOwned)
+    {
+        var config = new AppConfig { SensorGroups = new[] { "GPU", "CPU", "Leer" } };
+
+        IpcConfig ipc = IpcLiveMonitor.ToIpcConfig(config, withDaemonOwned);
+
+        // Never null: null tells the daemon "older GUI, keep your list", so a deliberately empty list must go as [].
+        Assert.Equal(new[] { "GPU", "CPU", "Leer" }, ipc.SensorGroups);
+        Assert.Empty(IpcLiveMonitor.ToIpcConfig(AppConfig.Empty, withDaemonOwned).SensorGroups!);
+    }
+
+    [Fact]
+    public void Snapshot_SensorGroups_ReachTheAppConfig()
+    {
+        MonitorSnapshot snap = IpcLiveMonitor.Convert(SnapshotWith(IpcConfig.Empty with { SensorGroups = new[] { "CPU", "Leer" } }));
+
+        Assert.Equal(new[] { "CPU", "Leer" }, snap.Config.SensorGroups);
+    }
+
+    [Fact]
+    public void Snapshot_FromADaemonWithoutSensorGroups_ReadsAsEmpty()
+    {
+        MonitorSnapshot snap = IpcLiveMonitor.Convert(SnapshotWith(IpcConfig.Empty with { SensorGroups = null }));
+
+        Assert.Empty(snap.Config.SensorGroups);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SaveAndReplace_CarryTheCaseType_ByName(bool withDaemonOwned)
+    {
+        IpcConfig ipc = IpcLiveMonitor.ToIpcConfig(new AppConfig { CaseType = CaseType.Open }, withDaemonOwned);
+
+        Assert.Equal("Open", ipc.CaseType); // never null - null would tell the daemon to keep its own
+    }
+
+    [Theory]
+    [InlineData("Server", CaseType.Server)]
+    [InlineData(null, CaseType.Tower)]      // a daemon that predates the field
+    [InlineData("Submarine", CaseType.Tower)] // a newer one with a type this GUI does not know
+    public void Snapshot_CaseType_ReachesTheAppConfig(string? sent, CaseType expected)
+    {
+        MonitorSnapshot snap = IpcLiveMonitor.Convert(SnapshotWith(IpcConfig.Empty with { CaseType = sent }));
+
+        Assert.Equal(expected, snap.Config.CaseType);
+    }
+
+    private static IpcSnapshot SnapshotWith(IpcConfig config) =>
+        new(DaemonStatus.Active, false, 40, Array.Empty<IpcSensor>(), Array.Empty<IpcFan>(), config);
 }

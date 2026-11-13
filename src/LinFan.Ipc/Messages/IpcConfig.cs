@@ -12,6 +12,16 @@ namespace LinFan.Ipc.Messages;
 /// soll laufen, <c>true</c> = abgeschlossen/übersprungen, <c>null</c> = ältere Gegenstelle kennt das
 /// Feld nicht (der Daemon überschreibt dann seinen eigenen Stand nicht).
 /// </para>
+/// <para>
+/// <paramref name="SensorGroups"/> are the sensor group names in display order, empty groups included. <c>null</c>
+/// means the peer predates the field: a merge (<c>SaveConfig</c>) then keeps the daemon's list, a replace
+/// (<c>ReplaceConfig</c>, import) treats it as empty. An empty list always clears the groups.
+/// </para>
+/// <para>
+/// <paramref name="CaseType"/> is the name of the Core enum (<c>Tower</c>/<c>Server</c>/<c>Open</c>/<c>Laptop</c>), a
+/// name so a type one side does not know yet reads as unknown instead of failing the whole line. <c>null</c> means the
+/// peer predates the field: a merge keeps the daemon's type, a replace takes <c>Tower</c>.
+/// </para>
 /// </summary>
 public sealed record IpcConfig(
     IReadOnlyList<IpcCurve> Curves,
@@ -19,7 +29,9 @@ public sealed record IpcConfig(
     IReadOnlyList<IpcSensorName> Sensors,
     IReadOnlyList<IpcProfile> Profiles,
     string? ActiveProfileId,
-    bool? OnboardingCompleted = null)
+    bool? OnboardingCompleted = null,
+    IReadOnlyList<string>? SensorGroups = null,
+    string? CaseType = null)
 {
     public static IpcConfig Empty { get; } = new(
         Array.Empty<IpcCurve>(), Array.Empty<IpcFanAssignment>(), Array.Empty<IpcSensorName>(),
@@ -64,6 +76,8 @@ public sealed record IpcCurve(
 public sealed record IpcCurvePoint(double TemperatureC, double Percent);
 
 /// <summary>Zuordnung + PWM-Grenzen eines Lüfters, samt Einbau-Position.</summary>
+/// <param name="MaxPwm">Upper PWM bound. A peer that omits it gets the Core default 255 - not 0, which would hold the
+/// fan's curve at a stop.</param>
 /// <param name="Calibration">Persistiertes Kalibrier-Ergebnis (Anlaufpunkt + Drehzahlbereich), vom Daemon
 /// an die GUI gespiegelt, damit das „bereits kalibriert"-Badge auch nach einem Neustart erscheint. Im
 /// Normalbetrieb (<c>SaveConfig</c>/Merge) fließt es nur Daemon → GUI und die GUI schickt es nicht zurück;
@@ -73,20 +87,38 @@ public sealed record IpcCurvePoint(double TemperatureC, double Percent);
 /// überschreibt (manuelles Zuordnen / Auto-Kopplung). Wie <paramref name="Calibration"/> daemon-verwaltet:
 /// nur Daemon → GUI gespiegelt (Merge bewahrt), außer bei <c>ReplaceConfig</c> (Restore). <c>null</c> =
 /// keine Übersteuerung bzw. ältere Gegenstelle kennt das Feld nicht.</param>
+/// <param name="BaseMinPwm">GUI → daemon in <c>SaveConfig</c> only: the <paramref name="MinPwm"/> the sender's state
+/// started from. Where the sent value still equals it, the user did not change it and the daemon keeps its own - a
+/// calibration result that landed after the sender built its config must not be overwritten with the old start point.
+/// <c>null</c> = no base (older GUI): the sent value wins. Ignored by <c>ReplaceConfig</c>.</param>
 public sealed record IpcFanAssignment(
     string FanId,
     string Name,
     int MinPwm,
-    int MaxPwm,
-    string? AssignedCurveId,
+    int MaxPwm = 255,
+    string? AssignedCurveId = null,
     string Location = "Unspecified",
     bool Hidden = false,
     IpcFanCalibration? Calibration = null,
-    string? RpmSource = null);
+    string? RpmSource = null,
+    int? BaseMinPwm = null);
 
 /// <summary>
 /// Persistiertes Kalibrier-Ergebnis eines Lüfters über die IPC-Grenze: Anlaufpunkt (<paramref name="StartPwm"/>)
-/// und Drehzahlbereich. Die rohe Messreihe (<c>FanCalibration.Samples</c>) bleibt bewusst im Daemon - die GUI
-/// braucht für Anzeige/Badge nur Anlaufpunkt und Bereich.
+/// und Drehzahlbereich.
+/// <para>
+/// <paramref name="Tachometer"/> (the speed sensor the calibration measured with) and <paramref name="Samples"/> (the raw
+/// series in ramp order) are what the daemon compares the fan's speed with. The GUI shows neither; it carries them so an
+/// export and its import keep them. <c>null</c> from a peer that predates them, or for a calibration that never recorded a
+/// sensor: an import then stores no sensor and an empty series.
+/// </para>
 /// </summary>
-public sealed record IpcFanCalibration(int StartPwm, int MinRpm, int MaxRpm);
+public sealed record IpcFanCalibration(
+    int StartPwm,
+    int MinRpm,
+    int MaxRpm,
+    string? Tachometer = null,
+    IReadOnlyList<IpcCalibrationSample>? Samples = null);
+
+/// <summary>One calibration sample: at raw PWM <paramref name="Pwm"/> (0..255) the fan turned at <paramref name="Rpm"/>.</summary>
+public sealed record IpcCalibrationSample(int Pwm, int Rpm);

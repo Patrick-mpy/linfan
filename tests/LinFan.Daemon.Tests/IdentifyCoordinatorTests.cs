@@ -2,6 +2,7 @@
 
 using System.Diagnostics;
 using LinFan.Core.Models;
+using LinFan.Core.Services;
 using LinFan.Daemon;
 using LinFan.Ipc.Messages;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,10 +28,10 @@ public class IdentifyCoordinatorTests
 
     private static IdentifyCoordinator New(
         FakeHardware hw, CancellationToken token,
-        Action<string>? suspend = null, Action<string>? resume = null,
+        Action<string, FanControlState>? suspend = null, Action<string>? resume = null,
         Func<TimeSpan, CancellationToken, Task>? delay = null, Func<double>? failSafe = null,
         TimeSpan? hold = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null) =>
-        new(hw, hw, NullLogger.Instance, suspend ?? (_ => { }), resume ?? (_ => { }), token,
+        new(hw, hw, NullLogger.Instance, suspend ?? ((_, _) => { }), resume ?? (_ => { }), token,
             delay ?? NoDelay, failSafe, hold ?? ShortHold, cooldown, now);
 
     private static async Task WaitUntilAsync(Func<bool> cond, int timeoutMs = 2000)
@@ -97,7 +98,7 @@ public class IdentifyCoordinatorTests
         int suspend = 0, resume = 0;
         using var cts = new CancellationTokenSource();
         var co = New(hw, cts.Token,
-            suspend: _ => Interlocked.Increment(ref suspend),
+            suspend: (_, _) => Interlocked.Increment(ref suspend),
             resume: _ => Interlocked.Increment(ref resume));
 
         co.Start(new FanId("f1"));
@@ -109,6 +110,22 @@ public class IdentifyCoordinatorTests
     }
 
     [Fact]
+    public async Task Identify_SuspendsTargetAsIdentifying_AndOthersAsThrottled()
+    {
+        var hw = Rig();
+        var owners = new System.Collections.Concurrent.ConcurrentDictionary<string, FanControlState>();
+        using var cts = new CancellationTokenSource();
+        var co = New(hw, cts.Token, suspend: (id, owner) => owners[id] = owner);
+
+        co.Start(new FanId("f2"));
+        await co.StopAsync();
+
+        Assert.Equal(FanControlState.Identifying, owners["f2"]);
+        Assert.Equal(FanControlState.IdentifyThrottled, owners["f1"]);
+        Assert.Equal(FanControlState.IdentifyThrottled, owners["f3"]);
+    }
+
+    [Fact]
     public async Task Identify_OverTemp_Aborts_WithoutThrottling_AndRestores()
     {
         // 95 °C ≥ Limit 90 → der Watchdog bricht VOR dem Drosseln ab (keine Kühlungs-Reduktion).
@@ -116,7 +133,7 @@ public class IdentifyCoordinatorTests
         int suspend = 0, resume = 0;
         using var cts = new CancellationTokenSource();
         var co = New(hw, cts.Token,
-            suspend: _ => Interlocked.Increment(ref suspend),
+            suspend: (_, _) => Interlocked.Increment(ref suspend),
             resume: _ => Interlocked.Increment(ref resume),
             failSafe: () => 90);
 
@@ -267,7 +284,7 @@ public class IdentifyCoordinatorTests
         var gate = new TaskCompletionSource();
         using var cts = new CancellationTokenSource();
         var co = New(hw, cts.Token,
-            suspend: _ => Interlocked.Increment(ref suspend),
+            suspend: (_, _) => Interlocked.Increment(ref suspend),
             resume: _ => Interlocked.Increment(ref resume),
             delay: (_, ct) => gate.Task.WaitAsync(ct));
 

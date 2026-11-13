@@ -8,9 +8,11 @@ namespace LinFan.Core.Models;
 /// <param name="Kind">Temperatur oder Drehzahl.</param>
 /// <param name="Unit">Einheit, z. B. <c>°C</c> oder <c>RPM</c>.</param>
 /// <param name="Source">Backend-spezifische Quelle (z. B. sysfs-Pfad) zur Diagnose.</param>
+/// <param name="Device">The physical device the channel belongs to; <c>null</c> if the backend does not say.</param>
 public sealed record SensorDescriptor(
     SensorId Id,
     string Name,
     SensorKind Kind,
     string Unit,
-    string Source);
+    string Source,
+    HardwareDevice? Device = null);

@@ -52,10 +52,11 @@ public class NamedPipeTransportTests
 
         try
         {
-            await using IAsyncEnumerator<IpcSnapshot> e =
+            await using IAsyncEnumerator<IpcSnapshot?> e =
                 client.ReadSnapshotsAsync(cts.Token).GetAsyncEnumerator(cts.Token);
             Assert.True(await e.MoveNextAsync());
-            IpcSnapshot received = e.Current;
+            IpcSnapshot? received = e.Current;
+            Assert.NotNull(received);
             Assert.Equal(DaemonStatus.DryRun, received.Status);
             Assert.Equal(128, Assert.Single(received.Fans).Pwm);
             Assert.Equal("CPU", Assert.Single(received.Sensors).Name);
@@ -130,7 +131,7 @@ public class NamedPipeTransportTests
             foreach (IpcClient c in new[] { c1, c2 })
             {
                 index++;
-                await using IAsyncEnumerator<IpcSnapshot> e =
+                await using IAsyncEnumerator<IpcSnapshot?> e =
                     c.ReadSnapshotsAsync(cts.Token).GetAsyncEnumerator(cts.Token);
                 try
                 {
@@ -146,6 +147,7 @@ public class NamedPipeTransportTests
                     throw new XunitException(
                         $"Client {index} bekam keinen Snapshot; der Server hatte {accepted} Verbindung(en) angenommen.");
                 }
+                Assert.NotNull(e.Current);
                 Assert.Equal(DaemonStatus.Active, e.Current.Status);
             }
         }

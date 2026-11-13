@@ -10,7 +10,8 @@ public sealed record AppConfig
 {
     /// <summary>
     /// Aktuelle Schema-Version. 3 = stabile <c>chip/channel</c>-Hardware-Ids (vorher <c>hwmonN/…</c>,
-    /// instabil über Reboots). Die Migration übernimmt <see cref="Services.HwmonIdMigration"/>.
+    /// instabil über Reboots). Older schemas only existed before the first release; their migration is gone - an
+    /// <c>hwmonN/…</c> id today is the fallback key of a chip the backend cannot tell apart otherwise.
     /// </summary>
     public const int CurrentSchemaVersion = 3;
 
@@ -26,7 +27,21 @@ public sealed record AppConfig
     public double FailSafeTempC { get; init; } = DefaultFailSafeTempC;
 
     public IReadOnlyList<SensorConfig> Sensors { get; init; } = [];
+
+    /// <summary>
+    /// Sensor group names in display order, including groups no sensor is in yet. A group's identity is its name,
+    /// the one <see cref="SensorConfig.Group"/> carries, compared case-insensitively - a group that sensors use but
+    /// this list lacks still exists. Missing in older JSON, the list reads as empty (no schema bump).
+    /// </summary>
+    public IReadOnlyList<string> SensorGroups { get; init; } = [];
+
     public IReadOnlyList<FanConfig> Fans { get; init; } = [];
+
+    /// <summary>
+    /// The kind of case: which case positions exist and whether a pressure balance applies. Display and airflow
+    /// analysis only - the control loop does not read it. Missing in older JSON, it reads as <see cref="CaseType.Tower"/>.
+    /// </summary>
+    public CaseType CaseType { get; init; } = CaseType.Tower;
     public IReadOnlyList<CurveConfig> Curves { get; init; } = [];
 
     /// <summary>Umschaltbare Zuordnungs-Sets; das aktive (<see cref="ActiveProfileId"/>) steuert die Lüfter.</summary>

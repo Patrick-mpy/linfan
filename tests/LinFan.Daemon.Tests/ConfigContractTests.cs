@@ -38,22 +38,35 @@ public class ConfigContractTests
             IpcOnly: new()),
         new(typeof(FanConfig), typeof(IpcFanAssignment), new(),
             // Calibration wird read-only an die GUI gespiegelt (Badge nach Neustart), bleibt aber
-            // daemon-autoritativ & nicht über IPC editierbar - die rohe Messreihe bleibt ganz im Daemon.
-            CoreOnly: new() { nameof(FanConfig.Calibration) },
-            IpcOnly: new()),
+            // daemon-autoritativ & nicht über IPC editierbar. Only ReplaceConfig (import) carries it back - its fields are
+            // checked by the FanCalibration pair below.
+            // The recorded device never travels: the snapshot reports changes of it instead (IpcHardwareChange).
+            CoreOnly: new() { nameof(FanConfig.Calibration), nameof(FanConfig.Device) },
+            // The MinPwm a save started from - merge input only, nothing to persist.
+            IpcOnly: new() { nameof(IpcFanAssignment.BaseMinPwm) }),
         new(typeof(SensorConfig), typeof(IpcSensorName),
             Rename: new() { [nameof(SensorConfig.SensorId)] = nameof(IpcSensorName.Id) },
-            CoreOnly: new(), IpcOnly: new()),
+            CoreOnly: new() { nameof(SensorConfig.Device) }, IpcOnly: new()),
         new(typeof(CurveConfig), typeof(IpcCurve), new(),
             // SourceSensorId (Legacy/Migration) lebt in beiden Typen - keine Ausnahme nötig.
             CoreOnly: new(), IpcOnly: new()),
         new(typeof(Profile), typeof(IpcProfile), new(), new(), new()),
         new(typeof(ProfileAssignment), typeof(IpcProfileAssignment), new(), new(), new()),
         new(typeof(CurvePoint), typeof(IpcCurvePoint), new(), new(), new()),
+        // An export carries the whole calibration, so its import keeps what the plausibility check compares with.
+        new(typeof(FanCalibration), typeof(IpcFanCalibration), new(), new(), new()),
+        new(typeof(CalibrationSample), typeof(IpcCalibrationSample), new(), new(), new()),
     };
 
     private static IEnumerable<string> PropNames(Type t) =>
         t.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name);
+
+    [Fact]
+    public void AnOmittedMaxPwm_GetsTheCoreDefault()
+    {
+        // LinFan.Ipc cannot reference Core, so the IPC default repeats the Core one - this keeps the two from drifting.
+        Assert.Equal(new FanConfig().MaxPwm, new IpcFanAssignment("f", "F", 0).MaxPwm);
+    }
 
     [Fact]
     public void EveryEditableCoreField_HasAnIpcCounterpart()
@@ -104,17 +117,19 @@ public class ConfigContractTests
         AppConfig desired = FullConfig();
 
         // „Veralteter" Daemon-Stand: gleiche Ids (Lüfter werden per Id gematcht), aber jedes editierbare
-        // Feld anders besetzt. Die daemon-autoritativen Felder (SchemaVersion/Poll/FailSafe/Calibration)
+        // Feld anders besetzt. Die daemon-autoritativen Felder (SchemaVersion/Poll/FailSafe/Calibration/Device)
         // bleiben identisch - sie stammen beim Merge aus `current` und dürfen keinen Diff erzeugen.
         AppConfig stale = desired with
         {
-            Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "ALT", Group = "ALTG", Hidden = false } },
+            Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "ALT", Group = "ALTG", Hidden = false, Device = Gpu } },
+            SensorGroups = new[] { "ALTG" },
+            CaseType = CaseType.Tower,
             Fans = new[]
             {
                 new FanConfig
                 {
                     FanId = "f1", Name = "ALT", MinPwm = 0, MaxPwm = 255, AssignedCurveId = null,
-                    Location = FanLocation.Unspecified, Hidden = false, Calibration = null,
+                    Location = FanLocation.Unspecified, Hidden = false, Calibration = null, Device = Gpu,
                 },
             },
             Curves = new[]
@@ -138,6 +153,8 @@ public class ConfigContractTests
         Assert.Equal(Serialize(desired), Serialize(result));
     }
 
+    private static readonly HardwareDevice Gpu = new("amdgpu", "pci:1002:73bf:1849:5201");
+
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static string Serialize(AppConfig c) => JsonSerializer.Serialize(c, Json);
 
@@ -159,13 +176,15 @@ public class ConfigContractTests
             SchemaVersion = 2,
             PollIntervalMs = 1500,
             FailSafeTempC = 88,
-            Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "CPU", Group = "Zone A", Hidden = true } },
+            Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "CPU", Group = "Zone A", Hidden = true, Device = Gpu } },
+            SensorGroups = new[] { "Leer", "Zone A" },
+            CaseType = CaseType.Server,
             Fans = new[]
             {
                 new FanConfig
                 {
                     FanId = "f1", Name = "Front", MinPwm = 40, MaxPwm = 220, AssignedCurveId = "c1",
-                    Location = FanLocation.CaseFrontIntake, Hidden = true, Calibration = null,
+                    Location = FanLocation.CaseFrontIntake, Hidden = true, Calibration = null, Device = Gpu,
                 },
             },
             Curves = new[] { curve },

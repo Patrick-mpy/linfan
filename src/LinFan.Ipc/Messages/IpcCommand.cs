@@ -18,7 +18,16 @@ namespace LinFan.Ipc.Messages;
 /// <item><c>"setActiveProfile"</c> - Profil <see cref="Target"/> aktivieren (Zuordnungen übernehmen).</item>
 /// <item><c>"setCurveEnabled"</c> - Kurve <see cref="Target"/> an/aus (<see cref="Value"/> 1/0); aus ⇒ zugeordnete Lüfter auf Hardware-Auto.</item>
 /// <item><c>"replaceConfig"</c> - mitgeschickte <see cref="Config"/> die bestehende <b>vollständig ersetzen</b> (kein Merge; für Import/Restore inkl. eingehender Kalibrierung).</item>
-/// <item><c>"resetConfig"</c> - Konfiguration auf Werkszustand zurücksetzen (Sensoren/Lüfter/Profile/Kurven/Kalibrierung leeren; Hardware wird neu entdeckt).</item>
+/// <item><c>"configOnChange"</c> - protocol, answered by the IPC server itself: send this connection the config only
+/// when it changed (see <see cref="IpcSnapshot.ConfigRevision"/>). <see cref="IpcClient"/> asks for it on connect and
+/// fills the config back in.</item>
+/// <item><c>"resetConfig"</c> - factory reset of what the GUI edits: sensors, fans, profiles, curves and calibration are cleared and the hardware is discovered afresh; the daemon-owned over-temperature limit and poll interval stay.</item>
+/// <item><c>"acceptHardware"</c> - keep the entries of the replaced device <see cref="Target"/> (an
+/// <see cref="IpcHardwareChange.Key"/> of the last snapshot) for the device behind them now; <see cref="Value"/> 1 also
+/// clears the own names of its sensors (0 or none: they stay).</item>
+/// <item><c>"forgetHardware"</c> - remove the entries of the device <see cref="Target"/> (an
+/// <see cref="IpcHardwareChange.Key"/>) and the profile assignments of its fans; refused while a calibration,
+/// identification or coupling runs on one of them.</item>
 /// </list>
 /// </summary>
 public sealed record IpcCommand(
@@ -44,6 +53,15 @@ public sealed record IpcCommand(
     /// <summary>Config vollständig ersetzen (Import/Restore) - anders als <see cref="SaveConfig"/> kein Merge.</summary>
     public const string ReplaceConfig = "replaceConfig";
 
-    /// <summary>Config auf Werkszustand zurücksetzen (leert alles, Hardware wird neu entdeckt).</summary>
+    /// <summary>Factory reset of what the GUI edits; the daemon-owned limits stay (see the list above).</summary>
     public const string ResetConfig = "resetConfig";
+
+    /// <summary>Snapshots for this connection carry the config only when it changed (see the list above).</summary>
+    public const string ConfigOnChange = "configOnChange";
+
+    /// <summary>Keep a replaced device's entries for the new device (see the list above).</summary>
+    public const string AcceptHardware = "acceptHardware";
+
+    /// <summary>Remove a replaced or missing device's entries (see the list above).</summary>
+    public const string ForgetHardware = "forgetHardware";
 }

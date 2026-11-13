@@ -43,7 +43,7 @@ public sealed class LocalizerTests : IDisposable
     public void Format_AppliesArgumentsInActiveCulture()
     {
         Localizer.Instance.SetLanguage(LanguageChoice.German);
-        Assert.Equal("max 80", Localizer.Instance.Format("MainCtrl.MaxTemp", 80));
+        Assert.Equal("3 Hinweise", Localizer.Instance.Format("Overview.StatusNotices", 3));
     }
 
     [Fact]
@@ -51,12 +51,10 @@ public sealed class LocalizerTests : IDisposable
     {
         // Was a hardcoded German const before - the fallback group label must switch with the language.
         Localizer.Instance.SetLanguage(LanguageChoice.German);
-        Assert.Equal("Ungruppiert", Controllers.FanGroup.Ungrouped);
-        Assert.Equal("Ungruppiert", Controllers.SensorGroup.Ungrouped);
+        Assert.Equal("Ungruppiert", Controllers.GroupLabels.Ungrouped);
 
         Localizer.Instance.SetLanguage(LanguageChoice.English);
-        Assert.Equal("Ungrouped", Controllers.FanGroup.Ungrouped);
-        Assert.Equal("Ungrouped", Controllers.SensorGroup.Ungrouped);
+        Assert.Equal("Ungrouped", Controllers.GroupLabels.Ungrouped);
     }
 
     [Fact]

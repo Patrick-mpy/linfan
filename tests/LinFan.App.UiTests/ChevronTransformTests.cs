@@ -23,7 +23,7 @@ public class ChevronTransformTests
     [AvaloniaFact]
     public void CurveEditorChevron_IsNotClipped_WhenTheSectionIsExpanded()
     {
-        var controller = new MainController(new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()));
+        var controller = UiTestHelpers.NewController(new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()));
         var window = new MainWindow { DataContext = controller };
         window.Show();
         UiTestHelpers.PumpUntil(() => controller.Editor.IsReady);
@@ -31,8 +31,9 @@ public class ChevronTransformTests
         window.Find<TabControl>().Single().SelectedIndex = 1; // Kurven-Tab
         Dispatcher.UIThread.RunJobs();
 
+        // The points section's chevron - the source-sensor sections carry their own (DataContext SensorCheckGroup).
         PathIcon chevron = Assert.Single(
-            window.Find<PathIcon>(), p => p.Classes.Contains("chevron") && p.IsEffectivelyVisible);
+            window.Find<PathIcon>(), p => p.Classes.Contains("chevron") && p.IsEffectivelyVisible && p.DataContext is CurveEditRow);
         Rect collapsed = ClipOf(chevron);
 
         controller.Editor.SelectedCurve!.ShowPoints = true;

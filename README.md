@@ -4,28 +4,38 @@ Cross-platform fan control for **Linux, Windows, and macOS** - modern, minimal, 
 
 LinFan reads temperature sensors and fans, calibrates them automatically on first start, and drives fan speed with freely definable curves (temperature → power). A privileged daemon runs the control loop with a fail-safe watchdog; the GUI runs without root and talks to it over local IPC.
 
-![LinFan dashboard: the active profile's curves with their live operating point, temperature history per sensor, and each fan's speed with a manual override slider](docs/images/overview.jpg)
+![LinFan overview: status tiles with the notices that need attention listed below them, one control loop row per curve (input temperature with its history, a mini curve with the approximate output, the fans it drives, an on/off switch), temperature tiles per sensor group, and a fan table with power, speed, history and what controls each fan](docs/images/overview.jpg)
 
 <details>
-<summary><b>More screenshots</b> - curve editor and settings</summary>
+<summary><b>More screenshots</b> - profiles & curves, fan settings</summary>
 
 <br>
 
-![Curve editor: a spline curve with five draggable points, the live operating point marked on it, the source sensor checkboxes with their current temperatures, and the list of fans assigned to this curve](docs/images/curves.jpg)
+![Profiles & curves: the profiles as a tree with the running one marked and its curves below, and the curve editor with a spline curve of five draggable points, the live operating point inside the hysteresis band, the assigned fans' lower power limit shaded, source sensors in collapsible sections per group, segmented controls for mix and shape, steppers for hysteresis and smoothing, and the fans on this curve grouped by position](docs/images/curves.jpg)
 
-![Fan settings: one card per fan with its hardware path, live speed, position, PWM min/max sliders, and buttons for calibration, identification, and coupling a speed sensor](docs/images/settings.jpg)
+![Fan settings: fans in one section per mounting position, each row with a drag handle, a selection checkbox, live speed, hardware path, an identify button and a position menu; the CPU fan's advanced part is open in three blocks - the power range as one slider with two handles, the calibrated start point marked on it and min/max steppers with their raw PWM; calibration & tach with the coupled speed sensor and the start point, each with a status mark, and the recalibrate and couple buttons; and a test block with a curve/manual switch and the live speed](docs/images/settings.jpg)
 
 </details>
 
 ## Features
 
-- **Read** fans (RPM) and temperature sensors, live in the dashboard.
-- **Auto-calibration** on first start: ramps each PWM channel 0→100 %, detects which channels actually drive a fan, the start-up/stall point, and the PWM→RPM characteristic.
+- **Read** fans (RPM) and temperature sensors, live in the overview - with each curve's control loop, the
+  notices that need attention, and what is driving every fan right now.
+- **Auto-calibration** on first start: couples each fan to its speed sensor, then ramps it 0→100 % to find the
+  start-up point and the PWM→RPM characteristic.
 - **Curve editor** as a graph: temperature → power, draggable points, hysteresis, smoothing against
-  short temperature spikes, live operating point. A curve can be assigned to one or more fans.
-- **Airflow auto-tune:** derives a pressure balance and role curves (CPU, GPU, intake, exhaust) from the fans' mounting positions.
-- **Profiles** (e.g. silent / performance) with their own curves, switchable from the dashboard.
-- **Manual mode** per fan (slider), rename fans/sensors, maintain install position.
+  short temperature spikes, live operating point, the assigned fans' power limits; new curves start from
+  templates. A curve can be assigned to one or more fans. Every edit can be undone and redone.
+- **Airflow auto-tune:** derives a pressure balance and role curves (CPU, GPU, intake, exhaust) from the fans' mounting
+  positions - in a tower, server / rack, laptop or open-bench case.
+- **Profiles** (e.g. silent / performance) with their own curves, switchable from the profile menu in the
+  header - also with unsaved changes, which you apply or discard on the way.
+- **Manual mode** per fan (slider), rename fans/sensors, group sensors (or let LinFan group them by
+  driver), set each fan's mounting position.
+- **Notices replaced hardware** (another graphics card, drive or Wi-Fi card under the same entries) and fans that no
+  longer match their calibration - e.g. a swapped case fan - and offers to keep the settings, recalibrate, or set
+  the device up as new.
+- **Themes:** light, dark, terminal and high contrast, each with its own or a chosen accent colour; English and German.
 - **Fail-safe:** over-temperature, a crash, or shutdown → fans to hardware auto / 100 %.
 
 ## Quick start
@@ -83,8 +93,9 @@ full guide - privileges, service installation, Windows, and the manual macOS sta
 | Controller        | CommunityToolkit.Mvvm                     |
 | Hardware Linux    | direct `sysfs`/`hwmon` access             |
 | Hardware Windows  | LibreHardwareMonitorLib (MPL-2.0)         |
+| Hardware macOS    | IOKit/SMC via P/Invoke                    |
 | Persistence       | System.Text.Json                          |
-| Service / logging | Microsoft.Extensions.Hosting, Serilog     |
+| Service / logging | Microsoft.Extensions.Hosting / Logging    |
 
 The platform-specific hardware access (the core of the project) and the full dependency list are in **[docs/HARDWARE.md](docs/HARDWARE.md)**.
 
@@ -94,7 +105,7 @@ The platform-specific hardware access (the core of the project) and the full dep
   service yet (start the daemon manually), and temperature sensors come from a curated key list, so some
   may be missing - open an issue with your model and the `monitor` output.
 - **Group membership needs a re-login (Linux and Windows).** Until you log out and back in, the GUI
-  reports the daemon as unreachable although it is running.
+  reports that access to the background service is denied, although it is running.
 - **Some sensor channels report intermittent read errors** (e.g. ThinkPad EC, `EIO`) - they show as a
   missing value; the control loop and the watchdog keep running.
 - **The Windows binaries/installer are unsigned** - SmartScreen warns on first run (*More info → Run

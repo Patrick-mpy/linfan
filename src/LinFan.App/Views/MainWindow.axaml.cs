@@ -3,9 +3,12 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LinFan.App.Controllers;
 using LinFan.App.Localization;
@@ -58,6 +61,72 @@ public partial class MainWindow : Window
         // Tunnel so targets that mark the press handled (e.g. CurveChart's drag capture) cannot bypass
         // the click-away focus release below.
         AddHandler(PointerPressedEvent, OnGlobalPointerPressed, RoutingStrategies.Tunnel);
+        // Tunnel: Ctrl+S has to act before the focused control - see OnSaveShortcut.
+        AddHandler(KeyDownEvent, OnSaveShortcut, RoutingStrategies.Tunnel);
+        // Tunnel: the list item would take Enter for itself - see OnCurveNavKeyDown.
+        CurveNavList.AddHandler(KeyDownEvent, OnCurveNavKeyDown, RoutingStrategies.Tunnel);
+        // The profile menu is built as it opens, so its counts and marks are current.
+        if (ProfileButton.Flyout is PopupFlyoutBase profileMenu)
+            profileMenu.Opening += (_, _) => (DataContext as MainController)?.RefreshProfileMenu();
+
+        // Drag at the grip of the settings lists - see OnGripPointerPressed.
+        AddHandler(PointerPressedEvent, OnGripPointerPressed, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(PointerMovedEvent, OnGripPointerMoved, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(PointerReleasedEvent, (_, _) => ForgetGripPress(), RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(DragDrop.DragEnterEvent, OnSettingsDragOver);
+        AddHandler(DragDrop.DragOverEvent, OnSettingsDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnSettingsDragLeave);
+        AddHandler(DragDrop.DropEvent, OnSettingsDrop);
+    }
+
+    private static readonly KeyGesture SaveGesture = new(Key.S, KeyModifiers.Control);
+    private static readonly KeyGesture UndoGesture = new(Key.Z, KeyModifiers.Control);
+    private static readonly KeyGesture[] RedoGestures =
+    {
+        new(Key.Y, KeyModifiers.Control),
+        new(Key.Z, KeyModifiers.Control | KeyModifiers.Shift),
+    };
+
+    /// <summary>
+    /// Ctrl+S saves from anywhere, text fields included (while something is unsaved and the service is reachable -
+    /// the command's CanExecute). The focus moves to the window first, so a field that commits on LostFocus writes
+    /// its last value before the save, and returns afterwards so typing can go on.
+    /// </summary>
+    private void OnSaveShortcut(object? sender, KeyEventArgs e)
+    {
+        if (!SaveGesture.Matches(e) || DataContext is not MainController controller)
+            return;
+        e.Handled = true;
+
+        IInputElement? focused = FocusManager?.GetFocusedElement();
+        bool moveFocus = focused is not null && !ReferenceEquals(focused, this);
+        if (moveFocus)
+            Focus();
+        if (controller.Editor.SaveCommand.CanExecute(null))
+            controller.Editor.SaveCommand.Execute(null);
+        if (moveFocus)
+            focused!.Focus();
+    }
+
+    /// <summary>
+    /// Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z step through the editor history - but only when the focused control left the
+    /// key unhandled: a text box keeps its own undo, a stepper box (IsUndoEnabled=False) passes it on. Window key
+    /// bindings cannot do this; Avalonia evaluates them before the focused control sees the key.
+    /// </summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || DataContext is not MainController controller)
+            return;
+
+        System.Windows.Input.ICommand? command = UndoGesture.Matches(e) ? controller.Editor.UndoCommand
+            : RedoGestures.Any(g => g.Matches(e)) ? controller.Editor.RedoCommand
+            : null;
+        if (command is null)
+            return;
+        e.Handled = true;
+        if (command.CanExecute(null))
+            command.Execute(null);
     }
 
     /// <summary>
@@ -191,6 +260,7 @@ public partial class MainWindow : Window
         if (!_quitRequested && !_allowClose && TrayAvailable && MinimizeToTrayEnabled)
         {
             e.Cancel = true;
+            (DataContext as MainController)?.OnHiddenToTray();
             Hide();
             return;
         }
@@ -211,11 +281,11 @@ public partial class MainWindow : Window
             if (choice == UnsavedChoice.Save)
                 await controller.Editor.SaveCommand.ExecuteAsync(null);
         }
-        catch
+        catch (Exception ex)
         {
-            // Defensive: ein unerwarteter Dialog-/Save-Fehler darf diesen async-void-Handler nicht
-            // in einen unbehandelten Crash kippen - dann lieber schließen (Save geht nur über IPC,
-            // kein Hardware-Zustand bleibt hängen).
+            // The window closes anyway: a failed dialog or save must not keep it open (saving only goes through IPC, no
+            // fan is left behind). Recorded - nobody would see a notice any more.
+            controller.RecordError("Closing", "Asking about or saving the unsaved changes failed - closing anyway", ex);
         }
 
         _allowClose = true;
@@ -224,12 +294,13 @@ public partial class MainWindow : Window
 
     // Bestätigung destruktiver Aktionen über einen modalen Dialog (statt der alten Aufklapp-Flyouts).
     // „Soll gefragt werden?" ist reine UI; die eigentliche Aktion bleibt ein Command auf dem Controller.
+    // Deleting a curve or profile asks nothing: it is a history step with „Rückgängig" in its toast.
 
     private async void OnRevertChanges(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainController controller)
             return;
-        // Revert stellt die Baseline wieder her → kein Auto-Save (wäre ein No-op gegen den gespeicherten Stand).
+        // Discarding everything keeps its confirmation although Ctrl+Z brings it back - the dialog says so.
         await ConfirmThen(
             Localizer.Instance["Dialog.RevertTitle"],
             Localizer.Instance["Dialog.RevertMessage"],
@@ -237,88 +308,239 @@ public partial class MainWindow : Window
             () => { controller.Editor.RevertCommand.Execute(null); return Task.CompletedTask; });
     }
 
-    private async void OnDeleteProfile(object? sender, RoutedEventArgs e)
+    // "Copy" in the offline banner: the clipboard is a view service, the controller only shows "Copied". Without a
+    // clipboard, or when writing fails, nothing claims success - the command stays selectable in the banner.
+    private async void OnCopyDiagnosticCommand(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainController controller)
-            return;
-        // Bestätigte Löschung persistiert sich selbst (bedingt) - siehe CurveEditorController.DeleteProfile.
-        await ConfirmThen(
-            Localizer.Instance["Dialog.DeleteProfileTitle"],
-            Localizer.Instance["Dialog.DeleteProfileMessage"],
-            Localizer.Instance["MainWindow.Delete"],
-            () => controller.Editor.DeleteProfileCommand.ExecuteAsync(null));
-    }
-
-    private async void OnDeleteCurve(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainController controller)
-            return;
-        await ConfirmThen(
-            Localizer.Instance["Dialog.DeleteCurveTitle"],
-            Localizer.Instance["Dialog.DeleteCurveMessage"],
-            Localizer.Instance["MainWindow.Delete"],
-            () => controller.Editor.DeleteCurveCommand.ExecuteAsync(null));
-    }
-
-    // Which of the two editors the curves tab shows follows the last click in the side menu. Bound to Tapped
-    // and not to SelectionChanged on purpose: coming back from a curve to its profile clicks a row that is
-    // already selected, which raises no selection change at all.
-    private void OnProfileListTapped(object? sender, TappedEventArgs e)
-    {
-        if (DataContext is MainController controller)
-            controller.Editor.Pane = CurveTabPane.Profile;
-    }
-
-    private void OnCurveListTapped(object? sender, TappedEventArgs e)
-    {
-        if (DataContext is MainController controller)
-            controller.Editor.Pane = CurveTabPane.Curve;
-    }
-
-    // Positions-Modal je Lüfterzeile: die Zeile kommt aus dem DataContext des Buttons; das Ergebnis wird
-    // zurück in die gebundene Location geschrieben (reine UI - wie ConfirmThen). Abbrechen lässt sie unberührt.
-    private async void OnPickLocation(object? sender, RoutedEventArgs e)
-    {
-        if ((sender as Control)?.DataContext is not FanAssignRow row)
+        if (DataContext is not MainController controller || Clipboard is not { } clipboard)
             return;
         try
         {
-            FanLocation? picked = await new FanLocationDialog(row.Name, row.Location.Value, row.Manual)
-                .ShowDialog<FanLocation?>(this);
-            if (picked is { } loc)
-                row.Location = FanLocationOption.For(loc);
+            await clipboard.SetTextAsync(controller.Connection.DiagnosticCommand);
+            controller.Connection.MarkCopied();
         }
-        catch
+        catch (Exception ex)
         {
-            // Defensive: ein Dialog-Fehler darf diesen async-void-Handler nicht in einen Crash kippen.
+            // A platform service failing: the banner shows no "Copied", which says enough.
+            controller.RecordError("Clipboard", "Copying the diagnostic command failed", ex);
         }
     }
 
-    // --- Sensor group chip: explicit view->VM commit instead of a TwoWay LostFocus binding. ---
-    // Why: with UpdateSourceTrigger=LostFocus, the transient focus loss towards the suggestion popup
-    // committed the typed PREFIX (not the clicked suggestion); the resulting refresh of the shared
-    // suggestion list then rebuilt the open popup mid-click, cancelling the selection (todo: group
-    // select bug). Committing only while the dropdown is CLOSED lets the AutoCompleteBox finish the
-    // click first (its adapter writes the suggestion into Text), and DropDownClosed commits the final
-    // value; free-typed text commits via LostFocus once the popup is closed.
-
-    private static void CommitGroupChip(AutoCompleteBox box)
+    /// <summary>
+    /// A row picked in the curves tab's side menu goes to the controller - posted, because opening a profile changes
+    /// this very list and the list box is still inside its selection change, which fails on a changed source. The list
+    /// shows the controller's selection (one-way binding): whatever the controller does not open (it decides which rows
+    /// can be opened) gets the controller's row back.
+    /// </summary>
+    private void OnCurveNavSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        // Raw text only - normalization (trim, empty -> null) stays controller-side (SensorOption.ToConfig).
-        if (box.DataContext is SensorOption row)
-            row.Group = box.Text ?? "";
+        if (sender is not ListBox list || DataContext is not MainController controller
+            || ReferenceEquals(list.SelectedItem, controller.Editor.SelectedNavItem))
+            return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            controller.Editor.SelectedNavItem = list.SelectedItem as CurveTabNavItem;
+            if (!ReferenceEquals(list.SelectedItem, controller.Editor.SelectedNavItem))
+                list.SelectedItem = controller.Editor.SelectedNavItem;
+        });
     }
 
-    private void OnGroupChipDropDownClosed(object? sender, EventArgs e)
+    /// <summary>
+    /// The "add curve" row of the curves tab's side menu is an action, which the list box can only select: Enter or
+    /// Space on the row opens its template menu instead, as a click on it does. Pure UI - the entries run the
+    /// controller's command.
+    /// </summary>
+    private void OnCurveNavKeyDown(object? sender, KeyEventArgs e)
     {
-        if (sender is AutoCompleteBox box)
-            CommitGroupChip(box);
+        if (e.Key is not (Key.Enter or Key.Space) || e.KeyModifiers != KeyModifiers.None
+            || e.Source is not ListBoxItem { DataContext: AddCurveNavItem } row)
+            return;
+        if (row.GetVisualDescendants().OfType<Button>().FirstOrDefault() is { IsEffectivelyEnabled: true, Flyout: { } flyout } button)
+        {
+            flyout.ShowAt(button);
+            e.Handled = true;
+        }
     }
 
-    private void OnGroupChipLostFocus(object? sender, RoutedEventArgs e)
+    // "Pick in the case diagram" from a fan's position menu: the dialog is a view, the controller only asks for it.
+    // The result goes back through the controller, as an edit like a menu pick. Cancel leaves the position alone.
+    private async void OnLocationDialogRequested(object? sender, FanAssignRow row)
     {
-        if (sender is AutoCompleteBox { IsDropDownOpen: false } box)
-            CommitGroupChip(box);
+        if (DataContext is not MainController controller)
+            return;
+        LocationPickController pick = controller.Editor.CreateLocationPick(row);
+        LocationPick? picked = await new FanLocationDialog(pick).ShowDialog<LocationPick?>(this);
+        if (picked is not null)
+            controller.Editor.ApplyLocationPick(row.FanId, picked);
+    }
+
+    // Replaced and missing hardware, from an overview hint: the dialog is a view, the controller holds its state and follows
+    // the snapshots while it is open.
+    private async void OnHardwareDialogRequested(object? sender, HardwareChangeController changes) =>
+        await new HardwareChangeDialog(changes).ShowDialog(this);
+
+    // Switching the running profile with unsaved changes: the dialog is a view, the editor decides what each answer does
+    // ("Übernehmen & wechseln" saves and switches in one config, "Verwerfen & wechseln" discards and switches live) and
+    // reports a failure itself in its status toast. Anything else that goes wrong - the dialog itself included - reaches
+    // the app's error barrier (recorded, and the user told) instead of vanishing in this handler.
+    private async void OnProfileSwitchConfirmationRequested(object? sender, ProfileSwitchRequest request)
+    {
+        if (DataContext is not MainController controller)
+            return;
+        IInputElement? origin = FocusManager?.GetFocusedElement();
+        UnsavedChoice choice = await new UnsavedChangesDialog(request.Title, request.Message, request.DiscardLabel,
+            request.SaveLabel, request.DiscardBlockedReason).ShowDialog<UnsavedChoice>(this);
+
+        // Back to where the switch started; a menu entry is gone by now - then to the button that opened the menu.
+        if (origin is InputElement { IsEffectivelyVisible: true } start && TopLevel.GetTopLevel(start) == this)
+            start.Focus();
+        else
+            ProfileButton.Focus();
+        switch (choice)
+        {
+            case UnsavedChoice.Save:
+                await controller.Editor.SaveAndSwitchAsync(request.ProfileId);
+                break;
+            case UnsavedChoice.Discard:
+                controller.Editor.DiscardAndSwitch(request.ProfileId);
+                break;
+        }
+    }
+
+    // A group's name field commits when the focus leaves it (Enter commits through its key binding): typing only
+    // drafts, so the duplicate warning can follow every keystroke before a rename merges anything.
+    private void OnGroupNameLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is SensorGroupSection section)
+            section.CommitNameCommand.Execute(null);
+    }
+
+    // --- Drag at the grip (settings: sensor groups, fan positions) ---
+    // Pure gesture plumbing: the controller decides what is dragged (a selected row takes the selection along) and
+    // carries out the drop as an edit. The grip is a Button, which marks the press handled - hence handledEventsToo.
+
+    private static readonly DataFormat<string[]> SensorIdsFormat = DataFormat.CreateInProcessFormat<string[]>("linfan-sensor-ids");
+    private static readonly DataFormat<string[]> FanIdsFormat = DataFormat.CreateInProcessFormat<string[]>("linfan-fan-ids");
+
+    /// <summary>Pointer travel before a press on a grip becomes a drag - a plain click stays a click.</summary>
+    private const double DragThreshold = 4;
+
+    private PointerPressedEventArgs? _gripPress;
+    private Point _gripPressAt;
+    private InputElement? _gripCapture; // holds the pointer capture of the press - losing it ends a pending drag
+    private Border? _dropTarget;
+
+    private void OnGripPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        ForgetGripPress();
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed
+            || (e.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true) is not { } button
+            || !button.Classes.Contains("grip"))
+            return;
+        _gripPress = e;
+        _gripPressAt = e.GetPosition(this);
+        // Capture-lost is a direct event: listen where the capture actually is (the button, by the time we get here).
+        _gripCapture = e.Pointer.Captured as InputElement;
+        if (_gripCapture is not null)
+            _gripCapture.PointerCaptureLost += OnGripCaptureLost;
+    }
+
+    private void OnGripCaptureLost(object? sender, PointerCaptureLostEventArgs e) => ForgetGripPress();
+
+    private void ForgetGripPress()
+    {
+        _gripPress = null;
+        if (_gripCapture is not null)
+            _gripCapture.PointerCaptureLost -= OnGripCaptureLost;
+        _gripCapture = null;
+    }
+
+    private async void OnGripPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_gripPress is not { } press || DataContext is not MainController controller)
+            return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            ForgetGripPress(); // the release went somewhere we did not see
+            return;
+        }
+        Point at = e.GetPosition(this);
+        if (Math.Abs(at.X - _gripPressAt.X) < DragThreshold && Math.Abs(at.Y - _gripPressAt.Y) < DragThreshold)
+            return;
+        object? row = (press.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true)?.DataContext;
+        ForgetGripPress();
+        if (row is not (SensorOption or FanAssignRow))
+            return;
+
+        try
+        {
+            var data = new DataTransfer();
+            if (row is SensorOption sensor)
+                data.Add(DataTransferItem.Create(SensorIdsFormat, controller.Editor.BeginSensorDrag(sensor).ToArray()));
+            else if (row is FanAssignRow fan)
+                data.Add(DataTransferItem.Create(FanIdsFormat, controller.Editor.BeginFanDrag(fan).ToArray()));
+            await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Move);
+        }
+        catch (Exception ex)
+        {
+            // A platform drag failing ends the drag, nothing else; the rows stay where they were.
+            controller.RecordError("Drag", "The drag at a grip failed", ex);
+        }
+        finally
+        {
+            SetDropTarget(null);
+            controller.Editor.EndSensorDrag();
+            controller.Editor.EndFanDrag();
+        }
+    }
+
+    /// <summary>The section under the pointer that takes this drag - sensors drop on groups, fans on positions.</summary>
+    private static Border? DropSectionFor(DragEventArgs e)
+    {
+        Border? section = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<Border>()
+            .FirstOrDefault(b => b.Classes.Contains("groupSection"));
+        return section?.DataContext switch
+        {
+            SensorGroupSection when e.DataTransfer.Contains(SensorIdsFormat) => section,
+            FanLocationSection when e.DataTransfer.Contains(FanIdsFormat) => section,
+            _ => null,
+        };
+    }
+
+    private void OnSettingsDragOver(object? sender, DragEventArgs e)
+    {
+        Border? section = DropSectionFor(e);
+        e.DragEffects = section is null ? DragDropEffects.None : DragDropEffects.Move;
+        SetDropTarget(section);
+    }
+
+    private void OnSettingsDragLeave(object? sender, DragEventArgs e) => SetDropTarget(null);
+
+    private void OnSettingsDrop(object? sender, DragEventArgs e)
+    {
+        Border? section = DropSectionFor(e);
+        SetDropTarget(null);
+        if (section is null || DataContext is not MainController controller)
+            return;
+        switch (section.DataContext)
+        {
+            case SensorGroupSection group when e.DataTransfer.TryGetValue(SensorIdsFormat) is { } sensorIds:
+                controller.Editor.MoveSensors(sensorIds, group);
+                break;
+            case FanLocationSection position when e.DataTransfer.TryGetValue(FanIdsFormat) is { } fanIds:
+                controller.Editor.SetFanLocations(fanIds, position);
+                break;
+        }
+        e.DragEffects = DragDropEffects.Move;
+    }
+
+    private void SetDropTarget(Border? section)
+    {
+        if (ReferenceEquals(section, _dropTarget))
+            return;
+        _dropTarget?.Classes.Remove("dropTarget");
+        _dropTarget = section;
+        _dropTarget?.Classes.Add("dropTarget");
     }
 
     // --- Sicherung: Export/Import über den StorageProvider (reine UI); die Logik liegt im BackupController. ---
@@ -347,17 +569,21 @@ public partial class MainWindow : Window
             await writer.WriteAsync(controller.Backup.BuildBackupJson());
             controller.Backup.ReportExported();
         }
-        catch
+        catch (Exception ex)
         {
-            // Defensive: ein Dialog-/Schreibfehler darf diesen async-void-Handler nicht in einen Crash kippen.
+            // A file the user picked could not be written (rights, disk): the toast says so, the log says why.
+            controller.RecordError("Backup", "Exporting the backup failed", ex);
             controller.Backup.ReportExportFailed();
         }
     }
 
+    // Read and checked before the confirmation (an unusable file needs none), which then names what the backup holds -
+    // it replaces the whole configuration, like a reset.
     private async void OnImportBackup(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainController controller)
             return;
+        BackupImport? import;
         try
         {
             IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -371,13 +597,21 @@ public partial class MainWindow : Window
 
             await using Stream stream = await files[0].OpenReadAsync();
             using var reader = new StreamReader(stream);
-            string json = await reader.ReadToEndAsync();
-            await controller.Backup.ImportFromJsonAsync(json);
+            import = controller.Backup.ReadImport(await reader.ReadToEndAsync());
         }
-        catch
+        catch (Exception ex)
         {
+            controller.RecordError("Backup", "Reading the backup file failed", ex);
             controller.Backup.ReportImportReadFailed();
+            return;
         }
+        if (import is null)
+            return; // the controller has said why
+        await ConfirmThen(
+            Localizer.Instance["Settings.ImportConfirmTitle"],
+            import.ConfirmMessage,
+            Localizer.Instance["Settings.ImportConfirm"],
+            () => controller.Backup.ImportAsync(import));
     }
 
     private async void OnResetConfig(object? sender, RoutedEventArgs e)
@@ -391,25 +625,61 @@ public partial class MainWindow : Window
             () => controller.Backup.ResetAsync());
     }
 
+    // Not guarded: what fails here reaches the app's error barrier (recorded, and the user told). The actions behind it
+    // report their own failures and do not throw.
     private async Task ConfirmThen(string title, string message, string confirmText, Func<Task> onConfirmed)
     {
-        try
-        {
-            if (await new ConfirmDialog(title, message, confirmText).ShowDialog<bool>(this))
-                await onConfirmed();
-        }
-        catch
-        {
-            // Defensive: ein Dialog-/Save-Fehler darf diesen async-void-Aufrufer nicht in einen Crash kippen.
-        }
+        if (await new ConfirmDialog(title, message, confirmText).ShowDialog<bool>(this))
+            await onConfirmed();
     }
+
+    private CurveEditorController? _editor;
+    private MainController? _overview;
 
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
 
+        if (_editor is not null)
+        {
+            _editor.LocationDialogRequested -= OnLocationDialogRequested;
+            _editor.ProfileSwitchConfirmationRequested -= OnProfileSwitchConfirmationRequested;
+        }
+        _editor = (DataContext as MainController)?.Editor;
+        if (_editor is not null)
+        {
+            _editor.LocationDialogRequested += OnLocationDialogRequested;
+            _editor.ProfileSwitchConfirmationRequested += OnProfileSwitchConfirmationRequested;
+        }
+
+        if (_overview is not null)
+        {
+            _overview.OverviewScrollRequested -= OnOverviewScrollRequested;
+            _overview.HardwareDialogRequested -= OnHardwareDialogRequested;
+        }
+        _overview = DataContext as MainController;
+        if (_overview is not null)
+        {
+            _overview.OverviewScrollRequested += OnOverviewScrollRequested;
+            _overview.HardwareDialogRequested += OnHardwareDialogRequested;
+        }
+
         if (DataContext is MainController controller)
             controller.PropertyChanged += OnControllerPropertyChanged;
+    }
+
+    /// <summary>
+    /// A status tile or hint leads to a section of the overview: scroll it to the top of the view. Posted, so a tile the
+    /// hint has just opened is laid out first.
+    /// </summary>
+    private void OnOverviewScrollRequested(object? sender, OverviewSection section)
+    {
+        Control target = section == OverviewSection.Temperatures ? OverviewTemperatures : OverviewFans;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (target.TranslatePoint(new Point(0, 0), OverviewContent) is { } top)
+                OverviewScroller.Offset = new Vector(OverviewScroller.Offset.X, top.Y);
+        }, DispatcherPriority.Loaded);
     }
 
     private void OnControllerPropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using LinFan.Conformance;
+using LinFan.Core.Abstractions;
 using LinFan.Core.Models;
 using Xunit;
 
@@ -33,6 +34,76 @@ public sealed class ConformanceSuiteCatchesViolationsTests
     {
         // Das gefährliche Backend setzt nach RestoreDefaults wieder pwm=1/Manual - INV-1 MUSS das reißen.
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => new DiscoveryStateProbe().RunInv1());
+    }
+
+    /// <summary>Hooks in a backend whose Dispose never restores - a fan written by the CLI's `set` would stay manual.</summary>
+    private sealed class NoRestoreOnDisposeProbe : BackendConformanceTests
+    {
+        protected override BackendUnderTest CreateBackend()
+        {
+            var inner = new ConformanceReferenceBackend();
+            inner.AddFan("f", canControl: true);
+            inner.AddSensor("t", SensorKind.Temperature, double.NaN, unit: "°C");
+            var fans = new NoRestoreOnDisposeBackend(inner);
+            return new BackendUnderTest(inner, fans, fans);
+        }
+
+        public void RunInv2c(bool viaSetMode) => Inv2c_Dispose_AfterAWrite_LeavesTheChannelsSafe_WithoutAnExplicitRestore(viaSetMode);
+    }
+
+    private sealed class NoRestoreOnDisposeBackend(IFanController inner) : IFanController
+    {
+        public IReadOnlyList<FanDescriptor> DiscoverFans() => inner.DiscoverFans();
+        public bool CanControl(FanId id) => inner.CanControl(id);
+        public FanMode GetMode(FanId id) => inner.GetMode(id);
+        public void SetMode(FanId id, FanMode mode) => inner.SetMode(id, mode);
+        public byte GetPwm(FanId id) => inner.GetPwm(id);
+        public void SetPwm(FanId id, byte value) => inner.SetPwm(id, value);
+        public void RestoreDefaults() => inner.RestoreDefaults();
+        public void Dispose() { } // the violation: a written channel is left as it is
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Inv2c_Fails_For_ABackendWhoseDisposeNeverRestores(bool viaSetMode)
+    {
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => new NoRestoreOnDisposeProbe().RunInv2c(viaSetMode));
+    }
+
+    /// <summary>Hooks in a backend that still writes after Dispose - nothing would hand such a channel back.</summary>
+    private sealed class WritesAfterDisposeProbe : BackendConformanceTests
+    {
+        protected override BackendUnderTest CreateBackend()
+        {
+            var inner = new ConformanceReferenceBackend();
+            inner.AddFan("f", canControl: true);
+            inner.AddSensor("t", SensorKind.Temperature, double.NaN, unit: "°C");
+            var fans = new WritesAfterDisposeBackend(inner);
+            return new BackendUnderTest(inner, fans, fans);
+        }
+
+        public void RunInv2d(bool viaSetMode) => Inv2d_AManualWriteAfterDispose_IsRefused_AndTheChannelsStaySafe(viaSetMode);
+    }
+
+    private sealed class WritesAfterDisposeBackend(IFanController inner) : IFanController
+    {
+        public IReadOnlyList<FanDescriptor> DiscoverFans() => inner.DiscoverFans();
+        public bool CanControl(FanId id) => inner.CanControl(id);
+        public FanMode GetMode(FanId id) => inner.GetMode(id);
+        public void SetMode(FanId id, FanMode mode) => inner.SetMode(id, mode);
+        public byte GetPwm(FanId id) => inner.GetPwm(id);
+        public void SetPwm(FanId id, byte value) => inner.SetPwm(id, value);
+        public void RestoreDefaults() => inner.RestoreDefaults();
+        public void Dispose() => inner.RestoreDefaults(); // hands back, but the violation: later writes still land
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Inv2d_Fails_For_ABackendThatAcceptsWritesAfterDispose(bool viaSetMode)
+    {
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => new WritesAfterDisposeProbe().RunInv2d(viaSetMode));
     }
 
     /// <summary>Subklasse, die ein zu langsames Backend mit sehr enger Latenz-Schranke einhängt.</summary>

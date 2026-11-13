@@ -15,9 +15,9 @@ namespace LinFan.App.Controllers;
 /// Daemon aktiviert. Die Zuordnung ist <b>kurvenzentriert</b>: für die ausgewählte Kurve kreuzt man die
 /// Lüfter an. „Speichern" schickt die Konfiguration über IPC an den Daemon (alleiniger Schreiber).
 /// </summary>
-public partial class CurveEditorController : ObservableObject
+public partial class CurveEditorController : ObservableObject, IDisposable
 {
-    private readonly Func<AppConfig, Task<bool>>? _save;
+    private readonly Func<AppConfig, IReadOnlyDictionary<string, byte>, Task<bool>>? _save;
     private readonly Func<string, Task>? _activateProfile;
     private readonly Func<string, Task>? _calibrate;
     private readonly Func<string, Task>? _identify;
@@ -26,14 +26,19 @@ public partial class CurveEditorController : ObservableObject
     private readonly Func<string, bool, Task>? _setCurveEnabled;
     private readonly Func<string, Task>? _startTachMapping;
     private readonly Func<Task>? _cancelTachMapping;
+    private readonly Func<Task>? _cancelCalibration;
     private readonly Func<string, string?, Task>? _setFanTachometer;
     private bool _initialized;
     private bool _applyingProfile; // unterdrückt das Nachladen beim programmatischen Setzen der Auswahl
     private bool _applyingActiveProfile; // dito für das aktive Profil (kein IPC beim Laden/Verwerfen)
     private string _liveCurvesSignature = ""; // Fingerabdruck der zuletzt aus dem Snapshot gebauten Live-Kurven
     private string? _savedConfigJson; // Baseline (zuletzt geladen/gespeichert) für die Dirty-Erkennung
+    private AppConfig? _savedConfig;  // the same baseline as an object (lazy, for the diff) - see SavedConfig
     private bool _dirtyCheckDeferred; // eine im dirty-Zustand koaleszierte Prüfung wartet auf den nächsten Live-Tick
-    private AirflowTuneResult? _lastAirflowResult; // letzte Airflow-Analyse, bis übernommen/verworfen
+    private readonly EditHistory _history;
+    private readonly TimeProvider _clock;
+    private int _nonEditDepth; // > 0 while a rebuild or live update runs - see WithoutHistory
+    private ConfigDiff _diff = ConfigDiff.None; // last comparison with the baseline - source of the markers and DirtySummary
 
     // Edit-getriebene Dirty-Erkennung: an die ConfigChanged/PropertyChanged der dynamischen Zeilen gekoppelt
     // (Curves/Profiles ändern ihre Membership) → Subscriptions mitführen, um beim Entfernen/Reset abzumelden.
@@ -41,6 +46,14 @@ public partial class CurveEditorController : ObservableObject
     private readonly HashSet<ProfileRow> _subscribedProfiles = new();
 
     public ObservableCollection<SensorOption> Sensors { get; } = new();
+
+    /// <summary>
+    /// The configured sensor group names in order (<see cref="AppConfig.SensorGroups"/>), held as editor state: loaded
+    /// with the config, restored by <see cref="RestoreFrom"/> (discard all, undo, redo) and written back by every save - <see cref="BuildConfig"/>
+    /// builds a fresh config, which would otherwise send an empty list and delete the groups.
+    /// </summary>
+    public IReadOnlyList<string> SensorGroups { get; private set; } = Array.Empty<string>();
+
     public ObservableCollection<SensorOption> VisibleSensors { get; } = new();
     public ObservableCollection<CurveEditRow> Curves { get; } = new();
     public ObservableCollection<FanAssignRow> Fans { get; } = new();
@@ -63,13 +76,13 @@ public partial class CurveEditorController : ObservableObject
 
     /// <summary>
     /// Im Geräte-Tab angezeigte Teilmenge der Sensoren - gefiltert über <see cref="SensorSearch"/> und
-    /// <see cref="HideHiddenSensors"/>. Discovery-Reihenfolge bleibt erhalten (kein Live-Umsortieren beim
+    /// <see cref="ShowHiddenSensors"/>. Discovery-Reihenfolge bleibt erhalten (kein Live-Umsortieren beim
     /// Tippen). Nicht zu verwechseln mit <see cref="VisibleSensors"/> (Quell-Sensoren für Kurven).
     /// </summary>
     public ObservableCollection<SensorOption> FilteredSensors { get; } = new();
 
     /// <summary>Im Geräte-Tab angezeigte Teilmenge der Lüfter - gefiltert über <see cref="FanSearch"/> und
-    /// <see cref="HideHiddenFans"/>. Discovery-Reihenfolge bleibt erhalten.</summary>
+    /// <see cref="ShowHiddenFans"/>. Discovery-Reihenfolge bleibt erhalten.</summary>
     public ObservableCollection<FanAssignRow> FilteredFans { get; } = new();
 
     /// <summary>Lüfter-Checkboxen für die aktuell ausgewählte Kurve (neu aufgebaut bei Kurvenwechsel).</summary>
@@ -78,22 +91,10 @@ public partial class CurveEditorController : ObservableObject
     /// <summary>Dieselben Lüfter-Checkboxen, nach Position/Gruppe gebündelt (wie das Dashboard) - Bindungsziel der gruppierten Anzeige.</summary>
     public ObservableCollection<FanCheckGroup> SelectedCurveFanGroups { get; } = new();
 
-    /// <summary>Pro-Lüfter-Vorschläge des Airflow-Auto-Tune (nach „Airflow analysieren"); leer bis zur Analyse.</summary>
-    public ObservableCollection<AirflowSuggestionRow> AirflowSuggestions { get; } = new();
-
-    /// <summary>Hinweise/Warnungen aus der Airflow-Analyse (z. B. Unterdruck, fehlende Position).</summary>
-    public ObservableCollection<string> AirflowHints { get; } = new();
-
     /// <summary>
-    /// Vorhandene Sensor-Gruppennamen als Auto-Vervollständigung für das Gruppen-Auswahlfeld der Sensoren
-    /// im Geräte-Tab. Geteilte Instanz aller Zeilen; ein frei getippter neuer Name bleibt möglich (kein Zwang).
-    /// </summary>
-    public ObservableCollection<string> AvailableGroups { get; } = new();
-
-    /// <summary>
-    /// Verfügbare Drehzahl-Sensoren fürs manuelle Tacho-Dropdown je Lüfterzeile (geteilte Instanz aller Zeilen).
-    /// Erster Eintrag ist immer der „keiner"-Eintrag (<see cref="TachSensorOption.Id"/> == <c>null</c>), der die
-    /// Zuordnung löscht; danach jeder RPM-Sensor aus der Discovery.
+    /// Verfügbare Drehzahl-Sensoren für die Tacho-Auswahl je Lüfterzeile (geteilte Instanz aller Zeilen).
+    /// Erster Eintrag ist immer der „Automatisch"-Eintrag (<see cref="TachSensorOption.Id"/> == <c>null</c>), der die
+    /// eigene Zuordnung löscht; danach jeder RPM-Sensor aus der Discovery, mit seinem Live-Wert.
     /// </summary>
     public ObservableCollection<TachSensorOption> AvailableTachSensors { get; } = new();
 
@@ -116,8 +117,11 @@ public partial class CurveEditorController : ObservableObject
     // gefilterte Sicht neu auf (Name-Bearbeitung triggert bewusst keinen Rebuild → kein Fokusverlust beim Tippen).
     [ObservableProperty] private string _sensorSearch = "";
     [ObservableProperty] private string _fanSearch = "";
-    [ObservableProperty] private bool _hideHiddenSensors;
-    [ObservableProperty] private bool _hideHiddenFans;
+    /// <summary>Hidden sensors still show in the settings list (to edit or show them again) - on by default.</summary>
+    [ObservableProperty] private bool _showHiddenSensors = true;
+
+    /// <summary>Hidden fans still show in the settings list - on by default.</summary>
+    [ObservableProperty] private bool _showHiddenFans = true;
 
     /// <summary>
     /// Welche Seite der Kurven-Tab rechts zeigt. Wird ausschließlich durch Klicks im Seitenmenü und die
@@ -126,29 +130,37 @@ public partial class CurveEditorController : ObservableObject
     /// </summary>
     [ObservableProperty] private CurveTabPane _pane = CurveTabPane.Curve;
 
-    /// <summary>Standard-Stützpunkte einer neu angelegten Kurve - bewusst ein paar mehr als das frühere 30/80-Paar.</summary>
-    private static readonly (decimal Temp, decimal Percent)[] DefaultCurvePoints =
-    {
-        (30, 20), (50, 35), (65, 50), (80, 75), (90, 100),
-    };
-
     /// <summary>True, sobald sich der Editor-Stand von der zuletzt gespeicherten/geladenen Konfiguration unterscheidet.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanChangeActiveProfile))]
-    [NotifyPropertyChangedFor(nameof(CanActivateSelectedProfile))]
-    [NotifyPropertyChangedFor(nameof(ShowActivationBlockedHint))]
+    [NotifyPropertyChangedFor(nameof(DirtySummary), nameof(UnsavedBarText))]
     private bool _hasUnsavedChanges;
+
+    /// <summary>Unsaved changes in curves or profile metadata - the dot on the curves tab.</summary>
+    [ObservableProperty] private bool _curvesAreaDirty;
+
+    /// <summary>Unsaved changes in fans, sensors or sensor groups - the dot on the settings tab.</summary>
+    [ObservableProperty] private bool _settingsAreaDirty;
+
+    /// <summary>
+    /// What is unsaved, e.g. „Geändert: 1 Kurve, Lüfter" - empty while nothing is. Built from the last diff on every
+    /// read, so it follows a language switch without a new comparison.
+    /// </summary>
+    public string DirtySummary => HasUnsavedChanges ? Summarize(_diff) : "";
+
+    /// <summary>The unsaved-changes bar's line: the summary, and that the service does not have it yet.</summary>
+    public string UnsavedBarText => HasUnsavedChanges ? Localizer.Instance.Format("UnsavedBar.Detail", DirtySummary) : "";
+
+    /// <summary>
+    /// Whether the daemon is reachable - fed by the <see cref="MainController"/> from every snapshot. Saving needs
+    /// it (the command would only fail); undo does not, it only changes the draft.
+    /// </summary>
+    [ObservableProperty] private bool _isConnected;
 
     /// <summary>True, sobald der erste Snapshot verarbeitet wurde (Geräte/Kurven geladen). Steuert Leer-/Lade-Hinweise.</summary>
     [ObservableProperty] private bool _isReady;
 
-    /// <summary>Klartext-Verdikt der Druckbilanz (für die Airflow-Vorschau).</summary>
-    [ObservableProperty] private string _airflowPressureText = "";
-
-    /// <summary>True, sobald eine Airflow-Analyse vorliegt (zeigt die Vorschau-Sektion).</summary>
-    [ObservableProperty] private bool _hasAirflowSuggestion;
-
-    /// <param name="save">Schickt die bearbeitete Konfiguration an den Daemon; liefert den Erfolg zurück.</param>
+    /// <param name="save">Schickt die bearbeitete Konfiguration an den Daemon; liefert den Erfolg zurück. The second
+    /// argument is each fan's MinPwm as the daemon reported it last (<see cref="ICommandSink.SendConfigAsync"/>).</param>
     /// <param name="activateProfile">Aktiviert ein Profil live im Daemon (optional).</param>
     /// <param name="calibrate">Startet die Kalibrierung eines Lüfters im Daemon (optional).</param>
     /// <param name="setCurveEnabled">Schaltet eine Kurve live an/aus im Daemon (optional).</param>
@@ -159,13 +171,15 @@ public partial class CurveEditorController : ObservableObject
     /// <param name="startTachMapping">Startet die automatische Tacho-Kopplung eines Lüfters im Daemon (optional).</param>
     /// <param name="cancelTachMapping">Bricht eine laufende Tacho-Kopplung ab (optional).</param>
     /// <param name="setFanTachometer">Ordnet einem Lüfter fest einen Drehzahl-Sensor zu (leer/null ⇒ löschen; optional).</param>
+    /// <param name="clock">Time source of the undo history's coalescing and the status toast's auto-hide (injectable for tests).</param>
     public CurveEditorController(
-        Func<AppConfig, Task<bool>>? save = null, Func<string, Task>? activateProfile = null,
+        Func<AppConfig, IReadOnlyDictionary<string, byte>, Task<bool>>? save = null, Func<string, Task>? activateProfile = null,
         Func<string, Task>? calibrate = null, Func<string, bool, Task>? setCurveEnabled = null,
         TimeSpan? statusAutoHide = null, Func<string, Task>? identify = null,
         Func<string, byte, Task>? sendManual = null, Func<string, Task>? sendAuto = null,
         Func<string, Task>? startTachMapping = null, Func<Task>? cancelTachMapping = null,
-        Func<string, string?, Task>? setFanTachometer = null)
+        Func<string, string?, Task>? setFanTachometer = null,
+        TimeProvider? clock = null, Func<Task>? cancelCalibration = null)
     {
         _save = save;
         _activateProfile = activateProfile;
@@ -176,8 +190,20 @@ public partial class CurveEditorController : ObservableObject
         _setCurveEnabled = setCurveEnabled;
         _startTachMapping = startTachMapping;
         _cancelTachMapping = cancelTachMapping;
+        _cancelCalibration = cancelCalibration;
         _setFanTachometer = setFanTachometer;
-        Status = new TransientStatus(statusAutoHide);
+        _clock = clock ?? TimeProvider.System;
+        Status = new TransientStatus(statusAutoHide, _clock);
+        _history = new EditHistory(_clock);
+        _history.Changed += (_, _) =>
+        {
+            UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
+        };
+
+        // Named handler, removed in Dispose: the localizer is an app-lifetime singleton and would keep every
+        // editor alive otherwise (same as SettingsController).
+        Localizer.Instance.PropertyChanged += OnLanguageChanged;
 
         // Im Konstruktor verdrahten, damit auch die während Initialize hinzugefügten Zeilen abonniert werden
         // (Dirty bleibt dort No-op, bis Initialize die Baseline setzt). Sensoren/Lüfter ändern ihre Membership
@@ -197,7 +223,7 @@ public partial class CurveEditorController : ObservableObject
         {
             SensorConfig? sc = snapshot.Config.Sensors.FirstOrDefault(x => x.SensorId == s.Id);
             var opt = new SensorOption(s.Id, s.Name, visible: sc?.Hidden != true, group: sc?.Group, unit: s.Unit,
-                                       availableGroups: AvailableGroups);
+                                       hardwareLabel: s.Label);
             // Lebensdauer von SensorOption == Lebensdauer des Controllers (Initialize ist einmalig,
             // die Sensors-Collection wird nie neu aufgebaut) → kein Unsubscribe nötig.
             opt.PropertyChanged += OnSensorRowChanged;
@@ -205,17 +231,17 @@ public partial class CurveEditorController : ObservableObject
             if (opt.Visible)
                 VisibleSensors.Add(opt);
         }
+        SensorGroups = snapshot.Config.SensorGroups;
+        CaseType = snapshot.Config.CaseType;
 
-        // Drehzahl-Sensoren fürs manuelle Tacho-Dropdown sammeln (geteilte Liste; „keiner"-Eintrag zuerst).
-        AvailableTachSensors.Add(new TachSensorOption(null, Localizer.Instance["FanAssignRow.NoTachometer"]));
+        // Drehzahl-Sensoren für die Tacho-Auswahl sammeln (geteilte Liste; „Automatisch"-Eintrag zuerst).
+        AvailableTachSensors.Add(TachSensorOption.Automatic());
         foreach (SensorReading rpm in snapshot.Sensors.Where(r => r.Kind == SensorKind.FanRpm))
             AvailableTachSensors.Add(new TachSensorOption(rpm.Id, rpm.Name));
 
         foreach (FanReading f in snapshot.Fans)
         {
-            // The hardware label comes along for display only (it applies as long as the fan carries no own
-            // name - e.g. entries the daemon created via calibration or tach coupling). Do NOT write it into
-            // the FanConfig: empty means "no own name" there.
+            // A fan the config does not list has no own name - its row shows „Lüfter N" (RefreshDefaultFanNames).
             FanConfig baseFan = snapshot.Config.Fans.FirstOrDefault(fc => fc.FanId == f.Id)
                 ?? new FanConfig { FanId = f.Id };
             var fan = new FanAssignRow(baseFan, selected: null, Curves, f.CanControl, _calibrate,
@@ -223,19 +249,31 @@ public partial class CurveEditorController : ObservableObject
                                        sendManual: _sendManual, sendAuto: _sendAuto,
                                        sendTachMapping: _startTachMapping, cancelTachMapping: _cancelTachMapping,
                                        sendSetTach: _setFanTachometer, availableTachSensors: AvailableTachSensors,
-                                       hardwareLabel: f.Name);
+                                       cancelCalibration: _cancelCalibration,
+                                       readOnlyReason: f.ReadOnlyReason)
+            {
+                TachOwner = TachOwnerOf,
+                TachAutoOwner = TachAutoOwnerOf,
+            };
             // Zuordnungswechsel (Selected) muss das Aktiv-Badge der Kurven neu auswerten. Lebensdauer der
             // FanAssignRow == Lebensdauer des Controllers (Initialize ist einmalig) → kein Unsubscribe nötig.
             fan.PropertyChanged += OnFanRowChanged;
             Fans.Add(fan);
         }
 
-        RefreshAvailableGroups(); // Vorschläge aus den geladenen Config-Gruppen befüllen
-        RebuildFilteredSensors(); // Geräte-Tab-Listen initial befüllen (ungefiltert)
+        var rowIds = Fans.Select(f => f.FanId).ToHashSet(StringComparer.Ordinal);
+        _fanNamesWithoutRow = snapshot.Config.Fans.Where(fc => !rowIds.Contains(fc.FanId)).Select(fc => fc.Name).ToList();
+        RefreshDefaultFanNames();
+
+        RebuildFilteredSensors(); // settings lists and their sections, initially unfiltered
         RebuildFilteredFans();
+        NotifyHiddenSensors();
+        NotifyHiddenFans();
+        RefreshPositionMenus();
+        RefreshDeviceActionsBlocked();
 
         foreach (Profile p in snapshot.Config.Profiles)
-            Profiles.Add(new ProfileRow(p.Id, p.Name, p.Curves, p.Assignments));
+            Profiles.Add(RowOf(p));
 
         // Der Editor startet auf dem aktiven Profil - beides zeigt anfangs dasselbe, ist aber ab hier
         // getrennt: die Auswahl folgt dem Nutzer, das aktive Profil nur einer ausdrücklichen Aktivierung.
@@ -255,6 +293,7 @@ public partial class CurveEditorController : ObservableObject
         else
         {
             // Fallback ohne Profile (dank Daemon-Migration selten): Kurven direkt aus der Config.
+            _undetectedAssignments = []; // a resync must not carry them over from the config before
             foreach (CurveConfig c in snapshot.Config.Curves)
                 Curves.Add(CurveEditRow.From(c, Sensors, Fans));
             foreach (FanAssignRow fan in Fans)
@@ -270,10 +309,17 @@ public partial class CurveEditorController : ObservableObject
         // Kurven-An/Aus nicht, dass es den Daemon etwas angeht (siehe IsLiveCurve).
         RebuildLiveCurvesIfChanged(snapshot.Config);
 
-        // Baseline für die Dirty-Erkennung festhalten (entspricht dem geladenen Daemon-Stand).
-        _savedConfigJson = Serialize(BuildConfig());
+        // Baseline of the dirty check (= the daemon's state just loaded) and the start of a fresh history: after an
+        // import, reset or the assistant, undo must not bring the replaced config back (saving it would then undo
+        // the import through the daemon's merge).
+        string json = Serialize(BuildConfig());
+        SetBaseline(json);
         HasUnsavedChanges = false;
-        RefreshAirflowStatus(); // zeigt in den Einstellungen an, ob schon getunt wurde (auch im Fallback ohne Profile)
+        _dirtyCheckDeferred = false;
+        ApplyDiff(ConfigDiff.None);
+        _history.Reset(json);
+        RefreshAirflow(); // Settings › Airflow: schema, balance and the proposal for the running profile
+        NotifyCurveCountChanged(); // adding curves needs an initialized editor
         IsReady = true;
     }
 
@@ -287,7 +333,11 @@ public partial class CurveEditorController : ObservableObject
     /// </summary>
     public void Resync(MonitorSnapshot snapshot)
     {
-        _savedConfigJson = null;  // RefreshDirty ist damit No-op, während wir die Collections abbauen
+        // An open „Position wählen" works on a row that goes away: it closes as a cancel (the nudge ends below).
+        _locationPick?.RequestClose();
+        _locationPick = null;
+        RevertAllManual(); // the rows go away - their manual control must not outlive them in the daemon
+        SetBaseline(null);        // RefreshDirty ist damit No-op, während wir die Collections abbauen
         _initialized = false;
 
         _applyingProfile = true;  // Profil-Setter-Nebenwirkungen beim Abbau unterdrücken
@@ -309,27 +359,59 @@ public partial class CurveEditorController : ObservableObject
         FilteredFans.Clear();
         SelectedCurveFans.Clear();
         SelectedCurveFanGroups.Clear();
-        AirflowSuggestions.Clear();
-        AirflowHints.Clear();
-        AirflowStatus.Clear(); // hält Verweise auf die eben abgebauten Lüfter-/Kurven-Zeilen
-        HasAirflowStatus = false;
-        HasAirflowSuggestion = false;
-        _lastAirflowResult = null;
-        AvailableGroups.Clear();
+        ClearAirflow(); // holds references to the fan and profile rows that just went away
         AvailableTachSensors.Clear();
+        SensorGroupSections.Clear();
+        FanLocationSections.Clear();
+        _sensorDragActive = false;
 
         HasUnsavedChanges = false;
         IsReady = false;
+        // The rebuilt editor starts on the daemon's running profile: nothing left to confirm or to switch back to.
+        _pendingSwitchId = null;
+        _pendingSwitchViaSave = false;
+        _preSwitchBaselineJson = null;
+        _switchBackCommand = null;
 
-        Initialize(snapshot); // setzt Baseline + IsReady neu aus der frischen Config
+        Initialize(snapshot); // setzt Baseline + IsReady neu aus der frischen Config und leert den Verlauf
     }
 
-    /// <summary>Speist jede Kurve mit der Live-Temperatur ihres Quell-Sensors (für den Arbeitspunkt im Graph).</summary>
+    /// <summary>
+    /// Feeds the live tick into the editor (working points, live values, daemon-side fan state). Everything it
+    /// changes is live state, never a user edit - it runs outside the history.
+    /// </summary>
     public void UpdateLive(MonitorSnapshot snapshot)
     {
         if (!_initialized)
             return;
 
+        WithoutHistory(() => ApplyLive(snapshot));
+        FollowDaemonProfile(snapshot.Config);
+
+        // Dirty-Erkennung läuft NICHT pro Tick aus den Live-Werten (die ändern die Config nicht) - sie hängt an
+        // den echten Edit-Pfaden (MarkDirty über die Collection-/Row-Handler). Der Tick zieht nur eine im
+        // dirty-Zustand koaleszierte Prüfung nach (z. B. ein Punkt-Drag zurück auf die Baseline) und schließt
+        // einen ruhig gewordenen Verlaufsschritt, damit der teure Vergleich höchstens einmal je Tick statt pro
+        // Maus-Sample läuft.
+        SettleEdits(force: false);
+    }
+
+    /// <summary>
+    /// The tick while the daemon is unreachable: nothing new arrived, so the live state (and the running curves) stay
+    /// as last seen. Only the edit bookkeeping of <see cref="UpdateLive"/> runs - undo works offline.
+    /// </summary>
+    public void UpdateOffline()
+    {
+        if (_initialized)
+            SettleEdits(force: false);
+    }
+
+    private MonitorSnapshot? _lastLiveSnapshot; // tells a new daemon snapshot from the last one applied again
+
+    private void ApplyLive(MonitorSnapshot snapshot)
+    {
+        bool fresh = !ReferenceEquals(snapshot, _lastLiveSnapshot); // the monitor hands out the last one until the next tick
+        _lastLiveSnapshot = snapshot;
         Dictionary<string, double> temps = snapshot.Sensors
             .Where(s => s.Kind == SensorKind.Temperature)
             .ToDictionary(s => s.Id, s => s.Value);
@@ -350,45 +432,81 @@ public partial class CurveEditorController : ObservableObject
         foreach (SensorOption s in Sensors)
             s.SetLive(temps.TryGetValue(s.Id, out double t) ? t : double.NaN);
 
+        // The reading of every speed sensor for the „assign by hand" list (display only).
+        var sensorRpms = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (SensorReading s in snapshot.Sensors.Where(r => r.Kind == SensorKind.FanRpm))
+            sensorRpms.TryAdd(s.Id, s.Value);
+        foreach (TachSensorOption option in AvailableTachSensors)
+            if (option.Id is { } tachId)
+                option.SetLive(sensorRpms.TryGetValue(tachId, out double v) ? v : null);
+
         // Live-Drehzahl + Kalibrier-/Identify-/Kopplungs-Status je Lüfter-Zeile spiegeln (ebenfalls reine Anzeige).
-        Dictionary<string, double?> rpms = snapshot.Fans.ToDictionary(f => f.Id, f => f.Rpm);
-        // Config-Ids können (durch Id-Migration/Hand-Edit) doppelt sein - erster gewinnt (wie im SnapshotBuilder),
+        var live = new Dictionary<string, FanReading>(StringComparer.Ordinal);
+        foreach (FanReading reading in snapshot.Fans)
+            live.TryAdd(reading.Id, reading);
+        // Config-Ids können (durch Hand-Edit) doppelt sein - erster gewinnt (wie im SnapshotBuilder),
         // statt hart am ToDictionary zu werfen und die ganze GUI abzureißen.
         var rpmSources = new Dictionary<string, string?>();
         var minPwms = new Dictionary<string, byte>();
+        var calibrations = new Dictionary<string, FanCalibration?>();
         foreach (FanConfig f in snapshot.Config.Fans)
         {
             rpmSources.TryAdd(f.FanId, f.RpmSource);
             minPwms.TryAdd(f.FanId, f.MinPwm);
+            calibrations.TryAdd(f.FanId, f.Calibration);
         }
+        // Own sensor names - the only name a coupled speed sensor that is not detected right now still has.
+        var sensorNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (SensorConfig s in snapshot.Config.Sensors.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+            sensorNames.TryAdd(s.SensorId, s.Name);
 
         // Vom Daemon geänderte Anlaufpunkte (Kalibrier-Ergebnis) einsammeln - sie müssen anschließend auch in
-        // die Dirty-Baseline, sonst gälten sie als ungespeicherte Nutzer-Änderung (Banner/Verwerfen).
-        Dictionary<string, (int Min, int Max)>? adoptedLimits = null;
+        // die Dirty-Baseline und in jeden Verlaufsschritt, sonst gälten sie als ungespeicherte Nutzer-Änderung
+        // (Leiste/Verwerfen) und Rückgängig holte den alten, zu niedrigen Anlaufpunkt zurück. Rebased whenever the
+        // daemon reports a new value the baseline does not have yet - even if the row already showed it as a
+        // draft; the echo of the editor's own save matches the baseline and changes nothing.
+        Dictionary<string, byte>? adoptedMinPwm = null;
+        Dictionary<string, FanCalibration>? adoptedCalibration = null;
+        AppConfig? saved = SavedConfig;
+        // While a save is on its way, Save sets the baseline only once the send returns - that would drop a start point
+        // adopted in between, and the row would remember it as seen. Taken over at the next poll instead.
+        bool adopt = !_saveInFlight;
+        bool tachsMoved = false;
         foreach (FanAssignRow fan in Fans)
         {
             fan.ApplyCalibration(snapshot.Calibration);
+            if (adopt && calibrations.TryGetValue(fan.FanId, out FanCalibration? cal) && fan.ApplyStoredCalibration(cal))
+            {
+                adoptedCalibration ??= new Dictionary<string, FanCalibration>(StringComparer.Ordinal);
+                adoptedCalibration[fan.FanId] = cal!;
+            }
             fan.ApplyIdentify(snapshot.Identify);
             fan.ApplyTachMapping(snapshot.TachMapping);
-            fan.ApplyRpmSource(rpmSources.TryGetValue(fan.FanId, out string? src) ? src : null);
-            if (minPwms.TryGetValue(fan.FanId, out byte min) && fan.ApplyDaemonMinPwm(min))
+            string? src = rpmSources.GetValueOrDefault(fan.FanId);
+            fan.ApplyRpmSource(src, src is null ? null : sensorNames.GetValueOrDefault(src));
+            if (adopt && minPwms.TryGetValue(fan.FanId, out byte min) && fan.ApplyDaemonMinPwm(min)
+                && saved?.Fans.FirstOrDefault(f => f.FanId == fan.FanId)?.MinPwm != min)
             {
-                // Nach dem Setzen lesen: der MinPwm-Setter kann MaxPwm nachziehen (Min > Max).
-                adoptedLimits ??= new Dictionary<string, (int, int)>(StringComparer.Ordinal);
-                adoptedLimits[fan.FanId] = (fan.MinPwm, fan.MaxPwm);
+                adoptedMinPwm ??= new Dictionary<string, byte>(StringComparer.Ordinal);
+                adoptedMinPwm[fan.FanId] = min;
             }
-            fan.SetLiveRpm(rpms.TryGetValue(fan.FanId, out double? r) ? r : null);
+            FanReading? reading = live.GetValueOrDefault(fan.FanId);
+            fan.SetLive(reading?.Rpm, DrivenPwm(reading), fresh ? reading?.ManualOverride : null);
+            fan.ApplyCalibrationMismatch(reading?.CalibrationMismatch);
+            fan.ApplyLacksSpeedSensor(reading is not null && DeviceActionBlock.LacksSpeedSensor(snapshot, reading));
+            tachsMoved |= fan.ApplyDaemonTachometer(reading?.Tachometer);
         }
+        // Another fan's hardware pairing may have come or gone: every row's „assign by hand" list names it.
+        if (tachsMoved)
+            foreach (FanAssignRow fan in Fans)
+                fan.RefreshTach();
 
-        if (adoptedLimits is not null)
-            RebaselineFanPwmLimits(adoptedLimits);
+        if (adoptedMinPwm is not null || adoptedCalibration is not null)
+            RebaselineFanCalibration(adoptedMinPwm, adoptedCalibration);
 
-        // Dirty-Erkennung läuft NICHT pro Tick aus den Live-Werten (die ändern die Config nicht) - sie hängt an
-        // den echten Edit-Pfaden (MarkDirty über die Collection-/Row-Handler). Der Tick zieht nur eine im
-        // dirty-Zustand koaleszierte Prüfung nach (z. B. ein Punkt-Drag zurück auf die Baseline), damit der
-        // teure Vergleich höchstens einmal je Tick statt pro Maus-Sample läuft.
-        if (_dirtyCheckDeferred)
-            RefreshDirty();
+        _deviceBusy = DeviceActionBlock.Busy(snapshot);
+        _dryRun = snapshot.DryRun;
+        RefreshDeviceActionsBlocked();
     }
 
     /// <summary>
@@ -412,6 +530,15 @@ public partial class CurveEditorController : ObservableObject
             LiveCurves.Add(CurveEditRow.From(c, Sensors, Fans));
         LiveCurvesRevision++;
     }
+
+    /// <summary>
+    /// The PWM of a fan the daemon drives itself (curve or manual) - only then is the reported value what the fan runs
+    /// at. Under hardware auto, the fail-safe or a device action it is 0, stale or throttled: <c>null</c> (unknown).
+    /// </summary>
+    internal static byte? DrivenPwm(FanReading? reading) =>
+        reading?.ControlState is FanControlState.Curve or FanControlState.CurveHolding or FanControlState.Manual
+            ? reading.Pwm
+            : null;
 
     /// <summary>
     /// Beendet eine ggf. in einer Lüfterzeile aktive temporäre Manuell-Steuerung → zurück auf Kurve/Hardware-Auto.

@@ -10,7 +10,7 @@ namespace LinFan.App.UiTests;
 
 /// <summary>
 /// Tier-3-Smoke-Tests: Steuerbefehle, die die GUI an den Daemon sendet, werden über einen Fake-
-/// <c>ICommandSink</c> beobachtet - Manual-PWM/Auto im Dashboard und das Speichern. Plus die
+/// <c>ICommandSink</c> beobachtet - Manual-PWM/Auto in der Übersicht (hinter „…“) und das Speichern. Plus die
 /// Sensor-Sichtbarkeit im Geräte-Tab (editor-lokal, ohne Sink).
 /// </summary>
 public class Tier3SmokeTests
@@ -19,7 +19,7 @@ public class Tier3SmokeTests
         LinFan.App.Services.MonitorSnapshot snapshot)
     {
         var fake = new FakeLiveMonitor(snapshot); // ist zugleich der ICommandSink
-        var ctrl = new MainController(fake);
+        var ctrl = UiTestHelpers.NewController(fake);
         var window = new MainWindow { DataContext = ctrl };
         window.Show();
         return (ctrl, fake, window);
@@ -40,7 +40,7 @@ public class Tier3SmokeTests
         SelectTab(window, 2); // Einstellungen → Sensoren (Default-Sektion)
 
         // Sichtbarkeit hängt jetzt am Augen-Button (ToggleVisibleCommand) statt am ToggleSwitch.
-        Button eye = window.Find<Button>().Single(b => b.DataContext is SensorOption);
+        Button eye = window.Find<Button>().Single(b => b.DataContext is SensorOption s && b.Command == s.ToggleVisibleCommand);
         var sensor = (SensorOption)eye.DataContext!;
         Assert.True(sensor.Visible);
         Assert.Contains(ctrl.Editor.VisibleSensors, s => s.Id == sensor.Id);
@@ -59,11 +59,18 @@ public class Tier3SmokeTests
     public void Dashboard_ManualToggleAndSlider_SendCommandsViaSink()
     {
         var (_, fake, window) = Show(UiTestHelpers.SnapshotWithFans(
-            new LinFan.App.Services.FanReading("pwm1", "Fan", 1000, 128, LinFan.Core.Models.FanMode.Auto, CanControl: true)));
+            new LinFan.App.Services.FanReading("pwm1", "Fan", 1000, 128, CanControl: true)));
         UiTestHelpers.PumpUntil(() => window.Find<ToggleSwitch>().Any(t => t.DataContext is FanRow));
         // Übersicht ist der Default-Tab → das Dashboard ist bereits im Visual-Tree.
 
+        // The manual controls sit behind the row's "…" button, closed at first.
         ToggleSwitch manual = window.Find<ToggleSwitch>().Single(t => t.DataContext is FanRow);
+        Assert.False(manual.IsEffectivelyVisible);
+        Button more = window.Find<Button>().Single(b => b.DataContext is FanRow row && b.Command == row.ToggleExpandedCommand);
+        more.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(manual.IsEffectivelyVisible && manual.IsEffectivelyEnabled);
+
         manual.IsChecked = true; // Manuell → ein SetManualPwm
         Dispatcher.UIThread.RunJobs();
         Assert.Contains(fake.ManualCalls, c => c.fanId == "pwm1");
@@ -86,16 +93,18 @@ public class Tier3SmokeTests
     {
         var (ctrl, fake, window) = Show(UiTestHelpers.SampleSnapshot());
         UiTestHelpers.PumpUntil(() => ctrl.Editor.IsReady);
-        ctrl.Editor.HasUnsavedChanges = true; // blendet „Übernehmen" neben der Profil-Auswahl ein
+        ctrl.Editor.SelectedCurve!.AddPointRow(95, 90); // a real edit shows the unsaved-changes bar
+        Dispatcher.UIThread.RunJobs();
 
-        // Über den Namen gesucht: der Knopf trägt nur sein Symbol, keine Beschriftung.
-        Button apply = window.Find<Button>().Single(b => b.Name == "HeaderSaveButton");
+        Button apply = window.Find<Button>().Single(b => b.Name == "ApplyButton");
+        Assert.True(apply.IsEffectivelyVisible && apply.IsEffectivelyEnabled);
         Assert.Empty(fake.ConfigCalls);
 
         apply.Command!.Execute(null); // → Editor.SaveCommand → SendConfigAsync
         Dispatcher.UIThread.RunJobs();
 
         Assert.Single(fake.ConfigCalls);
+        Assert.False(ctrl.Editor.HasUnsavedChanges);
     }
 
     [AvaloniaFact]

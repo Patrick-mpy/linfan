@@ -31,4 +31,11 @@ public sealed record FanConfig
     public string? RpmSource { get; init; }
 
     public FanCalibration? Calibration { get; init; }
+
+    /// <summary>
+    /// The device the backend reported behind <see cref="FanId"/> when the entry was set up (or the user last accepted
+    /// a replacement), <c>null</c> until it is known. Daemon-owned and never sent over IPC: another fingerprint behind
+    /// the same id later means the calibration and limits above may belong to a device that is gone.
+    /// </summary>
+    public HardwareDevice? Device { get; init; }
 }

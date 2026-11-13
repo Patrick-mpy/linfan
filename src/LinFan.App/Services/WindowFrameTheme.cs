@@ -2,7 +2,6 @@
 
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
-using Avalonia.Styling;
 
 namespace LinFan.App.Services;
 
@@ -75,7 +74,8 @@ public static class WindowFrameTheme
             return;
 
         // ActualThemeVariant, not the requested one: in "system" mode it already carries what the OS resolved to.
-        int dark = window.ActualThemeVariant == ThemeVariant.Dark ? 1 : 0;
+        // Terminal and high contrast inherit Dark, so they get the dark bar as well.
+        int dark = ThemeVariantMap.IsDark(window.ActualThemeVariant) ? 1 : 0;
         try
         {
             DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref dark, sizeof(int));

@@ -1,0 +1,19 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+      A tooltip is a logical child of the control it belongs to, so a rule like "Border.navBadge TextBlock" or
+      "Button.primary:disabled TextBlock" styles that control's tooltip text as well - dark text on the dark tooltip read
+      as an empty tooltip. Every tooltip in this app is plain text: this gives it the tooltip's own look back.
+      Such rules depend on a class or pseudo-class, so they apply as style triggers, above a plain "ToolTip TextBlock" -
+      hence ":open", which makes this one a trigger too. Among triggers a later style wins, so this is included after
+      every Styles collection that styles TextBlocks below a control: in App.axaml after Layout.axaml, and at the end of
+      MainWindow's styles.
+    -->
+    <Style Selector="ToolTip:open TextBlock">
+        <Setter Property="Foreground" Value="{Binding $parent[ToolTip].Foreground}" />
+        <Setter Property="FontSize" Value="{Binding $parent[ToolTip].FontSize}" />
+        <Setter Property="FontWeight" Value="{Binding $parent[ToolTip].FontWeight}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+</Styles>

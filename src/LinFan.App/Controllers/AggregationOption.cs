@@ -17,6 +17,12 @@ public sealed record AggregationOption(SensorAggregation Value, string Key)
     /// <summary>Berechneter Lookup, damit ein Sprachwechsel den Anzeigetext live aktualisiert.</summary>
     public string Display => Localizer.Instance[Key];
 
+    /// <summary>Tooltip of the option: what it does.</summary>
+    public string Hint => Localizer.Instance[Key + "Hint"];
+
+    /// <summary>Short note shown next to the switch while the option is selected.</summary>
+    public string Summary => Localizer.Instance[Key + "Summary"];
+
     public static AggregationOption For(SensorAggregation value) =>
         All.FirstOrDefault(o => o.Value == value) ?? All[0];
 

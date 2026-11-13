@@ -44,6 +44,32 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public void Apply_DuplicateOrNullFanIds_FirstAssignmentWins_InsteadOfThrowing()
+    {
+        // Runs on the load path too: a throw here used to abort every daemon start.
+        AppConfig config = TwoProfiles() with
+        {
+            Profiles = new[]
+            {
+                new Profile
+                {
+                    Id = "p", Name = "P",
+                    Assignments = new[]
+                    {
+                        new ProfileAssignment(null!, "x"),
+                        new ProfileAssignment("f1", "first"),
+                        new ProfileAssignment("f1", "second"),
+                    },
+                },
+            },
+        };
+
+        AppConfig result = ProfileService.Apply(config, "p");
+
+        Assert.Equal("first", result.Fans.Single(f => f.FanId == "f1").AssignedCurveId);
+    }
+
+    [Fact]
     public void Apply_UnknownProfile_OnlySetsActiveId()
     {
         AppConfig before = TwoProfiles();

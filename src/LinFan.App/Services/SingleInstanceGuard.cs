@@ -52,8 +52,11 @@ internal sealed class SingleInstanceGuard : IDisposable
         _pipe = pipe;
     }
 
-    /// <summary>Per-user endpoint: a socket path on Linux/macOS, a pipe name on Windows.</summary>
-    public static string DefaultEndpoint() =>
+    /// <summary>
+    /// Per-user endpoint: a socket path on Linux/macOS, a pipe name on Windows; <c>null</c> where no per-user place
+    /// for it exists (see <see cref="UnixSocketPath"/>).
+    /// </summary>
+    public static string? DefaultEndpoint() =>
         // Named pipes live in a machine-wide namespace, so the account has to be part of the name -
         // otherwise a second user's GUI would collide with the first one's endpoint instead of getting
         // its own instance. On Unix the path carries that separation on its own.
@@ -61,8 +64,7 @@ internal sealed class SingleInstanceGuard : IDisposable
             ? $"linfan-gui-{CurrentUserSid()}"
             : UnixSocketPath(
                 Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR"),
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                geteuid());
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
 
     /// <summary>
     /// Derives the Unix socket path from the environment: the per-user runtime dir when the session has
@@ -70,24 +72,26 @@ internal sealed class SingleInstanceGuard : IDisposable
     /// not <c>$TMPDIR</c> first, whose value differs between terminals and contexts on macOS (see
     /// <c>IpcEndpoint</c>) - both processes have to derive the same path.
     /// <para>
-    /// Without a home directory <paramref name="appData"/> comes back empty (containers, service
-    /// accounts). Combining that would produce a <b>relative</b> path, so every working directory would
-    /// get a "single" instance of its own - hence the last resort in the temp dir, with the uid in the
-    /// name because that directory is shared.
+    /// Without a home directory <paramref name="appData"/> comes back empty (containers, service accounts), and
+    /// combining that would produce a <b>relative</b> path. There is no endpoint then and the guard stays inert: the
+    /// shared temp dir is no option, another account could plant a listening socket under the name there and make
+    /// every launch of this user's GUI exit as "already running".
     /// </para>
     /// </summary>
-    internal static string UnixSocketPath(string? runtimeDir, string? appData, uint uid) =>
+    internal static string? UnixSocketPath(string? runtimeDir, string? appData) =>
         !string.IsNullOrEmpty(runtimeDir) ? Path.Combine(runtimeDir, "linfan-gui.sock")
         : !string.IsNullOrEmpty(appData) ? Path.Combine(appData, "linfan", "gui.sock")
-        : Path.Combine(Path.GetTempPath(), $"linfan-gui-{uid}.sock");
+        : null;
 
     /// <summary>
     /// Tries to become the one GUI instance. Returns the guard when this process owns the endpoint (the
     /// caller keeps it alive for the whole run), or <c>null</c> when a running instance was found and
     /// activated - then this process must exit silently.
     /// </summary>
-    public static SingleInstanceGuard? AcquireOrActivate(string endpoint)
+    public static SingleInstanceGuard? AcquireOrActivate(string? endpoint)
     {
+        if (endpoint is null)
+            return Inert();
         try
         {
             return OperatingSystem.IsWindows() ? AcquireWindows(endpoint) : AcquireUnix(endpoint);
@@ -274,9 +278,12 @@ internal sealed class SingleInstanceGuard : IDisposable
     {
         try
         {
+            // CurrentUserOnly, like the 0600 socket on Unix: the pipe namespace is machine-wide, so without it
+            // another account could pull this window out of the tray, or hold the name first - then the client
+            // side's CurrentUserOnly owner check fails and this launch starts on its own instead of being blocked.
             var pipe = new NamedPipeServerStream(
                 endpoint, PipeDirection.Out, maxNumberOfServerInstances: 1,
-                PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             return new SingleInstanceGuard(pipe: pipe);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -298,7 +305,7 @@ internal sealed class SingleInstanceGuard : IDisposable
             try { AllowSetForegroundWindow(AsfwAny); } catch (EntryPointNotFoundException) { /* egal */ }
 
             using var client = new NamedPipeClientStream(
-                ".", endpoint, PipeDirection.In, PipeOptions.Asynchronous);
+                ".", endpoint, PipeDirection.In, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             client.Connect(ConnectTimeoutMs);
             WaitForAck(client);
             return true;
@@ -335,8 +342,4 @@ internal sealed class SingleInstanceGuard : IDisposable
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool AllowSetForegroundWindow(uint processId);
-
-    /// <summary>Effective uid; only called from the Unix fallback in <see cref="DefaultEndpoint"/>.</summary>
-    [DllImport("libc", SetLastError = true)]
-    private static extern uint geteuid();
 }

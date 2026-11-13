@@ -14,7 +14,9 @@
     <Application.Styles>
         <!-- Standard-Controls (Tab-Unterstrich, ToggleSwitch, CheckBox, Slider, Combo-/ListBox-Auswahl)
              auf die App-Accent ziehen: ohne Palette nutzt FluentTheme seinen Default-Akzent (hier Orange).
-             Avalonia leitet Hover/Pressed-Abstufungen automatisch aus Accent ab. -->
+             Avalonia leitet Hover/Pressed-Abstufungen automatisch aus Accent ab.
+             These are the themes' own accents; App.ApplyAppearance replaces them with a chosen accent colour and puts the
+             terminal / high-contrast accent into the dark palette while one of those themes is on (Services/AccentResources). -->
         <FluentTheme>
             <FluentTheme.Palettes>
                 <ColorPaletteResources x:Key="Dark" Accent="#38BDF8" />
@@ -22,5 +24,6 @@
             </FluentTheme.Palettes>
         </FluentTheme>
         <StyleInclude Source="avares://LinFan.App/Theme/Layout.axaml" />
+        <StyleInclude Source="avares://LinFan.App/Theme/ToolTipText.axaml" />
     </Application.Styles>
 </Application>

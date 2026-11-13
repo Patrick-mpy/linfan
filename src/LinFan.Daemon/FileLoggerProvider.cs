@@ -20,6 +20,26 @@ internal sealed class FileLoggerProvider : ILoggerProvider
 {
     private const long DefaultMaxBytes = 1024 * 1024; // 1 MB je Datei
 
+    /// <summary>
+    /// Longest record written. The size check runs before each append, so this is what the file can overshoot its
+    /// bound by - a record joins strings IPC peers sent, and without a cap one record could exceed the bound many times
+    /// over. Far above a real one, stack traces included; the message alone gets half, so a long one leaves the
+    /// exception's lines room.
+    /// </summary>
+    internal const int MaxRecordChars = 16 * 1024;
+
+    /// <summary>Cuts <paramref name="text"/> to <paramref name="max"/> characters (never inside a surrogate pair) and says so.</summary>
+    internal static string Cap(string text, int max)
+    {
+        if (text.Length <= max)
+            return text;
+
+        int cut = max;
+        if (char.IsHighSurrogate(text[cut - 1]))
+            cut--;
+        return text[..cut] + $" … [{text.Length - cut} Zeichen gekürzt]";
+    }
+
     private readonly string _path;
     private readonly string _rolled; // <path>.1
     private readonly long _maxBytes;
@@ -79,16 +99,63 @@ internal sealed class FileLoggerProvider : ILoggerProvider
                 if (!_dirReady)
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+                    RestrictExistingFile();
                     _dirReady = true;
                 }
                 RollIfTooLarge();
-                File.AppendAllText(_path, line + Environment.NewLine, Encoding.UTF8);
+                if (IsLink(_path))
+                    return;
+                byte[] bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+                using var stream = new FileStream(_path, OwnerOnly(FileMode.Append));
+                stream.Write(bytes);
             }
             catch
             {
                 // best-effort: Diagnose darf den Daemon nie reißen.
             }
         }
+    }
+
+    /// <summary>
+    /// The log holds what IPC peers sent and is no one else's business: a new file is created owner-only (the root
+    /// daemon's under /etc/linfan would otherwise be world-readable with the default umask).
+    /// </summary>
+    private static FileStreamOptions OwnerOnly(FileMode mode)
+    {
+        var options = new FileStreamOptions { Mode = mode, Access = FileAccess.Write, Share = FileShare.Read };
+        if (!OperatingSystem.IsWindows())
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        return options;
+    }
+
+    /// <summary>A log file from before the owner-only mode keeps its old mode until it rolls over - fix it once.</summary>
+    private void RestrictExistingFile()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+        foreach (string file in new[] { _path, _rolled })
+        {
+            try
+            {
+                if (File.Exists(file) && !IsLink(file))
+                    File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            catch
+            {
+                // best-effort, like every other step here
+            }
+        }
+    }
+
+    /// <summary>
+    /// A link where the log should be is never followed: a root daemon run with a user's HOME (the dev setup) writes
+    /// into a folder that user owns, and a planted link would let it change and fill any file. The log then stays
+    /// silent rather than write through it.
+    /// </summary>
+    private static bool IsLink(string path)
+    {
+        try { return new FileInfo(path).LinkTarget is not null; }
+        catch { return true; } // cannot tell - do not risk it
     }
 
     /// <summary>Größe erreicht ⇒ aktuelle Datei nach <c>.1</c> rollen (die vorige <c>.1</c> entfällt). Best-effort.</summary>
@@ -111,6 +178,8 @@ internal sealed class FileLoggerProvider : ILoggerProvider
 
     private sealed class FileLogger : ILogger
     {
+        private const string ContinuationIndent = "    ";
+
         private readonly FileLoggerProvider _provider;
         private readonly string _category;
 
@@ -131,14 +200,19 @@ internal sealed class FileLoggerProvider : ILoggerProvider
             if (!IsEnabled(logLevel))
                 return;
 
-            string message = formatter(state, exception);
+            // One record starts one line and nothing else does: the message is escaped onto that line, and every line
+            // of an exception (its message may quote a peer's string) is indented - an IPC peer cannot forge a record.
+            string message = Cap(UntrustedText.Escape(formatter(state, exception)), MaxRecordChars / 2);
             var sb = new StringBuilder()
                 .Append(DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture))
                 .Append(" [").Append(Short(logLevel)).Append("] ")
                 .Append(_category).Append(": ").Append(message);
             if (exception is not null)
-                sb.Append(Environment.NewLine).Append(exception);
-            _provider.Append(sb.ToString());
+            {
+                foreach (string line in exception.ToString().Split('\n'))
+                    sb.Append(Environment.NewLine).Append(ContinuationIndent).Append(UntrustedText.Escape(line.TrimEnd('\r')));
+            }
+            _provider.Append(Cap(sb.ToString(), MaxRecordChars));
         }
 
         private static string Short(LogLevel level) => level switch

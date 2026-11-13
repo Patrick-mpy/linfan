@@ -21,7 +21,7 @@ public class MainWindowCloseTests
     private static MainWindow ShowWithTray()
     {
         string uiSettings = Path.Combine(Path.GetTempPath(), $"linfan-uitest-{Guid.NewGuid():N}.json");
-        var ctrl = new MainController(
+        var ctrl = UiTestHelpers.NewController(
             new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()),
             settings: new SettingsController(new UiSettingsStore(uiSettings)));
         ctrl.Settings.MinimizeToTray = true;

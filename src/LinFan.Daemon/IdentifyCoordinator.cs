@@ -44,7 +44,7 @@ internal sealed class IdentifyCoordinator
     private readonly ISensorBackend _sensors;
     private readonly IFanController _fans;
     private readonly ILogger _log;
-    private readonly Action<string> _suspend;
+    private readonly Action<string, FanControlState> _suspend;
     private readonly Action<string> _resume;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private readonly Func<double>? _failSafeTempC;
@@ -63,7 +63,7 @@ internal sealed class IdentifyCoordinator
     /// <param name="now">Uhr (injizierbar für Tests); <c>null</c> ⇒ <see cref="DateTimeOffset.UtcNow"/>.</param>
     public IdentifyCoordinator(
         ISensorBackend sensors, IFanController fans, ILogger log,
-        Action<string> suspend, Action<string> resume, CancellationToken hostToken,
+        Action<string, FanControlState> suspend, Action<string> resume, CancellationToken hostToken,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
         Func<double>? failSafeTempC = null, TimeSpan? hold = null,
         TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null)
@@ -127,8 +127,8 @@ internal sealed class IdentifyCoordinator
 
     private async Task RunAsync(FanId target, IReadOnlyList<FanId> fans, CancellationToken ct)
     {
-        foreach (FanId f in fans)
-            _suspend(f.Value); // alle betroffenen Lüfter dem Tick-Loop entziehen, BEVOR wir schreiben
+        foreach (FanId f in fans) // alle betroffenen Lüfter dem Tick-Loop entziehen, BEVOR wir schreiben
+            _suspend(f.Value, f == target ? FanControlState.Identifying : FanControlState.IdentifyThrottled);
 
         try
         {
@@ -165,6 +165,11 @@ internal sealed class IdentifyCoordinator
         {
             _status = new IpcIdentify(target.Value, Running: false, FailReason: IdentifyFailReason.NoTemperatureReading);
             _log.LogWarning("Identifikation abgebrochen (kein Watchdog): {Fan} - {Reason}", target.Value, ex.Message);
+        }
+        catch (ManualWritesBlockedException)
+        {
+            _status = null;
+            _log.LogInformation("Identifikation beim Herunterfahren beendet: {Fan}.", target.Value);
         }
         catch (Exception ex)
         {

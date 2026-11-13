@@ -35,48 +35,11 @@ public static class DefaultProfiles
         if (string.IsNullOrEmpty(primarySensorId))
             throw new ArgumentException("primarySensorId darf nicht null oder leer sein.", nameof(primarySensorId));
 
-        // Die 100-%-Marke liegt bei 86 °C und damit unter dem FailSafeTempC-Default (90 °C): die Kurve
-        // erreicht volle Drehzahl, bevor der Watchdog abrupt auf Hardware-Auto zurückfällt.
         return new[]
         {
-            BuildProfile(
-                id: "silent",
-                name: silentName,
-                primarySensorId: primarySensorId,
-                fans: fans,
-                points: new[]
-                {
-                    new CurvePoint(35, 0),
-                    new CurvePoint(55, 0),
-                    new CurvePoint(65, 25),
-                    new CurvePoint(78, 55),
-                    new CurvePoint(86, 100),
-                }),
-            BuildProfile(
-                id: "balanced",
-                name: balancedName,
-                primarySensorId: primarySensorId,
-                fans: fans,
-                points: new[]
-                {
-                    new CurvePoint(30, 20),
-                    new CurvePoint(50, 35),
-                    new CurvePoint(65, 55),
-                    new CurvePoint(80, 90),
-                    new CurvePoint(86, 100),
-                }),
-            BuildProfile(
-                id: "performance",
-                name: performanceName,
-                primarySensorId: primarySensorId,
-                fans: fans,
-                points: new[]
-                {
-                    new CurvePoint(30, 35),
-                    new CurvePoint(45, 55),
-                    new CurvePoint(60, 80),
-                    new CurvePoint(72, 100),
-                }),
+            BuildProfile("silent", silentName, primarySensorId, fans, CurvePresets.Silent),
+            BuildProfile("balanced", balancedName, primarySensorId, fans, CurvePresets.Balanced),
+            BuildProfile("performance", performanceName, primarySensorId, fans, CurvePresets.Performance),
         };
     }
 
@@ -85,7 +48,7 @@ public static class DefaultProfiles
         string name,
         string primarySensorId,
         IReadOnlyList<FanConfig> fans,
-        CurvePoint[] points)
+        IReadOnlyList<CurvePoint> points)
     {
         string curveId = $"{id}-curve";
 

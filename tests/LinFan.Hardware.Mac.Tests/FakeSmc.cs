@@ -18,6 +18,7 @@ internal sealed class FakeSmc : ISmc
 {
     private readonly Dictionary<string, SmcValue> _store = new(StringComparer.Ordinal);
     private readonly HashSet<string> _failWrites = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _failReads = new(StringComparer.Ordinal);
     private readonly object _lock = new();
 
     public bool Opened { get; private set; }
@@ -27,6 +28,13 @@ internal sealed class FakeSmc : ISmc
     public FakeSmc FailWritesFor(params string[] keys)
     {
         lock (_lock) foreach (var k in keys) _failWrites.Add(k);
+        return this;
+    }
+
+    /// <summary>Lets reads of the given keys fail (an SMC call that returns an error).</summary>
+    public FakeSmc FailReadsFor(params string[] keys)
+    {
+        lock (_lock) foreach (var k in keys) _failReads.Add(k);
         return this;
     }
 
@@ -67,7 +75,15 @@ internal sealed class FakeSmc : ISmc
 
     public bool TryReadKey(string key, out SmcValue value)
     {
-        lock (_lock) return _store.TryGetValue(key, out value);
+        lock (_lock)
+        {
+            if (_failReads.Contains(key))
+            {
+                value = default;
+                return false;
+            }
+            return _store.TryGetValue(key, out value);
+        }
     }
 
     public bool TryWriteKey(string key, SmcValue value)

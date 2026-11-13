@@ -24,6 +24,7 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
     private readonly Dictionary<SensorId, double> _values = new();
     private readonly Dictionary<FanId, FanState> _fans = new();
     private bool _disposed;
+    private bool _tookOver; // a channel was written: Dispose restores every channel
 
     private sealed class FanState
     {
@@ -119,6 +120,9 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
         {
             var fan = Fan(id);
             GuardControllable(fan);
+            if (mode == FanMode.Manual)
+                ObjectDisposedException.ThrowIf(_disposed, this);
+            _tookOver |= mode == FanMode.Manual;
             fan.Mode = mode;
         }
     }
@@ -134,6 +138,8 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
         {
             var fan = Fan(id);
             GuardControllable(fan);
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _tookOver = true;
             fan.Mode = FanMode.Manual; // selbsttätig auf Manual, ohne vorheriges SetMode
             fan.Pwm = value;
         }
@@ -168,7 +174,8 @@ public sealed class ConformanceReferenceBackend : ISensorBackend, IFanController
         {
             if (_disposed) return;
             _disposed = true;
-            RestoreDefaults();
+            if (_tookOver) // an instance that never wrote leaves the fans to whoever drives them
+                RestoreDefaults();
         }
     }
 

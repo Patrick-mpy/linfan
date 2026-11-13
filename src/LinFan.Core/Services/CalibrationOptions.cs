@@ -13,8 +13,11 @@ public sealed record CalibrationOptions
     /// <summary>Wartezeit nach jedem Schritt, bis sich die Drehzahl eingependelt hat.</summary>
     public TimeSpan SettleTime { get; init; } = TimeSpan.FromSeconds(2);
 
-    /// <summary>Ab dieser Drehzahl gilt der Lüfter als „dreht" (für den Anlaufpunkt).</summary>
-    public int SpinThresholdRpm { get; init; } = 100;
+    /// <summary>
+    /// How long the fan may run out at PWM 0 before the first sample - it comes from hardware auto, possibly at full
+    /// speed. Longer than the tach coupling's baseline settle (6 s): a large fan takes a while to stop.
+    /// </summary>
+    public TimeSpan RunOutTime { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>Vorgabe der Temperatur-Obergrenze, wenn keine aus der Config durchgereicht wird.</summary>
     public const double DefaultFailSafeTempC = AppConfig.DefaultFailSafeTempC; // zentrale Quelle: AppConfig
@@ -23,8 +26,9 @@ public sealed record CalibrationOptions
     public double FailSafeTempC { get; init; } = DefaultFailSafeTempC;
 
     /// <summary>
-    /// Übersteuert den vom Backend gepaarten Tacho für die RPM-Messung (aus <see cref="Models.FanConfig.RpmSource"/>).
-    /// <c>null</c> = den Tacho des <c>FanDescriptor</c> verwenden.
+    /// The configured fans, for their speed-sensor couplings: the calibration measures with the sensor
+    /// <see cref="FanTachometers"/> gives the fan - its own coupling, else the backend's pairing unless another fan is
+    /// coupled to that sensor. Empty = no couplings, the backend's pairing counts.
     /// </summary>
-    public SensorId? TachometerOverride { get; init; }
+    public IReadOnlyList<FanConfig> Couplings { get; init; } = [];
 }

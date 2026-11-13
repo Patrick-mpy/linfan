@@ -40,7 +40,7 @@ body:
     id: linfan-version
     attributes:
       label: LinFan version
-      placeholder: e.g. 0.1.0 (the release you installed)
+      placeholder: e.g. 0.5.0 · a1b2c3d (bottom of the settings menu)
     validations:
       required: true
   - type: textarea
@@ -51,8 +51,10 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Daemon logs
+      label: Logs
       description: |
-        Linux: `journalctl -u linfan-daemon` · Windows: `%ProgramData%\linfan\logs\linfan.log` ·
+        Daemon - Linux: `journalctl -u linfan-daemon` · Windows: `%ProgramData%\linfan\logs\linfan.log` ·
         macOS: the terminal output of the manually started daemon.
+        App, if it reported an error - Linux/macOS: `~/.config/linfan/logs/gui.log` ·
+        Windows: `%AppData%\linfan\logs\gui.log`.
       render: text

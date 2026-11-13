@@ -2,6 +2,7 @@
 
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using LinFan.Ipc;
 using LinFan.Ipc.Messages;
 using LinFan.Ipc.Transport;
@@ -64,9 +65,10 @@ public class IpcTransportSeamTests
 
         try
         {
-            await using IAsyncEnumerator<IpcSnapshot> e =
+            await using IAsyncEnumerator<IpcSnapshot?> e =
                 client.ReadSnapshotsAsync(cts.Token).GetAsyncEnumerator(cts.Token);
             Assert.True(await e.MoveNextAsync());
+            Assert.NotNull(e.Current);
             Assert.Equal(DaemonStatus.DryRun, e.Current.Status);
             Assert.Equal(55.0, e.Current.HottestTempC);
             Assert.Equal("CPU", Assert.Single(e.Current.Sensors).Name);
@@ -95,6 +97,41 @@ public class IpcTransportSeamTests
     }
 
     /// <summary>Server-Transport, der genau eine vorgefertigte Verbindung herausgibt.</summary>
+    [Fact]
+    public async Task Client_ReportsASnapshotLineOverTheBound_AndReadsTheNextOne()
+    {
+        var oversized = new IpcSnapshot(DaemonStatus.Active, false, 40, [], [], FailSafe: new string('x', 4096));
+        var next = new IpcSnapshot(DaemonStatus.Active, false, 41, [], []);
+        var stream = ScriptedStream.Of(oversized, next);
+        await using var client = new IpcClient("test", new FixedClientTransport(stream), maxSnapshotBytes: 1024);
+        await client.ConnectAsync();
+
+        var received = new List<IpcSnapshot?>();
+        await foreach (IpcSnapshot? snapshot in client.ReadSnapshotsAsync())
+            received.Add(snapshot);
+
+        Assert.Equal(2, received.Count);
+        Assert.Null(received[0]); // reported, not skipped: the reader must not keep showing the last snapshot
+        Assert.Equal(41, received[1]?.HottestTempC);
+    }
+
+    [Fact]
+    public async Task Client_ReportsALineItCannotParse_AndReadsTheNextOne()
+    {
+        var next = new IpcSnapshot(DaemonStatus.Active, false, 41, [], []);
+        byte[] wire = [.. Encoding.UTF8.GetBytes("{\"status\":\"SomethingNew\"\n"), .. IpcJson.SerializeLine(next)];
+        await using var client = new IpcClient("test", new FixedClientTransport(new ScriptedStream(wire)));
+        await client.ConnectAsync();
+
+        var received = new List<IpcSnapshot?>();
+        await foreach (IpcSnapshot? snapshot in client.ReadSnapshotsAsync())
+            received.Add(snapshot);
+
+        Assert.Equal(2, received.Count);
+        Assert.Null(received[0]);
+        Assert.Equal(41, received[1]?.HottestTempC);
+    }
+
     private sealed class FixedServerTransport : IIpcServerTransport
     {
         private readonly Stream _stream;
@@ -109,13 +146,5 @@ public class IpcTransportSeamTests
             throw new OperationCanceledException(ct);
         }
         public void Dispose() { }
-    }
-
-    /// <summary>Client-Transport, der eine vorgefertigte Verbindung liefert.</summary>
-    private sealed class FixedClientTransport : IIpcClientTransport
-    {
-        private readonly Stream _stream;
-        public FixedClientTransport(Stream stream) => _stream = stream;
-        public Task<Stream> ConnectAsync(string endpoint, CancellationToken ct) => Task.FromResult(_stream);
     }
 }

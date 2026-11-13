@@ -16,26 +16,82 @@
         CanResize="False"
         Background="{DynamicResource BgWindow}">
 
-    <Grid RowDefinitions="*,Auto" Margin="28">
+    <Window.Styles>
+        <!-- Step indicator: done and current steps fill their bar with the accent, the current label is the
+             brightest and semibold; steps still ahead stay neutral. -->
+        <Style Selector="Border.stepBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="CornerRadius" Value="{DynamicResource RadiusXxs}" />
+            <Setter Property="Background" Value="{DynamicResource ControlTrack}" />
+        </Style>
+        <Style Selector="StackPanel.done > Border.stepBar, StackPanel.current > Border.stepBar">
+            <Setter Property="Background" Value="{DynamicResource Accent}" />
+        </Style>
+        <Style Selector="TextBlock.stepLabel">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFaint}" />
+        </Style>
+        <Style Selector="StackPanel.done > TextBlock.stepLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+        </Style>
+        <Style Selector="StackPanel.current > TextBlock.stepLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="28">
+
+        <!-- Step indicator (not on the welcome page, which is not one of the four steps) -->
+        <ItemsControl Grid.Row="0" ItemsSource="{Binding Steps}"
+                      IsVisible="{Binding ShowStepper}" Margin="0,0,0,18">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4" ColumnSpacing="{StaticResource SpacingSm}" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="c:OnboardingStepItem">
+                    <StackPanel Spacing="{StaticResource SpacingXs}"
+                                Classes.done="{Binding IsDone}" Classes.current="{Binding IsCurrent}">
+                        <Border Classes="stepBar" />
+                        <TextBlock Classes="stepLabel" Text="{Binding Label}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
         <!-- Schrittinhalt -->
-        <Panel Grid.Row="0">
+        <Panel Grid.Row="1">
 
-            <!-- Schritt 0: Willkommen -->
-            <StackPanel Spacing="{StaticResource SpacingXl}"
-                        IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
-                                    ConverterParameter=Welcome}">
-                <!-- The mark only, not the wordmark: the title below already says "LinFan".
-                     Mark and title are centred; the body text stays left-aligned for readability. -->
-                <ctrl:BrandMark Height="56" HorizontalAlignment="Center" />
-                <TextBlock Text="{l:Tr Onboarding.WelcomeTitle}" FontSize="22" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" TextAlignment="Center"
-                           Foreground="{DynamicResource TextPrimary}" />
-                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="13"
-                           Text="{l:Tr Onboarding.WelcomeIntro}" />
-                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
-                           Text="{l:Tr Onboarding.WelcomeSkipHint}" />
-            </StackPanel>
+            <!-- Step 0: welcome. Scrollable like the other steps: the window is fixed (CanResize=False), so a
+                 longer translation must not push the text under the footer. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
+                                      ConverterParameter=Welcome}">
+                <StackPanel Spacing="{StaticResource SpacingXl}">
+                    <!-- The mark only, not the wordmark: the title below already says "LinFan".
+                         Mark and title are centred; the body text stays left-aligned for readability. -->
+                    <ctrl:BrandMark Height="56" HorizontalAlignment="Center" />
+                    <TextBlock Text="{l:Tr Onboarding.WelcomeTitle}" FontSize="22" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" TextAlignment="Center"
+                               Foreground="{DynamicResource TextPrimary}" />
+                    <!-- Only when the daemon set an unusable configuration aside: otherwise it seems to have vanished. -->
+                    <Border Classes="banner warning" Margin="0" IsVisible="{Binding HasConfigSetAsideNote}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SpacingMd}">
+                            <PathIcon Grid.Column="0" Classes="bannerIcon" Data="{StaticResource IconAlertCircle}" />
+                            <TextBlock Grid.Column="1" Classes="bannerText" Text="{Binding ConfigSetAsideNote}" />
+                        </Grid>
+                    </Border>
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="13"
+                               Text="{l:Tr Onboarding.WelcomeIntro}" />
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="12"
+                               Text="{l:Tr Onboarding.WelcomeSteps}" />
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
+                               Text="{l:Tr Onboarding.WelcomeSkipHint}" />
+                </StackPanel>
+            </ScrollViewer>
 
             <!-- Step 1: calibration. In a ScrollViewer like the devices/profile steps: the window is fixed
                  (CanResize=False), and as soon as the progress card grows a headline plus a bar, the content
@@ -50,7 +106,7 @@
                                Text="{l:Tr Onboarding.CalibrationIntro}" />
 
                     <!-- Lüfter-Liste -->
-                    <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                    <Border CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
                         <StackPanel Spacing="{StaticResource SpacingXs}">
                             <TextBlock Text="{l:Tr Onboarding.ControllableFansLabel}" Foreground="{DynamicResource TextFaint}" FontSize="11"
                                        Margin="0,0,0,4" />
@@ -74,7 +130,7 @@
                                                 <PathIcon Data="{StaticResource IconAlertCircle}" Width="13" Height="13" Foreground="{DynamicResource DangerAccent}"
                                                           IsVisible="{Binding CalibrationState, Converter={x:Static conv:EnumMatchConverter.Instance}, ConverterParameter=Failed}" />
                                             </Panel>
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
+                                            <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="{DynamicResource TextSecondary}"
                                                        FontSize="12" VerticalAlignment="Center" />
                                             <!-- Pro-Lüfter-Ergebnis (koppeln…/kalibrieren…/kein Tacho/nicht eindeutig/fertig) - bleibt nach der Sequenz stehen. -->
                                             <TextBlock Grid.Column="2" Text="{Binding CalibrationStateText}" Foreground="{DynamicResource TextFaint}"
@@ -86,13 +142,15 @@
                             <TextBlock Text="{l:Tr Onboarding.NoControllableFans}"
                                        IsVisible="{Binding !HasControllableFans}"
                                        Foreground="{DynamicResource TextFaintest}" FontSize="12" />
+                            <TextBlock Text="{l:Tr Overview.HintDriverLocked}" TextWrapping="Wrap" FontSize="12"
+                                       Foreground="{DynamicResource WarningText}" IsVisible="{Binding DriverLocked}" />
                         </StackPanel>
                     </Border>
 
                     <!-- Fortschritts-/Status-Anzeige. Sichtbar, sobald eine Meldung vorliegt: während der Sequenz zeigt
                          CalibrationProgress den Live-Detailtext (immer gesetzt), danach das Ergebnis. Kopfzeile + Balken
                          nur während der laufenden Kalibrierung. -->
-                    <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource InfoBg}" Padding="12"
+                    <Border CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource InfoBg}" Padding="12"
                             IsVisible="{Binding CalibrationProgress, Converter={x:Static acv:StringConverters.IsNotNullOrEmpty}}">
                         <ctrl:CalibrationCard Headline="{Binding CalibrationHeadline}"
                                               Detail="{Binding CalibrationProgress}"
@@ -100,13 +158,16 @@
                                               ShowProgress="{Binding IsCalibrating}" />
                     </Border>
 
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}">
+                    <TextBlock Text="{l:Tr Onboarding.CalibrationDryRun}" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{DynamicResource TextFaint}" IsVisible="{Binding IsDryRun}" />
+                    <!-- Hidden (not just disabled) during a run: the fixed window then needs the room for the fan list
+                         and the progress card. Back aborts a running sequence. -->
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMd}"
+                                IsVisible="{Binding !IsCalibrating}">
                         <Button Content="{l:Tr Onboarding.CalibrateButton}"
-                                Command="{Binding CalibrateAllCommand}"
-                                IsEnabled="{Binding !IsCalibrating}" />
+                                Command="{Binding CalibrateAllCommand}" />
                         <Button Content="{l:Tr Onboarding.SkipCalibration}"
-                                Command="{Binding SkipCalibrationCommand}"
-                                IsEnabled="{Binding !IsCalibrating}" />
+                                Command="{Binding SkipCalibrationCommand}" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
@@ -121,22 +182,29 @@
                     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="12"
                                Text="{l:Tr Onboarding.DevicesIntro}" />
 
-                    <!-- Lüfter-Positionen (optional) -->
+                    <!-- Fan names and positions (optional) -->
                     <StackPanel Spacing="{StaticResource SpacingSm}">
                         <TextBlock Text="{l:Tr Onboarding.FanPositionsLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
-                        <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                        <Border CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
                             <ItemsControl ItemsSource="{Binding Fans}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="c:OnboardingFanRow">
                                         <StackPanel Margin="0,3" Spacing="{StaticResource SpacingXs}">
                                             <Grid ColumnDefinitions="*,Auto,Auto">
-                                                <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
-                                                           FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                                           Margin="0,0,8,0" />
+                                                <!-- Name like in the settings: an empty field is saved as its placeholder („Lüfter N"),
+                                                     the hardware address below tells the fans apart. -->
+                                                <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <TextBox Classes="ghost" Text="{Binding Name}" PlaceholderText="{Binding DefaultName}"
+                                                             MaxLength="{Binding MaxNameLength}"
+                                                             FontSize="12" Foreground="{DynamicResource TextSecondary}" />
+                                                    <TextBlock Text="{Binding FanId}" Foreground="{DynamicResource TextFaintest}" FontSize="10"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{l:Tr MainWindow.HardwareAddressTooltip}" />
+                                                </StackPanel>
                                                 <!-- Identifizieren: kurz auf 100 %, andere gedrosselt - nur für steuerbare Lüfter. -->
                                                 <Button Grid.Column="1" Command="{Binding IdentifyCommand}" IsVisible="{Binding CanControl}"
-                                                        Margin="0,0,8,0"
-                                                        ToolTip.Tip="{l:Tr Onboarding.IdentifyTooltip}">
+                                                        Margin="0,0,8,0" ToolTip.ShowOnDisabled="True"
+                                                        ToolTip.Tip="{Binding IdentifyTooltip}">
                                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
                                                         <PathIcon Data="{StaticResource IconFan}" Width="13" Height="13" />
                                                         <TextBlock Text="{l:Tr Onboarding.IdentifyButton}" />
@@ -177,23 +245,49 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- Sensor-Sichtbarkeit -->
+                    <!-- Sensor visibility, grouped: each sensor's own group, else the suggested one -->
                     <StackPanel Spacing="{StaticResource SpacingSm}">
                         <TextBlock Text="{l:Tr Onboarding.SensorsLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
                         <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="11"
                                    Text="{l:Tr Onboarding.SensorsHint}" />
-                        <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
-                            <ItemsControl ItemsSource="{Binding TemperatureSensors}">
+                        <!-- Only when something was suggested: on a re-run every sensor may already have its group. -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SpacingXs}"
+                              IsVisible="{Binding HasSuggestedGroups}">
+                            <PathIcon Data="{StaticResource IconSparkle}" Width="13" Height="13"
+                                      Foreground="{DynamicResource InfoAccent}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                            <TextBlock Grid.Column="1" TextWrapping="Wrap" Foreground="{DynamicResource InfoText}" FontSize="11"
+                                       Text="{l:Tr Onboarding.SensorGroupsHint}" />
+                        </Grid>
+                        <Border CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                            <ItemsControl ItemsSource="{Binding TemperatureSensorGroups}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="{StaticResource SpacingMd}" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="c:SensorOption">
-                                        <CheckBox IsChecked="{Binding Visible, Mode=TwoWay}" Margin="0,1">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
-                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
-                                                           FontSize="12" VerticalAlignment="Center" />
-                                                <TextBlock Text="{Binding LiveValue}" Foreground="{DynamicResource TextFaint}"
-                                                           FontSize="11" VerticalAlignment="Center" />
+                                    <DataTemplate x:DataType="c:OnboardingSensorGroup">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}" Margin="2,0,0,2">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextMuted}"
+                                                           FontSize="11" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource TextFaint}" FontSize="11" />
                                             </StackPanel>
-                                        </CheckBox>
+                                            <ItemsControl ItemsSource="{Binding Sensors}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="c:SensorOption">
+                                                        <CheckBox IsChecked="{Binding Visible, Mode=TwoWay}" Margin="0,1">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSm}">
+                                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextSecondary}"
+                                                                           FontSize="12" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding LiveValue}" Foreground="{DynamicResource TextFaint}"
+                                                                           FontSize="11" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </CheckBox>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -215,15 +309,28 @@
                         <TextBlock Text="{l:Tr Onboarding.PrimarySensorLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
                         <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="11"
                                    Text="{l:Tr Onboarding.PrimarySensorHint}" />
-                        <ComboBox ItemsSource="{Binding PrimarySensorChoices}"
-                                  SelectedItem="{Binding SelectedPrimarySensor}"
-                                  MinWidth="260" HorizontalAlignment="Left">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="c:SensorOption">
-                                    <TextBlock Text="{Binding Name}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+                        <!-- Quiet choice chip: the sensor and its live value; the menu groups the sensors like the devices step. -->
+                        <Button Classes="chip" Name="PrimarySensorChip" Padding="10,5" HorizontalAlignment="Left"
+                                AutomationProperties.Name="{Binding PrimarySensorChipName}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <TextBlock Text="{Binding SelectedPrimarySensor.Name}" FontSize="13" MaxWidth="320"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                           IsVisible="{Binding SelectedPrimarySensor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <TextBlock Text="{Binding SelectedPrimarySensor.LiveValue}" FontSize="13" Foreground="{DynamicResource TextFaint}"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding SelectedPrimarySensor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <TextBlock Text="{l:Tr Onboarding.PrimarySensorNone}" FontSize="13" Foreground="{DynamicResource TextMuted}"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding SelectedPrimarySensor, Converter={x:Static ObjectConverters.IsNull}}" />
+                                <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10"
+                                          Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="choiceMenu"
+                                            ItemsSource="{Binding PrimarySensorMenu}"
+                                            ItemContainerTheme="{StaticResource DetailMenuItem}" />
+                            </Button.Flyout>
+                        </Button>
                     </StackPanel>
 
                     <!-- Airflow-Modus: die Profile entstehen aus den Einbau-Positionen (Rollen-Kurven je Lüfter) -->
@@ -241,7 +348,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <TextBlock Text="{l:Tr Onboarding.AirflowFansLabel}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
-                        <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                        <Border CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
                             <ItemsControl ItemsSource="{Binding AirflowSummary}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="c:AirflowSuggestionRow">
@@ -283,41 +390,44 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Schritt 4: Fertig (nur über ein erfolgreiches Finish erreichbar - Quittungsseite) -->
-            <StackPanel Spacing="{StaticResource SpacingXl}"
-                        IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
-                                    ConverterParameter=Done}">
-                <TextBlock Text="{l:Tr Onboarding.DoneTitle}" FontSize="18" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextPrimary}" />
+            <!-- Step 4: done (reachable only through a successful Finish - the receipt page). Scrollable since the
+                 step indicator above now takes part of the fixed window's height. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          IsVisible="{Binding CurrentStep, Converter={x:Static conv:EnumMatchConverter.Instance},
+                                      ConverterParameter=Done}">
+                <StackPanel Spacing="{StaticResource SpacingXl}">
+                    <TextBlock Text="{l:Tr Onboarding.DoneTitle}" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
 
-                <!-- Was wurde eingerichtet -->
-                <Border CornerRadius="{StaticResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
-                    <StackPanel Spacing="{StaticResource SpacingXs}">
-                        <TextBlock Text="{Binding DoneCalibrationSummary}" Foreground="{DynamicResource TextSecondary}"
-                                   FontSize="12" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding DonePositionsSummary}" Foreground="{DynamicResource TextSecondary}"
-                                   FontSize="12" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding DoneProfileSummary}" Foreground="{DynamicResource TextSecondary}"
-                                   FontSize="12" TextWrapping="Wrap" />
+                    <!-- Was wurde eingerichtet -->
+                    <Border CornerRadius="{DynamicResource RadiusMd}" Background="{DynamicResource BgCard}" Padding="12">
+                        <StackPanel Spacing="{StaticResource SpacingXs}">
+                            <TextBlock Text="{Binding DoneCalibrationSummary}" Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding DonePositionsSummary}" Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding DoneProfileSummary}" Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="13"
+                               Text="{l:Tr Onboarding.DoneIntro}" />
+                    <StackPanel Spacing="{StaticResource SpacingSm}">
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
+                                   Text="{l:Tr Onboarding.DoneOverview}" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
+                                   Text="{l:Tr Onboarding.DoneCurves}" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
+                                   Text="{l:Tr Onboarding.DoneSettings}" />
                     </StackPanel>
-                </Border>
-
-                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="13"
-                           Text="{l:Tr Onboarding.DoneIntro}" />
-                <StackPanel Spacing="{StaticResource SpacingSm}">
-                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
-                               Text="{l:Tr Onboarding.DoneOverview}" />
-                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
-                               Text="{l:Tr Onboarding.DoneCurves}" />
-                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" FontSize="12"
-                               Text="{l:Tr Onboarding.DoneSettings}" />
                 </StackPanel>
-            </StackPanel>
+            </ScrollViewer>
 
         </Panel>
 
         <!-- Navigations-Leiste -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,20,0,0">
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,20,0,0">
 
             <!-- Überspringen (global - nicht auf Done, dort ist die Config bereits gespeichert) -->
             <Button Grid.Column="0" Content="{l:Tr Onboarding.SkipWizard}"

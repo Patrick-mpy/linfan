@@ -13,4 +13,7 @@ public sealed record SensorConfig
 
     /// <summary>Hidden app-wide except in the settings' device lists (display/selection only - the sensor keeps being measured).</summary>
     public bool Hidden { get; init; }
+
+    /// <summary>The device behind the sensor, daemon-owned like <see cref="FanConfig.Device"/>; <c>null</c> until known.</summary>
+    public HardwareDevice? Device { get; init; }
 }

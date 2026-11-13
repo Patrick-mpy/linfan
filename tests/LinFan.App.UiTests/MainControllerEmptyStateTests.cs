@@ -17,7 +17,7 @@ namespace LinFan.App.UiTests;
 public class MainControllerEmptyStateTests
 {
     private static MainController Start(MonitorSnapshot initial) =>
-        new(new FakeLiveMonitor(initial), pollInterval: TimeSpan.FromMilliseconds(10));
+        UiTestHelpers.NewController(new FakeLiveMonitor(initial), pollInterval: TimeSpan.FromMilliseconds(10));
 
     /// <summary>Verbundener Snapshot ohne jedes Gerät (leere Live-Listen + leere Config).</summary>
     private static MonitorSnapshot ConnectedEmpty() => new(
@@ -31,10 +31,10 @@ public class MainControllerEmptyStateTests
     public void BeforeFirstSnapshot_NoDashboardPlaceholders_AndConnectingText()
     {
         // Der Controller hat noch nichts angewandt: keine Leer-Hinweise, Text = „Verbinde …".
-        var ctrl = Start(MonitorSnapshot.Unavailable("Verbinde …"));
+        var ctrl = Start(MonitorSnapshot.Unavailable("Verbinde …", ConnectionProblem.Connecting));
         try
         {
-            Assert.False(ctrl.HasSnapshot);
+            Assert.True(ctrl.OverviewConnecting);
             Assert.False(ctrl.ShowNoSensors);
             Assert.False(ctrl.ShowNoFans);
             Assert.Equal("Verbinde mit dem Hintergrunddienst …", ctrl.DeviceLoadingText);
@@ -49,7 +49,7 @@ public class MainControllerEmptyStateTests
         var ctrl = Start(ConnectedEmpty());
         try
         {
-            UiTestHelpers.PumpUntil(() => ctrl.HasSnapshot);
+            UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(ctrl));
 
             Assert.True(ctrl.ShowNoSensors);    // geladen UND keine Sensoren
             Assert.True(ctrl.ShowNoFans);       // geladen UND keine Lüfter
@@ -65,14 +65,17 @@ public class MainControllerEmptyStateTests
     [AvaloniaFact]
     public void Disconnected_StaysConnecting_NoEmptyDeviceHint()
     {
-        // Snapshot da (HasSnapshot), aber nicht verbunden: Lade-Hinweis bleibt sichtbar (Text „Verbinde …"),
+        // Snapshot da, aber nicht verbunden: Lade-Hinweis bleibt sichtbar (Text „Verbinde …"),
         // KEIN „keine Geräte" (das wäre irreführend ohne Daemon).
-        var ctrl = Start(MonitorSnapshot.Unavailable("nicht erreichbar"));
+        var ctrl = Start(MonitorSnapshot.Unavailable("nicht erreichbar", ConnectionProblem.Unreachable));
         try
         {
-            UiTestHelpers.PumpUntil(() => ctrl.HasSnapshot);
+            UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(ctrl));
 
             Assert.False(ctrl.Connected);
+            Assert.False(ctrl.ShowNoSensors); // the overview never claims "nothing detected" without the daemon
+            Assert.False(ctrl.ShowNoFans);
+            Assert.True(ctrl.OverviewConnecting);
             Assert.False(ctrl.ShowNoDevices);
             Assert.True(ctrl.ShowDeviceLoading);
             Assert.True(ctrl.ShowCurveLoading); // ohne Daemon bleibt auch der Kurven-Tab im „Verbinde …"
@@ -88,7 +91,7 @@ public class MainControllerEmptyStateTests
         var ctrl = Start(ConnectedEmpty());
         try
         {
-            UiTestHelpers.PumpUntil(() => ctrl.HasSnapshot);
+            UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(ctrl));
 
             Assert.True(ctrl.Connected);
             Assert.Equal("Lade Geräte …", ctrl.DeviceLoadingText);
@@ -120,33 +123,55 @@ public class MainControllerEmptyStateTests
     public void DashboardPlaceholder_VisibleWhenEmpty_HiddenWhenPopulated()
     {
         // Leerer (verbundener) Daemon: beide Dashboard-Platzhalter müssen im gerenderten Fenster sichtbar sein.
-        var emptyCtrl = new MainController(new FakeLiveMonitor(ConnectedEmpty()));
+        var emptyCtrl = UiTestHelpers.NewController(new FakeLiveMonitor(ConnectedEmpty()));
         var emptyWindow = new MainWindow { DataContext = emptyCtrl };
         emptyWindow.Show();
         try
         {
-            UiTestHelpers.PumpUntil(() => emptyCtrl.HasSnapshot);
+            UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(emptyCtrl));
 
-            TextBlock noSensors = SinglePlaceholder(emptyWindow, "Keine Temperatursensoren erkannt.");
-            TextBlock noFans = SinglePlaceholder(emptyWindow, "Keine Lüfter erkannt.");
+            TextBlock noSensors = SinglePlaceholder(emptyWindow, NoSensorsText);
+            TextBlock noFans = SinglePlaceholder(emptyWindow, NoFansText);
             Assert.True(noSensors.IsEffectivelyVisible);
             Assert.True(noFans.IsEffectivelyVisible);
         }
         finally { emptyCtrl.Dispose(); }
 
         // Voller Daemon: dieselben Platzhalter müssen unsichtbar (eingeklappt) sein.
-        var fullCtrl = new MainController(new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()));
+        var fullCtrl = UiTestHelpers.NewController(new FakeLiveMonitor(UiTestHelpers.SampleSnapshot()));
         var fullWindow = new MainWindow { DataContext = fullCtrl };
         fullWindow.Show();
         try
         {
             UiTestHelpers.PumpUntil(() => fullCtrl.HasSensors && fullCtrl.HasFans);
 
-            Assert.False(SinglePlaceholder(fullWindow, "Keine Temperatursensoren erkannt.").IsEffectivelyVisible);
-            Assert.False(SinglePlaceholder(fullWindow, "Keine Lüfter erkannt.").IsEffectivelyVisible);
+            Assert.False(SinglePlaceholder(fullWindow, NoSensorsText).IsEffectivelyVisible);
+            Assert.False(SinglePlaceholder(fullWindow, NoFansText).IsEffectivelyVisible);
         }
         finally { fullCtrl.Dispose(); }
     }
+
+    [AvaloniaFact]
+    public void OfflineAtStart_SaysConnecting_AndNeverNothingDetected()
+    {
+        var ctrl = UiTestHelpers.NewController(new FakeLiveMonitor(MonitorSnapshot.Unavailable("weg", ConnectionProblem.Unreachable)),
+                                      pollInterval: TimeSpan.FromMilliseconds(10));
+        var window = new MainWindow { DataContext = ctrl };
+        window.Show();
+        try
+        {
+            UiTestHelpers.PumpUntil(() => UiTestHelpers.Applied(ctrl));
+            UiTestHelpers.PumpUntil(() => false, timeoutMs: 60); // a few offline ticks
+
+            Assert.True(window.Find<TextBlock>().Single(t => t.Name == "OverviewConnectingText").IsEffectivelyVisible);
+            Assert.False(window.Find<ScrollViewer>().Single(v => v.Name == "OverviewScroller").IsEffectivelyVisible);
+            Assert.DoesNotContain(window.Find<TextBlock>(), t => t.IsEffectivelyVisible && t.Text is NoSensorsText or NoFansText);
+        }
+        finally { ctrl.Dispose(); }
+    }
+
+    private const string NoSensorsText = "Keine sichtbaren Temperatursensoren.";
+    private const string NoFansText = "Keine sichtbaren Lüfter.";
 
     private static TextBlock SinglePlaceholder(MainWindow window, string text) =>
         window.Find<TextBlock>().Single(t => t.Text == text);

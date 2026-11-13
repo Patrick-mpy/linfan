@@ -20,7 +20,12 @@ public static class ProfileService
         if (profile is null)
             return config with { ActiveProfileId = profileId };
 
-        Dictionary<string, string?> map = profile.Assignments.ToDictionary(a => a.FanId, a => a.CurveId);
+        // First assignment per fan wins, as in ConfigSanitizer. A duplicate or null FanId must not throw here:
+        // this also runs on the load path, before any client could reach the daemon to repair the config.
+        var map = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (ProfileAssignment a in profile.Assignments)
+            if (a.FanId is not null)
+                map.TryAdd(a.FanId, a.CurveId);
         var fans = config.Fans
             .Select(f => map.TryGetValue(f.FanId, out string? curveId) ? f with { AssignedCurveId = curveId } : f)
             .ToList();

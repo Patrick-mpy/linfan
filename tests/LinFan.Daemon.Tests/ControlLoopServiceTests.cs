@@ -23,11 +23,10 @@ namespace LinFan.Daemon.Tests;
 /// Seams in <c>CalibrationCoordinator</c>): <c>ControlLoopService</c> hat zwei optionale Ctor-Parameter
 /// - <c>TimeSpan? tickInterval</c> (null = Config-Intervall; hier kurz für schnelle Ticks) und eine
 /// <c>CalibrationService</c>-Factory (null = echte Delays; hier Null-Delay für die Kalibrier-Tests).</para>
-/// <para>Tests laufen ohne Root → der ControlLoop arbeitet im Dry-Run und schreibt KEINE PWM auf die
-/// (Fake-)Hardware. Manuelle Steuerung wird daher über das <c>ManualOverride</c>-Flag des Snapshots
-/// beobachtet, nicht über <c>FakeHardware.Writes</c>.</para>
+/// <para>The service writes to the fake hardware like the root daemon unless a test asks for a dry run
+/// (<c>dryRun: true</c>): a dry run touches no fan at all - no restore, no calibration or identification.</para>
 /// </summary>
-public class ControlLoopServiceTests
+public partial class ControlLoopServiceTests
 {
     private static readonly TimeSpan FastTick = TimeSpan.FromMilliseconds(15);
 
@@ -71,15 +70,15 @@ public class ControlLoopServiceTests
         Func<TimeSpan, CancellationToken, Task>? identifyDelay = null,
         Func<TimeSpan, CancellationToken, Task>? calibrationDelay = null,
         TimeSpan? coordinatorStopTimeout = null, ILogger<ControlLoopService>? log = null,
-        bool fastTachMapping = false) =>
-        // dryRunOverride: true - die Tests laufen konzeptionell ohne Root (Dry-Run, keine echten PWM-Writes).
-        // Explizit erzwungen, damit der Test unabhängig von der euid des Runners ist (CI-Container = Root).
+        bool fastTachMapping = false, TimeSpan? executeStopTimeout = null, bool dryRun = false) =>
+        // dryRunOverride explizit, damit der Test unabhängig von der euid des Runners ist (CI-Container = Root).
+        // Writing by default, like the root daemon: a dry run touches no fan - no restore, no device action.
         new(hw, hw, store, ipc, log ?? NullLogger<ControlLoopService>.Instance, FastTick,
             calibrationDelay is not null ? (s, f) => new CalibrationService(s, f, calibrationDelay)
                 : fastCalibration ? (s, f) => new CalibrationService(s, f, NoDelay) : null,
             identifyDelay, coordinatorStopTimeout,
             tachMappingFactory: fastTachMapping ? (s, f) => new TachometerMappingService(s, f, NoDelay) : null,
-            dryRunOverride: true);
+            dryRunOverride: dryRun, executeStopTimeout: executeStopTimeout);
 
     /// <summary>Startet den Dienst und wartet, bis ExecuteAsync seine IPC-Handler gesetzt hat.</summary>
     private static async Task StartAndWaitReadyAsync(ControlLoopService service, FakeIpcServer ipc, CancellationToken ct)
@@ -98,7 +97,7 @@ public class ControlLoopServiceTests
         var hw = FanRig();
         var store = new FakeConfigStore();
         var ipc = new FakeIpcServer();
-        var service = NewService(hw, store, ipc);
+        var service = NewService(hw, store, ipc, dryRun: true);
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
@@ -113,7 +112,7 @@ public class ControlLoopServiceTests
         await WaitUntilAsync(() => ipc.Broadcasts.Count > seen);
 
         IpcSnapshot snapshot = ipc.Broadcasts[0];
-        Assert.Equal(DaemonStatus.DryRun, snapshot.Status); // Tests laufen ohne Root
+        Assert.Equal(DaemonStatus.DryRun, snapshot.Status);
         Assert.True(snapshot.DryRun);
 
         await service.StopAsync(cts.Token);
@@ -140,6 +139,77 @@ public class ControlLoopServiceTests
         int after = ipc.Broadcasts.Count;
         await Task.Delay(60);
         Assert.Equal(after, ipc.Broadcasts.Count);
+    }
+
+    /// <summary>
+    /// Regression for security audit run-2 #3: a config change that fails to apply used to throw out of the
+    /// whole tick, so a client re-sending it faster than the poll interval kept the watchdog off.
+    /// </summary>
+    [Fact]
+    public async Task FailingConfigChange_ResentEveryMillisecond_DoesNotSkipTheOverTemperatureWatchdog()
+    {
+        var hw = FanRig();
+        hw.Values["t"] = 120; // well above the default FailSafeTempC
+        var store = new FakeConfigStore { ThrowOnSave = true };
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+
+        using var stopFlood = new CancellationTokenSource();
+        Task flood = Task.Run(async () =>
+        {
+            while (!stopFlood.IsCancellationRequested)
+            {
+                ipc.Emit(new IpcCommand(IpcCommand.SaveConfig, Config: IpcConfig.Empty));
+                await Task.Delay(1);
+            }
+        });
+
+        try
+        {
+            int before = hw.RestoreCount;
+            await WaitUntilAsync(() => hw.RestoreCount >= before + 5);
+        }
+        finally
+        {
+            stopFlood.Cancel();
+            await flood;
+            await service.StopAsync(cts.Token);
+        }
+    }
+
+    /// <summary>
+    /// A tick that throws is an internal daemon error and must lead to the safe state (ARCHITECTURE §7).
+    /// Before, it was only logged: here the over-temperature fail-safe throws before it can clear the manual
+    /// override, so the override survived the failing ticks and drove the fan again afterwards.
+    /// </summary>
+    [Fact]
+    public async Task FailingTick_ClearsManualOverrides()
+    {
+        var hw = FanRig();
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+
+        ipc.Emit(new IpcCommand(IpcCommand.SetManualPwm, Target: "hwmon7/pwm1", Value: 0));
+        await WaitUntilAsync(() => FanIsManual(ipc, "hwmon7/pwm1"));
+
+        hw.ThrowOnRestore = true;
+        hw.Values["t"] = 120; // every tick now throws from the over-temperature fail-safe
+        int attempts = hw.RestoreCount;
+        await WaitUntilAsync(() => hw.RestoreCount >= attempts + 4);
+
+        hw.Values["t"] = 40;
+        hw.ThrowOnRestore = false;
+        int seen = ipc.Broadcasts.Count;
+        await WaitUntilAsync(() => ipc.Broadcasts.Count > seen);
+
+        Assert.False(FanIsManual(ipc, "hwmon7/pwm1"));
+        await service.StopAsync(cts.Token);
     }
 
     // --- LoadAndMigrate: persistiert bei Migration -----------------------------------------------
@@ -203,6 +273,57 @@ public class ControlLoopServiceTests
         await service.StopAsync(cts.Token);
     }
 
+    // Older versions saved the hardware label as the own name; it then stayed when the hardware behind the id changed.
+    [Fact]
+    public async Task Start_ClearsNamesThatAreJustTheHardwareLabel_AndPersistsThat()
+    {
+        var hw = FanRig(); // temperature sensor "t" is labelled "temp"
+        var profile = new Profile { Id = "default", Name = "Standard", Curves = Array.Empty<CurveConfig>() };
+        var store = new FakeConfigStore
+        {
+            Stored = AppConfig.Empty with
+            {
+                Sensors = [new SensorConfig { SensorId = "t", Name = "temp", Group = "CPU" }],
+                Fans = [new FanConfig { FanId = "hwmon7/pwm1", Name = "hwmon7/pwm1" }],
+                Profiles = [profile],
+                ActiveProfileId = "default",
+                OnboardingCompleted = true,
+            },
+            Exists = true,
+        };
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+
+        AppConfig saved = Assert.Single(store.Saves);
+        Assert.Equal(("", "CPU"), (saved.Sensors.Single().Name, saved.Sensors.Single().Group));
+        Assert.Equal("", saved.Fans.Single().Name);
+
+        await service.StopAsync(cts.Token);
+    }
+
+    [Fact]
+    public async Task SaveConfig_ASensorNamedLikeItsHardware_IsSavedWithoutAnOwnName()
+    {
+        var hw = FanRig();
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        store.ClearSaves();
+
+        // An older GUI still sends the label as the name.
+        ipc.Emit(new IpcCommand(IpcCommand.SaveConfig, IpcConfig.Empty with { Sensors = [new IpcSensorName("t", "temp")] }));
+
+        await WaitUntilAsync(() => store.Saves.Count > 0);
+        Assert.Equal("", store.Saves[^1].Sensors.Single(s => s.SensorId == "t").Name);
+
+        await service.StopAsync(cts.Token);
+    }
+
     [Fact]
     public async Task LoadAndMigrate_FreshInstall_SetsOnboardingCompletedFalse()
     {
@@ -245,42 +366,42 @@ public class ControlLoopServiceTests
     }
 
     [Fact]
-    public async Task LoadAndMigrate_RewritesLegacyHwmonIds_AndPersists()
+    public async Task ALeftoverLegacyHwmonId_IsNotRemapped_AndTheFanStaysOnHardwareAuto()
     {
-        var hw = FanRig();
-        hw.LegacyIds["hwmon7/pwm1"] = "nct6797/pwm1"; // Backend bietet die stabile Zuordnung an
-        // Altbestand (Schema 2) mit instabiler hwmonN-Id in einer Lüfter-Zuordnung.
+        // A config from before the stable ids (schema 2, pre-release): its fan id matches nothing the backend knows.
+        // Without the old migration it stays unknown - never written, the real fan stays with the firmware.
+        var hw = new FakeHardware();
+        hw.AddTempSensor("t", 60);
+        hw.AddFan("thinkpad/pwm1");
         var store = new FakeConfigStore
         {
+            Exists = true,
             Stored = AppConfig.Empty with
             {
                 SchemaVersion = 2,
-                Fans = new[] { new FanConfig { FanId = "hwmon7/pwm1", Name = "CPU" } },
-                Profiles = new[]
+                OnboardingCompleted = true,
+                Curves = new[]
                 {
-                    new Profile
+                    new CurveConfig
                     {
-                        Id = "default", Name = "Standard",
-                        Curves = new[] { new CurveConfig { Id = "c1", Name = "C", Points = new[] { new CurvePoint(40, 50) } } },
-                        Assignments = new[] { new ProfileAssignment("hwmon7/pwm1", null) },
+                        Id = "c", Name = "c", SourceSensorIds = new[] { "t" }, SmoothingSeconds = 0,
+                        Points = new[] { new CurvePoint(30, 0), new CurvePoint(80, 100) },
                     },
                 },
-                ActiveProfileId = "default",
-                OnboardingCompleted = true,
+                Fans = new[] { new FanConfig { FanId = "hwmon7/pwm1", AssignedCurveId = "c" } },
             },
-            Exists = true,
         };
         var ipc = new FakeIpcServer();
-        var service = NewService(hw, store, ipc);
         using var cts = new CancellationTokenSource();
-
+        var service = WritingService(hw, store, ipc);
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        await WaitUntilAsync(() => ipc.Broadcasts.Count >= 4);
 
-        await WaitUntilAsync(() => store.Saves.Count >= 1); // Migration persistiert die stabilen Ids
-        AppConfig saved = store.Saves[0];
-        Assert.Equal(3, saved.SchemaVersion);
-        Assert.Equal("nct6797/pwm1", saved.Fans[0].FanId);
-        Assert.Equal("nct6797/pwm1", saved.Profiles[0].Assignments[0].FanId);
+        IpcSnapshot snapshot = LastSnapshot(ipc)!;
+        Assert.Empty(hw.Writes);
+        Assert.Equal(FanMode.Auto, hw.ModeLog["thinkpad/pwm1"]); // the start-up restore, nothing after it
+        Assert.Equal("HardwareAuto", snapshot.Fans.Single(f => f.Id == "thinkpad/pwm1").ControlState);
+        Assert.Equal("hwmon7/pwm1", Assert.Single(snapshot.Config!.Fans).FanId);
 
         await service.StopAsync(cts.Token);
     }
@@ -297,7 +418,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear(); // evtl. Startup-Migrationsspeicherung ignorieren
+        store.ClearSaves(); // evtl. Startup-Migrationsspeicherung ignorieren
 
         var incoming = IpcWith(new IpcFanAssignment("hwmon7/pwm1", "CPU", 30, 220, "c1"));
         ipc.Emit(new IpcCommand(IpcCommand.SaveConfig, Config: incoming));
@@ -319,13 +440,14 @@ public class ControlLoopServiceTests
     public async Task OnCommand_SetFanTachometer_PersistsRpmSource()
     {
         var hw = FanRig();
+        hw.AddFanSensor("hwmon7/fan9", 0); // a second discovered speed sensor to assign
         var store = new FakeConfigStore();
         var ipc = new FakeIpcServer();
         var service = NewService(hw, store, ipc);
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm1", RpmSource: "hwmon7/fan9"));
 
@@ -341,6 +463,7 @@ public class ControlLoopServiceTests
     public async Task OnCommand_SetFanTachometer_Empty_ClearsRpmSource()
     {
         var hw = FanRig();
+        hw.AddFanSensor("hwmon7/fan9", 0); // a second discovered speed sensor to assign
         var store = new FakeConfigStore();
         var ipc = new FakeIpcServer();
         var service = NewService(hw, store, ipc);
@@ -350,7 +473,7 @@ public class ControlLoopServiceTests
         ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm1", RpmSource: "hwmon7/fan9"));
         await WaitUntilAsync(() => store.Saves.Any(s =>
             s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan9")));
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm1", RpmSource: null));
 
@@ -374,7 +497,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.StartTachMapping, Target: "hwmon7/pwm1"));
 
@@ -383,6 +506,80 @@ public class ControlLoopServiceTests
             s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan1")));
         AppConfig saved = store.Saves.Last(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1"));
         Assert.Equal("hwmon7/fan1", saved.Fans.Single(f => f.FanId == "hwmon7/pwm1").RpmSource);
+
+        await service.StopAsync(cts.Token);
+    }
+
+    [Fact]
+    public async Task OnCommand_SetFanTachometer_TwiceForOneSensor_KeepsItWithTheFirst()
+    {
+        // The second assignment may come before the tick applies the first: it must see the queued one.
+        var hw = FanRig();
+        hw.AddFanSensor("hwmon7/fan9", 0);
+        hw.AddFan("hwmon7/pwm2", tachId: null);
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        store.ClearSaves();
+
+        ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm1", RpmSource: "hwmon7/fan9"));
+        ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm2", RpmSource: "hwmon7/fan9"));
+        await WaitUntilAsync(() => store.Saves.Any(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan9")));
+        ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm2", RpmSource: "hwmon7/fan1")); // barrier
+        await WaitUntilAsync(() => store.Saves.Any(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm2" && f.RpmSource == "hwmon7/fan1")));
+
+        Assert.DoesNotContain(store.Saves, s => s.Fans.Any(f => f.FanId == "hwmon7/pwm2" && f.RpmSource == "hwmon7/fan9"));
+
+        await service.StopAsync(cts.Token);
+    }
+
+    [Fact]
+    public async Task OnCommand_StartCalibration_OfAPairingAnotherFanIsCoupledTo_EndsAsNoTacho()
+    {
+        var hw = FanRig();                                         // the backend pairs pwm1 with fan1
+        hw.AddFan("hwmon7/pwm2", tachId: null);
+        var store = new FakeConfigStore
+        {
+            Stored = AppConfig.Empty with { Fans = [new FanConfig { FanId = "hwmon7/pwm2", RpmSource = "hwmon7/fan1" }] },
+            Exists = true,
+        };
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc, fastCalibration: true);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+
+        ipc.Emit(new IpcCommand(IpcCommand.StartCalibration, Target: "hwmon7/pwm1"));
+
+        await WaitUntilAsync(() => ipc.Broadcasts.Any(b => b.Calibration is { FanId: "hwmon7/pwm1", FailReason: CalibrationFailReason.NoTacho }));
+        Assert.DoesNotContain(hw.Writes, w => w.Fan == "hwmon7/pwm1" && w.Pwm == 0); // no ramp began
+
+        await service.StopAsync(cts.Token);
+    }
+
+    [Fact]
+    public async Task OnCommand_StartTachMapping_TakesTheSensorFromTheFanThatHadIt()
+    {
+        // pwm2 was coupled to fan1 by hand, but the measurement shows fan1 follows pwm1: the measurement wins.
+        var hw = FanRig();
+        hw.AddFan("hwmon7/pwm2", tachId: null);
+        var store = new FakeConfigStore
+        {
+            Stored = AppConfig.Empty with { Fans = [new FanConfig { FanId = "hwmon7/pwm2", RpmSource = "hwmon7/fan1" }] },
+            Exists = true,
+        };
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc, fastTachMapping: true);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+
+        ipc.Emit(new IpcCommand(IpcCommand.StartTachMapping, Target: "hwmon7/pwm1"));
+
+        await WaitUntilAsync(() => store.Saves.Any(s =>
+            s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan1")));
+        AppConfig saved = store.Saves.Last(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan1"));
+        Assert.Null(saved.Fans.Single(f => f.FanId == "hwmon7/pwm2").RpmSource);
 
         await service.StopAsync(cts.Token);
     }
@@ -399,7 +596,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         int restoresBefore = hw.RestoreCount;
         var incoming = IpcWith(new IpcFanAssignment("hwmon7/pwm1", "Neu", 30, 220, "c1",
@@ -432,7 +629,7 @@ public class ControlLoopServiceTests
         ipc.Emit(new IpcCommand(IpcCommand.ReplaceConfig,
             Config: IpcWith(new IpcFanAssignment("hwmon7/pwm1", "CPU", 30, 220, "c1"))));
         await WaitUntilAsync(() => store.Saves.Any(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1")));
-        store.Saves.Clear();
+        store.ClearSaves();
         int restoresBefore = hw.RestoreCount;
 
         ipc.Emit(new IpcCommand(IpcCommand.ResetConfig));
@@ -469,7 +666,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.StartCalibration, Target: "hwmon7/pwm1"));
         await rampStarted.Task.WaitAsync(TimeSpan.FromSeconds(15));
@@ -524,6 +721,70 @@ public class ControlLoopServiceTests
             "Das finally-RestoreDefaults muss trotz hängendem Coordinator-Stop gelaufen sein.");
 
         unblock.TrySetResult(); // den hängenden Delay auflösen, damit der Coordinator-Task sauber endet
+    }
+
+    /// <summary>
+    /// Regression for security audit run-2 #11: with the loop wedged in a hardware call, StopAsync waited for
+    /// ExecuteAsync until the host's 30 s ShutdownTimeout - past systemd's 20 s SIGKILL, so the final
+    /// RestoreDefaults never ran. The bound must come from the service itself, not from the host's token.
+    /// </summary>
+    [Fact]
+    public async Task StopAsync_WithLoopWedgedInHardwareCall_RestoresDefaultsWithinItsOwnBound()
+    {
+        var hw = FanRig();
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc, executeStopTimeout: TimeSpan.FromMilliseconds(200));
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+
+        var wedged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var unblock = new ManualResetEventSlim();
+        hw.OnRead = () =>
+        {
+            wedged.TrySetResult();
+            unblock.Wait(); // blocks the loop thread like a sysfs read stuck in the driver
+        };
+        await wedged.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        int restoresBefore = hw.RestoreCount;
+
+        try
+        {
+            // A shutdown token that never fires stands in for the host's 30 s timeout.
+            await service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.True(hw.RestoreCount > restoresBefore,
+                "The final RestoreDefaults must run although ExecuteAsync is still wedged.");
+        }
+        finally
+        {
+            hw.OnRead = null;
+            unblock.Set();
+        }
+    }
+
+    /// <summary>
+    /// Fail-safe audit of run-2 #11: once StopAsync gives up waiting on a wedged loop or coordinator, a write
+    /// that wakes up after the final RestoreDefaults must not leave a fan in manual mode. StopAsync therefore
+    /// engages the controller's latch first - and restores right away instead of only after the waits.
+    /// </summary>
+    [Fact]
+    public async Task StopAsync_BlocksManualWrites_AndRestoresImmediately()
+    {
+        var hw = FanRig();
+        var fans = new SynchronizedFanController(hw);
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        using var service = new ControlLoopService(hw, fans, store, ipc, NullLogger<ControlLoopService>.Instance,
+            FastTick, dryRunOverride: false);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        int restoresBefore = hw.RestoreCount;
+
+        await service.StopAsync(cts.Token);
+
+        Assert.Throws<ManualWritesBlockedException>(() => fans.SetPwm(new FanId("hwmon7/pwm1"), 0));
+        Assert.True(hw.RestoreCount >= restoresBefore + 2, "Immediate and final RestoreDefaults expected.");
     }
 
     // --- OnCommand: SetManualPwm / SetFanAuto -----------------------------------------------------
@@ -624,7 +885,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.StartCalibration, Target: "hwmon7/pwm1"));
 
@@ -637,6 +898,8 @@ public class ControlLoopServiceTests
             .Last(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.Calibration is not null))
             .Fans.Single(f => f.FanId == "hwmon7/pwm1");
         Assert.NotNull(fan.Calibration);
+        Assert.Equal("hwmon7/fan1", fan.Calibration!.Tachometer); // what the plausibility check compares the sensor with
+        Assert.NotEmpty(fan.Calibration.Samples);
 
         await service.StopAsync(cts.Token);
     }
@@ -745,7 +1008,7 @@ public class ControlLoopServiceTests
         var service = new ControlLoopService(
             hw, hw, store, ipc, NullLogger<ControlLoopService>.Instance, FastTick,
             (s, f) => new CalibrationService(s, f, (_, ct) => gate.Task.WaitAsync(ct)), NoDelay,
-            dryRunOverride: true);
+            dryRunOverride: false);
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
@@ -773,7 +1036,7 @@ public class ControlLoopServiceTests
         var gate = new TaskCompletionSource(); // hält den Identify-Puls „laufend"
         var service = new ControlLoopService(
             hw, hw, store, ipc, NullLogger<ControlLoopService>.Instance, FastTick,
-            null, (_, ct) => gate.Task.WaitAsync(ct), dryRunOverride: true);
+            null, (_, ct) => gate.Task.WaitAsync(ct), dryRunOverride: false);
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
@@ -827,7 +1090,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.SetActiveProfile, Target: "pb"));
 
@@ -858,7 +1121,7 @@ public class ControlLoopServiceTests
             ActiveProfileId = "pa",
         };
 
-        AppConfig result = ControlLoopService.ApplyCurveToggles(config, new[] { ("c", false) });
+        AppConfig result = ControlLoopService.ApplyCurveToggles(config, new Dictionary<string, bool> { ["c"] = false });
 
         Assert.False(result.Curves.Single().Enabled);                                   // aktive Kurven
         Assert.False(result.Profiles.Single(p => p.Id == "pa").Curves.Single().Enabled); // aktives Profil
@@ -866,17 +1129,30 @@ public class ControlLoopServiceTests
     }
 
     [Fact]
-    public void ApplyCurveToggles_LastValuePerCurveWins()
+    public async Task OnCommand_SetCurveEnabled_KeepsTogglesOfDifferentCurves_AndTheLastValuePerCurve()
     {
-        var config = AppConfig.Empty with
-        {
-            Curves = new[] { new CurveConfig { Id = "c", Name = "C", Enabled = true } },
-            ActiveProfileId = null,
-        };
+        // One slot per curve: quick toggles of two curves both land, a curve toggled twice keeps the second value.
+        var hw = FanRig(canControl: true);
+        CurveConfig Curve(string id) => new() { Id = id, Name = id, SourceSensorIds = new[] { "t" }, Points = new[] { new CurvePoint(40, 30) } };
+        var store = new FakeConfigStore { Stored = AppConfig.Empty with { Curves = new[] { Curve("ca"), Curve("cb") } } };
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
 
-        AppConfig result = ControlLoopService.ApplyCurveToggles(config, new[] { ("c", false), ("c", true) });
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        store.ClearSaves();
 
-        Assert.True(result.Curves.Single().Enabled);
+        ipc.Emit(new IpcCommand(IpcCommand.SetCurveEnabled, Target: "ca", Value: 0));
+        ipc.Emit(new IpcCommand(IpcCommand.SetCurveEnabled, Target: "cb", Value: 0));
+        ipc.Emit(new IpcCommand(IpcCommand.SetCurveEnabled, Target: "ca", Value: 1));
+
+        await WaitUntilAsync(() => store.Saves.Any(s => s.Curves.Any(c => c.Id == "cb" && !c.Enabled)));
+        int seen = ipc.Broadcasts.Count;
+        await WaitUntilAsync(() => ipc.Broadcasts.Count > seen + 1); // whatever was left has been applied by now
+        Assert.True(store.Stored.Curves.Single(c => c.Id == "ca").Enabled);
+        Assert.False(store.Stored.Curves.Single(c => c.Id == "cb").Enabled);
+
+        await service.StopAsync(cts.Token);
     }
 
     [Fact]
@@ -912,7 +1188,7 @@ public class ControlLoopServiceTests
         using var cts = new CancellationTokenSource();
 
         await StartAndWaitReadyAsync(service, ipc, cts.Token);
-        store.Saves.Clear();
+        store.ClearSaves();
 
         ipc.Emit(new IpcCommand(IpcCommand.SetCurveEnabled, Target: "ca", Value: 0));
 
@@ -921,6 +1197,30 @@ public class ControlLoopServiceTests
         AppConfig saved = store.Saves.Last(s => s.Curves.Any(c => c.Id == "ca"));
         Assert.False(saved.Curves.Single(c => c.Id == "ca").Enabled);
         Assert.False(saved.Profiles.Single(p => p.Id == "pa").Curves.Single(c => c.Id == "ca").Enabled);
+
+        await service.StopAsync(cts.Token);
+    }
+
+    [Fact]
+    public async Task OnCommand_SetCurveEnabled_ForACurveNotInTheConfig_IsNeitherQueuedNorSaved()
+    {
+        // Only curves of the live config get a slot: a client cannot pile up toggles (and log text) with made-up ids.
+        var hw = FanRig(canControl: true);
+        var curve = new CurveConfig { Id = "ca", Name = "A", SourceSensorIds = new[] { "t" }, Points = new[] { new CurvePoint(40, 30) } };
+        var store = new FakeConfigStore { Stored = AppConfig.Empty with { Curves = new[] { curve } } };
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        store.ClearSaves();
+
+        for (int i = 0; i < 100; i++)
+            ipc.Emit(new IpcCommand(IpcCommand.SetCurveEnabled, Target: $"made-up-{i}", Value: 0));
+        int seen = ipc.Broadcasts.Count;
+        await WaitUntilAsync(() => ipc.Broadcasts.Count > seen + 1); // two full ticks later
+
+        Assert.Empty(store.Saves); // an accepted toggle saves even when it changes nothing
 
         await service.StopAsync(cts.Token);
     }
@@ -1022,6 +1322,38 @@ public class ControlLoopServiceTests
         await service.StopAsync(cts.Token);
     }
 
+    /// <summary>
+    /// The start log names each device behind the channels once, with its fingerprint or that it has none - a fingerprint
+    /// that only repeats the name (Windows) is not repeated.
+    /// </summary>
+    [Fact]
+    public async Task Start_LogsEachDiscoveredDeviceOnce()
+    {
+        var hw = FanRig();
+        var gpu = new HardwareDevice("amdgpu", "pci:1002:1114:17aa:5129");
+        var thinkpad = new HardwareDevice("thinkpad", null);
+        var board = new HardwareDevice("Nuvoton NCT6798D", "Nuvoton NCT6798D");
+        hw.AddTempSensor("board/temp1", 35);
+        hw.Sensors[0] = hw.Sensors[0] with { Device = gpu };
+        hw.Sensors[1] = hw.Sensors[1] with { Device = thinkpad };
+        hw.Sensors[2] = hw.Sensors[2] with { Device = board };
+        hw.Fans[0] = hw.Fans[0] with { Device = thinkpad };
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        var log = new CapturingLogger<ControlLoopService>();
+        var service = NewService(hw, store, ipc, log: log, dryRun: true);
+        using var cts = new CancellationTokenSource();
+
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        await WaitUntilAsync(() => ipc.Broadcasts.Count >= 1); // the first tick runs after the discovery dump
+
+        var lines = log.Snapshot().Where(e => e.Message.Contains("Geräte:", StringComparison.Ordinal)).ToList();
+        Assert.Equal("  Geräte: Nuvoton NCT6798D, amdgpu (pci:1002:1114:17aa:5129), thinkpad (kein Fingerabdruck)",
+            Assert.Single(lines).Message);
+
+        await service.StopAsync(cts.Token);
+    }
+
     /// <summary>Sammelt Log-Einträge (Level + gerenderte Nachricht) thread-sicher - der Tick-Loop loggt parallel.</summary>
     private sealed class CapturingLogger<T> : ILogger<T>
     {
@@ -1043,5 +1375,31 @@ public class ControlLoopServiceTests
         {
             lock (_gate) _entries.Add((logLevel, formatter(state, exception)));
         }
+    }
+
+    [Fact]
+    public async Task OnCommand_SetFanTachometer_ASensorAnotherDetectedFanHas_IsRejected()
+    {
+        var hw = FanRig();
+        hw.AddFanSensor("hwmon7/fan9", 0);
+        hw.AddFan("hwmon7/pwm2", tachId: null);
+        var store = new FakeConfigStore();
+        var ipc = new FakeIpcServer();
+        var service = NewService(hw, store, ipc);
+        using var cts = new CancellationTokenSource();
+        await StartAndWaitReadyAsync(service, ipc, cts.Token);
+        ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm1", RpmSource: "hwmon7/fan9"));
+        await WaitUntilAsync(() => store.Saves.Any(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan9")));
+        store.ClearSaves();
+
+        ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm2", RpmSource: "hwmon7/fan9"));
+        // An accepted command for the other fan after it: once its save is there, the one before has been dealt with -
+        // and had it been queued, the same tick would have saved it too.
+        ipc.Emit(new IpcCommand(IpcCommand.SetFanTachometer, Target: "hwmon7/pwm1", RpmSource: "hwmon7/fan1"));
+        await WaitUntilAsync(() => store.Saves.Any(s => s.Fans.Any(f => f.FanId == "hwmon7/pwm1" && f.RpmSource == "hwmon7/fan1")));
+
+        Assert.DoesNotContain(store.Saves, s => s.Fans.Any(f => f.FanId == "hwmon7/pwm2" && f.RpmSource == "hwmon7/fan9"));
+
+        await service.StopAsync(cts.Token);
     }
 }

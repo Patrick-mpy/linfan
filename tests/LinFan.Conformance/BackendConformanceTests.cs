@@ -108,9 +108,9 @@ public abstract class BackendConformanceTests
         Assert.True(fans.CanControl(broken)); // der kaputte Kanal bleibt sichtbar/bekannt
     }
 
-    // === INV-2b: Dispose stellt den sicheren Zustand best-effort her und WIRFT NIE - auch wenn ein =====
-    // Kanal beim Restore-Write fehlschlägt. Genau der Shutdown-Pfad (using/SIGTERM), der den Fail-Safe
-    // garantiert erreichen muss; eine durchschlagende Exception aus Dispose würde ihn vereiteln.
+    // === INV-2b: Dispose nach einem Write stellt den sicheren Zustand best-effort her und WIRFT NIE - ==
+    // auch wenn ein Kanal beim Restore-Write fehlschlägt. Genau der Shutdown-Pfad (using/SIGTERM), der den
+    // Fail-Safe garantiert erreichen muss; eine durchschlagende Exception aus Dispose würde ihn vereiteln.
 
     [Fact]
     public void Inv2b_Dispose_DoesNotThrow_EvenIfAChannelFailsToRestore()
@@ -126,6 +126,69 @@ public abstract class BackendConformanceTests
 
         // Best-effort erfüllt: der gesunde Kanal ist nach Dispose sicher (Auto oder Volllast).
         Assert.True(fans.GetMode(ok) == FanMode.Auto || fans.GetPwm(ok) == 255);
+    }
+
+    // === INV-2c: Dispose after a write restores on its own - no RestoreDefaults before it ================
+    // An instance that never wrote may leave the fans alone on Dispose (a read-only CLI command next to a running
+    // daemon); one that did - SetPwm, or SetMode to manual - must leave every channel it wrote safe.
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Inv2c_Dispose_AfterAWrite_LeavesTheChannelsSafe_WithoutAnExplicitRestore(bool viaSetMode)
+    {
+        var b = CreateBackend();
+        var controllable = b.Fans.DiscoverFans().Where(f => f.CanControl).Select(f => f.Id).ToArray();
+        foreach (var id in controllable)
+        {
+            if (viaSetMode)
+                b.Fans.SetMode(id, FanMode.Manual);
+            else
+                b.Fans.SetPwm(id, 1);
+        }
+
+        b.Disposable.Dispose();
+
+        foreach (var id in controllable)
+        {
+            var mode = b.Fans.GetMode(id);
+            byte pwm = b.Fans.GetPwm(id);
+            Assert.True(mode == FanMode.Auto || pwm == 255,
+                $"Kanal {id} nach Write + Dispose weder Auto (war {mode}) noch Volllast (pwm {pwm}).");
+        }
+    }
+
+    // === INV-2d: no manual write after Dispose ==========================================================
+    // Dispose has handed every channel back; a manual write after it would run with nothing left to undo it. Going back
+    // to auto (SetMode Auto, RestoreDefaults) is not refused for that - the safe direction (INV-3), even where the closed
+    // device can no longer take the write.
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Inv2d_AManualWriteAfterDispose_IsRefused_AndTheChannelsStaySafe(bool viaSetMode)
+    {
+        var b = CreateBackend();
+        var controllable = b.Fans.DiscoverFans().Where(f => f.CanControl).Select(f => f.Id).ToArray();
+        foreach (var id in controllable)
+            b.Fans.SetPwm(id, 1);
+
+        b.Disposable.Dispose();
+
+        foreach (var id in controllable)
+        {
+            Assert.Throws<ObjectDisposedException>(() =>
+            {
+                if (viaSetMode)
+                    b.Fans.SetMode(id, FanMode.Manual);
+                else
+                    b.Fans.SetPwm(id, 1);
+            });
+            var mode = b.Fans.GetMode(id);
+            byte pwm = b.Fans.GetPwm(id);
+            Assert.True(mode == FanMode.Auto || pwm == 255,
+                $"Kanal {id} nach Write-Versuch nach Dispose weder Auto (war {mode}) noch Volllast (pwm {pwm}).");
+        }
     }
 
     // === INV-3: idempotent + nach Dispose wiederholbar, Endzustand sicher =============================
@@ -310,10 +373,10 @@ public abstract class BackendConformanceTests
         }
     }
 
-    // === INV-10: GetPwm/GetMode für bekannte id werfen nie (Fallback) =================================
+    // === INV-10: GetPwm für bekannte id wirft nie (Fallback); GetMode höchstens IOException (unlesbar) ===
 
     [Fact]
-    public void Inv10_GetPwm_GetMode_KnownId_NeverThrow()
+    public void Inv10_GetPwm_NeverThrows_GetMode_OnlyAnIOException_ForAKnownId()
     {
         var b = CreateBackend();
         using var lifetime = b.Disposable;
@@ -322,7 +385,7 @@ public abstract class BackendConformanceTests
         {
             var exMode = Record.Exception(() => b.Fans.GetMode(fan.Id));
             var exPwm = Record.Exception(() => b.Fans.GetPwm(fan.Id));
-            Assert.Null(exMode);
+            Assert.True(exMode is null or IOException, $"GetMode({fan.Id}) threw {exMode?.GetType().Name}");
             Assert.Null(exPwm);
         }
     }

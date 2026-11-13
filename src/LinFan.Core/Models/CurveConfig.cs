@@ -30,8 +30,10 @@ public sealed record CurveConfig
     /// <summary>Wie mehrere Quell-Sensoren zu einem Eingangswert zusammengefasst werden.</summary>
     public SensorAggregation Aggregation { get; init; } = SensorAggregation.Max;
 
+    public const double DefaultHysteresisC = 2.0;
+
     /// <summary>Mindest-Temperaturänderung (°C), bevor der PWM-Wert nachgeführt wird (gegen Pendeln).</summary>
-    public double HysteresisC { get; init; } = 2.0;
+    public double HysteresisC { get; init; } = DefaultHysteresisC;
 
     /// <summary>
     /// Sliding window (seconds) the curve's input temperature is averaged over before it is evaluated;

@@ -48,7 +48,57 @@ public partial class OnboardingController : ObservableObject
     private string? _waitingTachForFanId;
     private TachMappingStatus? _tachResult; // vom Apply gesetzter Abschluss-Status, den die Schleife auswertet
 
-    [ObservableProperty] private OnboardingStep _currentStep = OnboardingStep.Welcome;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowStepper))]
+    private OnboardingStep _currentStep = OnboardingStep.Welcome;
+
+    /// <summary>The step indicator - not on the welcome page, which is not one of the four steps.</summary>
+    public bool ShowStepper => CurrentStep != OnboardingStep.Welcome;
+
+    /// <summary>
+    /// Where the daemon moved an unusable configuration, which is why this assistant opened - the welcome page says
+    /// so. Kept for the assistant's lifetime: the daemon drops the report with the first saved change, which may come
+    /// from this very assistant (a calibration).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ConfigSetAsideNote), nameof(HasConfigSetAsideNote))]
+    private string? _configSetAsidePath;
+
+    public string? ConfigSetAsideNote => ConfigSetAsidePath is { } path
+        ? Localizer.Instance.Format("Onboarding.ConfigSetAside", path)
+        : null;
+
+    public bool HasConfigSetAsideNote => ConfigSetAsidePath is not null;
+
+    /// <summary>The daemon runs dry (without the rights to write fans) - the calibration step says so.</summary>
+    [ObservableProperty] private bool _isDryRun;
+
+    /// <summary>
+    /// Why the daemon would refuse calibration, coupling and identification right now (offline, dry run, a device action
+    /// running - see <see cref="DeviceActionBlock"/>); empty when it would not. The sequence would otherwise wait 60 s
+    /// per fan for results that never come.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CalibrateAllCommand))]
+    private string _deviceActionsBlockedReason = "";
+
+    /// <summary>
+    /// No fan is controllable because the driver locks fan control (ThinkPad without <c>fan_control=1</c>) - the
+    /// calibration step names the fix instead of only "no controllable fans".
+    /// </summary>
+    [ObservableProperty] private bool _driverLocked;
+
+    /// <summary>The step indicator's segments, one per step after the welcome page; rebuilt by <see cref="RebuildSteps"/>.</summary>
+    public ObservableCollection<OnboardingStepItem> Steps { get; } = new();
+
+    private static readonly (OnboardingStep Step, string LabelKey)[] StepLabels =
+    [
+        (OnboardingStep.Calibration, "OnboardingCtrl.StepCalibration"),
+        (OnboardingStep.Devices, "OnboardingCtrl.StepDevices"),
+        (OnboardingStep.ChooseProfile, "OnboardingCtrl.StepProfile"),
+        (OnboardingStep.Done, "OnboardingCtrl.StepDone"),
+    ];
+
     [ObservableProperty] private bool _isCalibrating;
     [ObservableProperty] private string _calibrationProgress = "";
     [ObservableProperty] private string _statusMessage = "";
@@ -86,23 +136,79 @@ public partial class OnboardingController : ObservableObject
     public ObservableCollection<OnboardingFanRow> Fans { get; } = new();
 
     /// <summary>
+    /// The case type the positions are picked in - from the config, changed in „Position wählen"; Finish keeps it.
+    /// </summary>
+    public CaseType CaseType { get; private set; }
+
+    /// <summary>The „Position wählen" dialog for <paramref name="row"/>, with the other fans in the schema.</summary>
+    public LocationPickController CreateLocationPick(OnboardingFanRow row) => new(
+        row.FanId, row.DisplayName, row.Location.Value, CaseType, row.Manual,
+        Fans.Where(f => !ReferenceEquals(f, row))
+            .Select(f => new CaseFan(f.FanId, f.DisplayName, f.Location.Value, f.Manual))
+            .ToList());
+
+    /// <summary>Takes over what „Position wählen" returned: the row's position and the case type it was picked in.</summary>
+    public void ApplyLocationPick(OnboardingFanRow row, LocationPick pick)
+    {
+        CaseType = pick.CaseType;
+        row.Location = FanLocationOption.For(pick.Location);
+    }
+
+    /// <summary>
     /// Temperatursensoren - speisen sowohl die Primärsensor-Wahl als auch die Sichtbarkeits-Auswahl
     /// im Geräte-Schritt (gleiches Scope wie der Geräte-Tab, der nur Temperatursensoren persistiert).
     /// </summary>
     public ObservableCollection<SensorOption> TemperatureSensors { get; } = new();
 
     /// <summary>
-    /// Choices for the primary-sensor ComboBox: visible sensors only, plus the current selection while
-    /// it is hidden (kept selectable/removable, mirroring the curve source lists). Sensors deselected in
-    /// the devices step must not be offered as the primary curve source.
+    /// Choices for the primary sensor: visible sensors only, plus the current selection while it is hidden (kept
+    /// selectable, mirroring the curve source lists). Sensors deselected in the devices step must not be offered as
+    /// the primary curve source.
     /// </summary>
-    public ObservableCollection<SensorOption> PrimarySensorChoices { get; } = new();
+    public IReadOnlyList<SensorOption> PrimarySensorChoices =>
+        TemperatureSensors.Where(s => s.Visible || ReferenceEquals(s, SelectedPrimarySensor)).ToList();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanFinish))]
+    [NotifyPropertyChangedFor(nameof(CanFinish), nameof(PrimarySensorChipName))]
     private SensorOption? _selectedPrimarySensor;
 
-    partial void OnSelectedPrimarySensorChanged(SensorOption? value) => SyncPrimarySensorChoices();
+    /// <summary>Accessible name of the primary-sensor chip, which shows the value only as text inside.</summary>
+    public string PrimarySensorChipName => Localizer.Instance.Format("Onboarding.PrimarySensorChipName",
+        SelectedPrimarySensor?.Name ?? Localizer.Instance["Onboarding.PrimarySensorNone"]);
+
+    /// <summary>
+    /// The primary-sensor chip's menu, rebuilt as it opens (<see cref="RefreshPrimarySensorMenu"/>). One collection
+    /// filled in place: the open flyout keeps the items source it was created with.
+    /// </summary>
+    public ObservableCollection<MenuChoice> PrimarySensorMenu { get; } = new();
+
+    /// <summary>
+    /// Builds the primary-sensor menu: the <see cref="PrimarySensorChoices"/> under the headings of their sensor groups
+    /// (the devices step's), each with its live temperature. Built as the menu opens, so the values are current.
+    /// </summary>
+    public void RefreshPrimarySensorMenu()
+    {
+        IReadOnlyList<SensorOption> choices = PrimarySensorChoices;
+        ObservableCollection<MenuChoice> menu = PrimarySensorMenu;
+        menu.Clear();
+        var listed = new HashSet<SensorOption>();
+        foreach (OnboardingSensorGroup group in TemperatureSensorGroups)
+            AddSection(group.Name, group.Sensors.Where(choices.Contains).ToList());
+        AddSection(GroupLabels.Ungrouped, choices.Where(s => !listed.Contains(s)).ToList());
+
+        void AddSection(string heading, IReadOnlyList<SensorOption> sensors)
+        {
+            if (sensors.Count == 0)
+                return;
+            menu.Add(MenuChoice.Heading(heading));
+            foreach (SensorOption sensor in sensors)
+            {
+                listed.Add(sensor);
+                menu.Add(MenuChoice.Value(sensor.Name, new RelayCommand(() => SelectedPrimarySensor = sensor),
+                    ReferenceEquals(sensor, SelectedPrimarySensor), detail: sensor.LiveValue));
+            }
+        }
+    }
 
     /// <summary>
     /// True while the profile step builds the three profiles from the airflow analysis - at least one
@@ -215,13 +321,14 @@ public partial class OnboardingController : ObservableObject
 
         // Default-Auswahl in der ListBox vorbelegen (Id bleibt "balanced").
         _selectedProfile = ProfileOptions.FirstOrDefault(p => p.Id == _selectedProfileId);
+        RebuildSteps();
 
         // Bei Sprachwechsel die Profil-Optionen neu aufbauen: die ListBox bindet DisplayName/Description
         // direkt, daher müssen frische Instanzen mit übersetzten Texten nachgereicht werden. Die Auswahl
         // wird über die Id rekonstruiert (nicht die alte Instanz gehalten). CalibrationHeadline ist ein
         // berechneter Localizer-Lookup und muss ebenfalls neu gelesen werden.
         // Benannter Handler + Unsubscribe beim Schließen (CloseWizard): dieser Controller wird pro
-        // Onboarding-Durchlauf neu erzeugt (Erststart und „Einstellungen → Onboarding"), ein anonymes
+        // Onboarding-Durchlauf neu erzeugt (Erststart und „Einstellungen → Sicherung & Einrichtung"), ein anonymes
         // Dauer-Abo am app-lebenslangen Localizer-Singleton würde jede alte Instanz am Leben halten.
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
     }
@@ -232,9 +339,18 @@ public partial class OnboardingController : ObservableObject
         OnPropertyChanged(nameof(ProfileOptions));
         SelectedProfile = ProfileOptions.FirstOrDefault(p => p.Id == SelectedProfileId);
         OnPropertyChanged(nameof(CalibrationHeadline));
+        RebuildSteps();
+        // Suggested group names are in the UI language, and a name can merge with an existing group in one
+        // language but not in the other - regroup rather than rename.
+        RebuildSensorGroups(_cachedSnapshot?.Config.SensorGroups ?? []);
         // The airflow preview holds materialized localized strings → rebuild while visible.
         if (CurrentStep == OnboardingStep.ChooseProfile)
             RefreshProfilePreview();
+        OnPropertyChanged(nameof(ConfigSetAsideNote));
+        OnPropertyChanged(nameof(PrimarySensorChipName));
+        RefreshDefaultFanNames();
+        foreach (OnboardingFanRow fan in Fans)
+            fan.NotifyLanguageChanged();
         // The Done summary getters read the Localizer directly - re-announce them.
         OnPropertyChanged(nameof(DoneCalibrationSummary));
         OnPropertyChanged(nameof(DonePositionsSummary));
@@ -254,7 +370,13 @@ public partial class OnboardingController : ObservableObject
     /// </summary>
     public void Apply(MonitorSnapshot snapshot)
     {
+        bool fresh = !ReferenceEquals(snapshot, _cachedSnapshot); // the monitor hands out the last one until the next tick
         _cachedSnapshot = snapshot;
+        IsDryRun = snapshot.DryRun;
+        DeviceActionsBlockedReason = DeviceActionBlock.Reason(snapshot.Connected, snapshot.DryRun, DeviceActionBlock.Busy(snapshot));
+        DriverLocked = snapshot.Fans.Any(f => f.ReadOnlyReason == FanReadOnlyReason.DriverLocked);
+        if (snapshot.ConfigProblem is ConfigLoadProblem.SetAside)
+            ConfigSetAsidePath ??= snapshot.ConfigSetAsidePath;
 
         if (!_populated && (snapshot.Fans.Count > 0 || snapshot.Sensors.Count > 0))
         {
@@ -262,11 +384,27 @@ public partial class OnboardingController : ObservableObject
             Populate(snapshot);
         }
 
-        // Live-Drehzahl je Lüfter in den Manuell-Slider spiegeln (reine Anzeige; läuft auch, während das
-        // Positions-Modal offen ist, da es denselben Row teilt).
-        var rpmById = snapshot.Fans.ToDictionary(f => f.Id, f => f.Rpm);
+        // Live speed and power per fan for the manual slider (display only; also while the position dialog is open, as it
+        // shares the row). The power is where manual control starts when the fan is nudged.
+        var liveById = new Dictionary<string, FanReading>(StringComparer.Ordinal);
+        foreach (FanReading reading in snapshot.Fans)
+            liveById.TryAdd(reading.Id, reading);
         foreach (OnboardingFanRow fan in Fans)
-            fan.SetLiveRpm(rpmById.TryGetValue(fan.FanId, out double? r) ? r : null);
+        {
+            FanReading? reading = liveById.GetValueOrDefault(fan.FanId);
+            fan.SetLive(reading?.Rpm, CurveEditorController.DrivenPwm(reading), fresh ? reading?.ManualOverride : null);
+            fan.DeviceActionsBlockedReason = DeviceActionsBlockedReason;
+        }
+
+        // Live temperature per sensor - the devices step lists it, the primary-sensor menu names it.
+        if (fresh)
+        {
+            var temps = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (SensorReading reading in snapshot.Sensors)
+                temps.TryAdd(reading.Id, reading.Value);
+            foreach (SensorOption sensor in TemperatureSensors)
+                sensor.SetLive(temps.TryGetValue(sensor.Id, out double value) ? value : double.NaN);
+        }
 
         // Kopplungs-Vorstufe aus dem Snapshot ableiten (läuft vor der Kalibrierung; nie gleichzeitig).
         if (_waitingTachForFanId is { } tachFanId && snapshot.TachMapping is { } tm && tm.FanId == tachFanId)
@@ -290,7 +428,7 @@ public partial class OnboardingController : ObservableObject
         {
             // Anzeigename statt Hardware-Id zeigen (z. B. „thinkpad pwm1" statt „hwmon8/pwm1").
             OnboardingFanRow? row = ControllableFans.FirstOrDefault(f => f.FanId == fanId);
-            string fanName = row?.Name ?? fanId;
+            string fanName = row?.DisplayName ?? fanId;
             if (cal.Done || cal.FailReason is not null)
             {
                 if (cal.FailReason is { } reason)
@@ -337,10 +475,22 @@ public partial class OnboardingController : ObservableObject
     partial void OnCurrentStepChanged(OnboardingStep value)
     {
         RevertAllManual();
+        RebuildSteps();
         // Entering the profile step re-evaluates the airflow gate + preview: the positions were just
         // chosen in the devices step, so the mode can flip on every visit.
         if (value == OnboardingStep.ChooseProfile)
             RefreshProfilePreview();
+    }
+
+    private void RebuildSteps()
+    {
+        Steps.Clear();
+        for (int i = 0; i < StepLabels.Length; i++)
+        {
+            (OnboardingStep step, string labelKey) = StepLabels[i];
+            Steps.Add(new OnboardingStepItem(
+                $"{i + 1} · {Localizer.Instance[labelKey]}", IsDone: step < CurrentStep, IsCurrent: step == CurrentStep));
+        }
     }
 
     private void RevertAllManual()
@@ -383,7 +533,9 @@ public partial class OnboardingController : ObservableObject
 
     // --- Kalibrierung -----------------------------------------------------------------------------
 
-    [RelayCommand]
+    private bool CanCalibrateAll() => DeviceActionsBlockedReason.Length == 0;
+
+    [RelayCommand(CanExecute = nameof(CanCalibrateAll))]
     private async Task CalibrateAll()
     {
         if (IsCalibrating || ControllableFans.Count == 0)
@@ -412,7 +564,7 @@ public partial class OnboardingController : ObservableObject
 
                 OnboardingFanRow fan = ControllableFans[i];
                 CalibrationFanIndex = i + 1;
-                CalibrationFanName = fan.Name;
+                CalibrationFanName = fan.DisplayName;
                 CalibrationFanProgress = 0;
 
                 // Phase 1: Tacho automatisch koppeln (Vorstufe - die Kalibrierung braucht den Tacho). Ist der
@@ -530,12 +682,12 @@ public partial class OnboardingController : ObservableObject
         {
             case TachMappingPhase.NoResponse:
                 fan.CalibrationState = OnboardingCalibrationState.NoTacho;
-                CalibrationProgress = Localizer.Instance.Format("OnboardingCtrl.CouplingNoTacho", fan.Name);
+                CalibrationProgress = Localizer.Instance.Format("OnboardingCtrl.CouplingNoTacho", fan.DisplayName);
                 break;
 
             case TachMappingPhase.Ambiguous:
                 fan.CalibrationState = OnboardingCalibrationState.Ambiguous;
-                CalibrationProgress = Localizer.Instance.Format("OnboardingCtrl.CouplingAmbiguous", fan.Name);
+                CalibrationProgress = Localizer.Instance.Format("OnboardingCtrl.CouplingAmbiguous", fan.DisplayName);
                 break;
 
             default: // Failed (Übertemp / kein Watchdog / Unknown) oder unerwartet null
@@ -543,7 +695,7 @@ public partial class OnboardingController : ObservableObject
                 string reason = result?.FailReason is { } r
                     ? IpcStatusText.Fail(r, result.OverTempC, result.OverLimitC)
                     : "";
-                CalibrationProgress = Localizer.Instance.Format("OnboardingCtrl.CouplingFailed", fan.Name, reason);
+                CalibrationProgress = Localizer.Instance.Format("OnboardingCtrl.CouplingFailed", fan.DisplayName, reason);
                 break;
         }
 
@@ -636,7 +788,7 @@ public partial class OnboardingController : ObservableObject
             // primary sensor is required.
             profiles = AirflowTuneService.BuildProfiles(
                 draft, controllableIds, AirflowText.CurveNames(),
-                silentName, balancedName, performanceName);
+                silentName, balancedName, performanceName, SensorOption.Labels(TemperatureSensors));
         }
         else
         {
@@ -713,16 +865,14 @@ public partial class OnboardingController : ObservableObject
         // der Airflow-Druckbilanz.
         var baseFanById = baseConfig.Fans.ToDictionary(f => f.FanId);
         var fans = Fans
-            .Select((row, i) =>
+            .Select(row =>
             {
                 FanConfig baseFan = baseFanById.TryGetValue(row.FanId, out FanConfig? existing)
                     ? existing
                     : new FanConfig { FanId = row.FanId };
-                // Erststart: noch kein eigener Name → durchnummerieren statt Hardware-Pfad zeigen
-                // (der Pfad bleibt als Unterzeile im Geräte-Tab/Tooltip sichtbar). Ein bereits
-                // gesetzter Name bleibt erhalten.
-                string name = string.IsNullOrWhiteSpace(baseFan.Name) ? Localizer.Instance.Format("OnboardingCtrl.FanDefaultName", i + 1) : baseFan.Name;
-                return baseFan with { Name = name, Location = row.Location.Value };
+                // The name the step showed: the one typed, or „Lüfter N" for an empty field instead of the hardware path
+                // (that stays visible under the name in the settings).
+                return baseFan with { Name = row.DisplayName, Location = row.Location.Value };
             })
             .ToList();
 
@@ -731,8 +881,11 @@ public partial class OnboardingController : ObservableObject
         var rowIds = fans.Select(f => f.FanId).ToHashSet(StringComparer.Ordinal);
         fans.AddRange(baseConfig.Fans.Where(f => f.Hidden && !rowIds.Contains(f.FanId)));
 
-        // Sensor-Sichtbarkeit (Temperatursensoren - gleiches Scope wie der Geräte-Tab).
-        var sensors = TemperatureSensors.Select(s => s.ToConfig()).ToList();
+        // Sensor-Sichtbarkeit (Temperatursensoren - gleiches Scope wie der Geräte-Tab). Every sensor also gets the
+        // group the devices step showed it in: its own, or the suggested one. Part of the draft, not only of Finish,
+        // so the airflow preview already sees them - its CPU/GPU detection reads the group too.
+        SensorGroupPlan groups = PlanSensorGroups(baseConfig.SensorGroups);
+        var sensors = TemperatureSensors.Select(s => s.ToConfig() with { Group = groups.GroupById[s.Id] }).ToList();
 
         // Same no-data-loss rule as for the hidden fans above: config entries whose sensor is not in
         // the current discovery (unplugged device, EIO channel) have no wizard row - carry them over
@@ -740,7 +893,15 @@ public partial class OnboardingController : ObservableObject
         var sensorIds = sensors.Select(s => s.SensorId).ToHashSet(StringComparer.Ordinal);
         sensors.AddRange(baseConfig.Sensors.Where(s => !sensorIds.Contains(s.SensorId)));
 
-        return baseConfig with { Fans = fans, Sensors = sensors };
+        // Over ConfigLimits.MaxSensorGroups the daemon would refuse the whole config; the names past it are new
+        // ones (the configured list is within the limit), and their sensors still form the group without them.
+        return baseConfig with
+        {
+            Fans = fans,
+            Sensors = sensors,
+            SensorGroups = groups.Names.Take(ConfigLimits.MaxSensorGroups).ToList(),
+            CaseType = CaseType,
+        };
     }
 
     /// <summary>Airflow gate: at least one controllable fan has a role-specific mounting position.</summary>
@@ -764,7 +925,7 @@ public partial class OnboardingController : ObservableObject
         }
 
         AirflowTuneResult result = AirflowTuneService.Analyze(
-            BuildDraftConfig(_cachedSnapshot!.Config), AirflowText.CurveNames());
+            BuildDraftConfig(_cachedSnapshot!.Config), AirflowText.CurveNames(), SensorOption.Labels(TemperatureSensors));
         Dictionary<string, string> curveNames = result.SuggestedCurves.ToDictionary(c => c.Id, c => c.Name);
         var controllableIds = ControllableFans.Select(f => f.FanId).ToHashSet(StringComparer.Ordinal);
 
@@ -774,20 +935,23 @@ public partial class OnboardingController : ObservableObject
             // Only controllable fans get an assignment - don't promise a curve to read-only channels.
             if (!controllableIds.Contains(s.FanId))
                 continue;
-            string fanName = Fans.FirstOrDefault(f => f.FanId == s.FanId)?.Name ?? s.FanId;
+            string fanName = Fans.FirstOrDefault(f => f.FanId == s.FanId)?.DisplayName ?? s.FanId;
             string curveName = s.SuggestedCurveId is { } id && curveNames.TryGetValue(id, out string? n)
                 ? n
                 : Localizer.Instance["CurveEditorCtrl.NoCurveHardwareAuto"];
             AirflowSummary.Add(new AirflowSuggestionRow(
                 s.FanId, fanName, FanLocationOption.For(s.Location).Display, curveName,
-                AirflowText.DescribeReason(s, curveName), apply: true));
+                AirflowText.DescribeReason(s, curveName)));
         }
 
+        // The verdict line already says what these would repeat (only one side, negative pressure); without case fans it
+        // only says that there is no balance, the hint says why.
         AirflowHints.Clear();
-        foreach (AirflowHint hint in result.Hints)
+        foreach (AirflowHint hint in result.Hints.Where(h => h is not (AirflowHint.NoIntakeFan
+                     or AirflowHint.NoExhaustFan or AirflowHint.NegativePressure)))
             AirflowHints.Add(AirflowText.DescribeHint(hint));
 
-        AirflowPressureText = AirflowText.DescribePressure(result);
+        AirflowPressureText = Localizer.Instance.Format("Onboarding.PressureVerdict", AirflowText.DescribeVerdict(result));
     }
 
     /// <summary>
@@ -822,6 +986,7 @@ public partial class OnboardingController : ObservableObject
 
     private void Populate(MonitorSnapshot snapshot)
     {
+        CaseType = snapshot.Config.CaseType;
         // Position-/Sichtbarkeits-Defaults aus der persistierten Config; bei Erststart leer → Defaults greifen.
         var fanCfgById = snapshot.Config.Fans.ToDictionary(f => f.FanId);
         var sensorCfgById = snapshot.Config.Sensors.ToDictionary(s => s.SensorId);
@@ -838,12 +1003,21 @@ public partial class OnboardingController : ObservableObject
             if (cfg?.Hidden == true)
                 continue;
             FanLocation loc = cfg?.Location ?? FanLocation.Unspecified;
-            var row = new OnboardingFanRow(fan.Id, fan.Name, loc, fan.CanControl, _sendIdentify, _sendManual, _sendAuto);
+            var row = new OnboardingFanRow(fan.Id, cfg?.Name ?? "", loc, fan.CanControl, _sendIdentify, _sendManual, _sendAuto);
+            // Lifetime equals the controller's (_populated latch) - no unsubscribe needed.
+            row.PropertyChanged += OnFanRowChanged;
             Fans.Add(row);
             if (fan.CanControl)
                 ControllableFans.Add(row);
         }
         HasControllableFans = ControllableFans.Count > 0;
+        // Numbered over every detected fan in its order, hidden ones too - as the settings and the overview count.
+        _detectedFans = snapshot.Fans
+            .Select(f => (f.Id, fanCfgById.TryGetValue(f.Id, out FanConfig? cfg) ? cfg.Name ?? "" : ""))
+            .ToList();
+        var detected = snapshot.Fans.Select(f => f.Id).ToHashSet(StringComparer.Ordinal);
+        _undetectedFanNames = snapshot.Config.Fans.Where(f => !detected.Contains(f.FanId)).Select(f => f.Name).ToList();
+        RefreshDefaultFanNames();
 
         // Temperatursensoren: speisen Primärwahl und Sichtbarkeits-Liste. Sichtbarkeit aus der Config, sonst
         // standardmäßig ausgeblendet, wenn der Sensor keinen Messwert liefert (NaN - z. B. EIO-Kanäle).
@@ -853,50 +1027,55 @@ public partial class OnboardingController : ObservableObject
             bool visible = sensorCfgById.TryGetValue(sensor.Id, out SensorConfig? sc)
                 ? !sc.Hidden
                 : !double.IsNaN(sensor.Value);
-            var opt = new SensorOption(sensor.Id, sensor.Name, visible, sc?.Group, sensor.Unit);
+            var opt = new SensorOption(sensor.Id, sensor.Name, visible, sc?.Group, sensor.Unit, sensor.Label);
             opt.SetLive(sensor.Value);
-            // Keep the primary combo in sync with the visibility checkboxes (same collection, live).
+            // A visibility change recounts the sensor's group in the devices step.
             // Lifetime equals the controller's (_populated latch) - no unsubscribe needed.
             opt.PropertyChanged += OnSensorRowChanged;
             TemperatureSensors.Add(opt);
         }
+        RebuildSensorGroups(snapshot.Config.SensorGroups);
 
         string? bestId = SelectPrimarySensorId(TemperatureSensors, snapshot.Sensors);
         if (bestId is not null)
             SelectedPrimarySensor = TemperatureSensors.FirstOrDefault(s => s.Id == bestId);
-        SyncPrimarySensorChoices(); // covers the no-selection path (all sensors dead/hidden)
+    }
+
+    // Every detected fan in its order with its saved name - a hidden one has no row, but takes a number all the same.
+    private IReadOnlyList<(string Id, string Name)> _detectedFans = [];
+
+    // Own names of the config's fans that are not detected right now - „Lüfter N" must not reuse them.
+    private IReadOnlyList<string> _undetectedFanNames = [];
+
+    /// <summary>
+    /// Gives every row its „Lüfter N" (<see cref="DefaultFanNames"/>) - placeholder and name of an empty field. Counted
+    /// like the settings and the overview (<see cref="DefaultFanNames.ApplyTo"/>): over every detected fan, so a hidden fan
+    /// without a name keeps the number it has there.
+    /// </summary>
+    private void RefreshDefaultFanNames()
+    {
+        var rows = new Dictionary<string, OnboardingFanRow>(StringComparer.Ordinal);
+        foreach (OnboardingFanRow row in Fans)
+            rows.TryAdd(row.FanId, row);
+        IReadOnlyList<string> defaults = DefaultFanNames.For(
+            _detectedFans.Select(f => rows.TryGetValue(f.Id, out OnboardingFanRow? row) ? row.Name : f.Name).ToList(),
+            _undetectedFanNames);
+        for (int i = 0; i < _detectedFans.Count; i++)
+            if (rows.TryGetValue(_detectedFans[i].Id, out OnboardingFanRow? row))
+                row.DefaultName = defaults[i];
+    }
+
+    // A name typed in one row can take the number another row's placeholder showed.
+    private void OnFanRowChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OnboardingFanRow.Name))
+            RefreshDefaultFanNames();
     }
 
     private void OnSensorRowChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SensorOption.Visible))
-            SyncPrimarySensorChoices();
-    }
-
-    /// <summary>
-    /// Rebuilds <see cref="PrimarySensorChoices"/> via targeted add/remove - never Clear(): both step
-    /// panels are always instantiated (IsVisible-toggled), and clearing the combo's ItemsSource would
-    /// momentarily drop the selected item, nulling <see cref="SelectedPrimarySensor"/> through the
-    /// TwoWay binding. The predicate always retains the current selection, so no remove touches it.
-    /// </summary>
-    private void SyncPrimarySensorChoices()
-    {
-        List<SensorOption> desired = TemperatureSensors
-            .Where(s => s.Visible || ReferenceEquals(s, SelectedPrimarySensor))
-            .ToList();
-        for (int i = PrimarySensorChoices.Count - 1; i >= 0; i--)
-        {
-            if (!desired.Contains(PrimarySensorChoices[i]))
-                PrimarySensorChoices.RemoveAt(i);
-        }
-
-        // After the removal pass the existing items are an order-preserving subsequence of `desired`
-        // (both derive from TemperatureSensors order), so positional insert is correct.
-        for (int i = 0; i < desired.Count; i++)
-        {
-            if (i >= PrimarySensorChoices.Count || !ReferenceEquals(PrimarySensorChoices[i], desired[i]))
-                PrimarySensorChoices.Insert(i, desired[i]);
-        }
+        if (e.PropertyName == nameof(SensorOption.Visible) && sender is SensorOption sensor)
+            RefreshSensorGroupCount(sensor);
     }
 
     /// <summary>

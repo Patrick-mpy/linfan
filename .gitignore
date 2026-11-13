@@ -5,6 +5,15 @@
 
 # dotenv files
 .env
+.env.*
+
+# Secrets and signing keys - none belong in the repo (release signing runs in CI)
+secrets.json
+credentials.json
+appsettings.*.json
+*.snk
+*.pem
+*.key
 
 # User-specific files
 *.rsuser

@@ -24,15 +24,26 @@ public partial class ProfileRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(ActivityHint))]
     private bool _isActive;
 
+    /// <summary>
+    /// Unsaved changes in this profile: new, renamed, a changed curve list or a changed curve. Set by the
+    /// controller's diff; display only.
+    /// </summary>
+    [ObservableProperty] private bool _isDirty;
+
     /// <summary>Tooltip zum Aktiv-Punkt in der Profil-Liste.</summary>
     public string ActivityHint => IsActive
         ? Localizer.Instance["ProfileRow.ActiveHint"]
         : Localizer.Instance["ProfileRow.InactiveHint"];
 
-    /// <summary>Die Kurven dieses Profils (Snapshot; beim Speichern/Wechsel des aktiven Profils aktualisiert).</summary>
+    internal void NotifyLanguageChanged() => OnPropertyChanged(nameof(ActivityHint));
+
+    /// <summary>
+    /// The profile's curves while it is not shown in the editor - updated when it is switched away from or saved, and
+    /// directly by a curve switched on/off and by taking an airflow proposal over into it.
+    /// </summary>
     public IReadOnlyList<CurveConfig> Curves { get; set; }
 
-    /// <summary>Lüfter→Kurve-Zuordnungen dieses Profils (wird beim Speichern des aktiven Profils aktualisiert).</summary>
+    /// <summary>The profile's fan → curve assignments, kept like <see cref="Curves"/>.</summary>
     public IReadOnlyList<ProfileAssignment> Assignments { get; set; }
 
     public ProfileRow(string id, string name, IReadOnlyList<CurveConfig> curves,

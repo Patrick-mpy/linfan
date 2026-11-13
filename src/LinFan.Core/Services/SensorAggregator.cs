@@ -51,8 +51,8 @@ public static class SensorAggregator
 
     /// <summary>
     /// Liest einen Quell-Sensor defensiv: Die IDs stammen aus der gespeicherten Config und können auf einen
-    /// Sensor zeigen, den das Backend gerade <b>nicht</b> kennt (z. B. weil sich die hwmon-Nummerierung seit
-    /// dem Speichern geändert hat) - laut Vertrag darf <see cref="ISensorBackend.ReadValue"/> dafür werfen.
+    /// Sensor zeigen, den das Backend gerade <b>nicht</b> kennt (z. B. weil das Gerät seit dem Speichern
+    /// gewechselt oder nicht erkannt wurde) - laut Vertrag darf <see cref="ISensorBackend.ReadValue"/> dafür werfen.
     /// <b>Jede</b> Backend-Exception (nicht nur <see cref="KeyNotFoundException"/>: auch <c>IOException</c>/EIO,
     /// unerwartete Fehler) zählt hier wie „nicht lesbar" → <see cref="double.NaN"/>, statt den ganzen Regel-Tick
     /// abzureißen (Fail-Safe: eine einzelne fehlende/kaputte Quelle darf nicht die Regelung ALLER Lüfter - und

@@ -1,23 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+using LinFan.App.Localization;
 using LinFan.App.Services;
 
 namespace LinFan.App.Controllers;
 
 /// <summary>
-/// Anzeige-Option für <see cref="LanguageChoice"/> im Header-Umschalter. Die Sprachnamen sind
-/// <b>Endonyme</b> (jede Sprache in sich selbst geschrieben) und bewusst NICHT lokalisiert - sie
-/// bleiben in beiden Sprachlisten gleich (vermeidet das Henne-Ei-Problem beim Umschalten).
-/// Spiegelt <see cref="ThemeOption"/>.
+/// Display option for <see cref="LanguageChoice"/> in the language switch. The names are <b>endonyms</b> (each language
+/// in itself) and deliberately not translated - they read the same in both languages, so a user who picked the wrong
+/// one still finds their own. "System" names the language it resolves to, e.g. "System (Deutsch)".
 /// </summary>
-public sealed record LanguageOption(LanguageChoice Value, string Display)
+/// <param name="Name">The entry's name in the menu: „System" or the endonym.</param>
+/// <param name="SystemLanguage">For „System": the endonym of the language it resolves to; <c>null</c> otherwise.</param>
+public sealed record LanguageOption(LanguageChoice Value, string Name, string? SystemLanguage = null)
 {
-    public static readonly IReadOnlyList<LanguageOption> All = new[]
+    public static readonly IReadOnlyList<LanguageOption> All = Build(Localizer.SystemLanguage);
+
+    /// <param name="system">The language "System" resolves to (<see cref="LanguageChoice.German"/> or <see cref="LanguageChoice.English"/>).</param>
+    public static IReadOnlyList<LanguageOption> Build(LanguageChoice system) => new[]
     {
-        new LanguageOption(LanguageChoice.System, "System"),
-        new LanguageOption(LanguageChoice.German, "Deutsch"),
-        new LanguageOption(LanguageChoice.English, "English"),
+        new LanguageOption(LanguageChoice.System, "System", Endonym(system)),
+        new LanguageOption(LanguageChoice.German, Endonym(LanguageChoice.German)),
+        new LanguageOption(LanguageChoice.English, Endonym(LanguageChoice.English)),
     };
+
+    /// <summary>What the chip shows: the name, for „System" with the language it resolves to.</summary>
+    public string Display => SystemLanguage is null ? Name : $"{Name} ({SystemLanguage})";
+
+    private static string Endonym(LanguageChoice language) => language == LanguageChoice.German ? "Deutsch" : "English";
 
     public static LanguageOption For(LanguageChoice value) =>
         All.FirstOrDefault(o => o.Value == value) ?? All[0];

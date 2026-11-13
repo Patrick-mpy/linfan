@@ -37,4 +37,10 @@ public enum FanLocation
     CaseSideExhaust,
     CaseTopIntake,
     CaseRearIntake,
+
+    /// <summary>
+    /// Fan wall of a server case (<see cref="CaseType.Server"/>), between the drives and the board: it moves the air on
+    /// from front to rear inside the case, so it cools like an intake but does not count in the pressure balance.
+    /// </summary>
+    FanWall,
 }

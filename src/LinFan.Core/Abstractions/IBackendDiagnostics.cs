@@ -18,4 +18,13 @@ public interface IBackendDiagnostics
     /// wird nicht erfasst, und der Hinweis wird nicht zurückgenommen, wenn er sich auflöst.
     /// </summary>
     string? StartupWarning { get; }
+
+    /// <summary>
+    /// A non-fatal condition the backend only detects while running (e.g. Windows: another LinFan process's crash
+    /// marker turns the fan hand-back into 100 %). Raised once per condition, outside the backend's locks, so the
+    /// host can log it when it happens. Default: never raised.
+    /// Raised on the thread that drives the fans (control loop, fail-safe restore, shutdown): subscribers must not
+    /// block or marshal to a UI.
+    /// </summary>
+    event Action<string>? RuntimeWarning { add { } remove { } }
 }

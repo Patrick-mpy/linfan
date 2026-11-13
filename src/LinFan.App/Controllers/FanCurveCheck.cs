@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using LinFan.App.Localization;
 
 namespace LinFan.App.Controllers;
 
@@ -30,7 +31,23 @@ public sealed partial class FanCurveCheck : ObservableObject
                 Fan.Selected = _curve;
             else if (ReferenceEquals(Fan.Selected, _curve))
                 Fan.Selected = null;
-            OnPropertyChanged();
+            Refresh();
         }
+    }
+
+    /// <summary>The fan follows another curve, so ticking it here moves it (one curve per fan).</summary>
+    public bool ShowMoveHint => !Assigned && Fan.Selected is not null;
+
+    /// <summary>„Steckt in „CPU“ – Häkchen verschiebt ihn hierher"; empty unless <see cref="ShowMoveHint"/>.</summary>
+    public string MoveHint => ShowMoveHint
+        ? Localizer.Instance.Format("FanCurveCheck.MoveHint", Fan.Selected!.Name)
+        : "";
+
+    /// <summary>Re-reads the assignment - it lives on the fan row and also changes through other curves.</summary>
+    public void Refresh()
+    {
+        OnPropertyChanged(nameof(Assigned));
+        OnPropertyChanged(nameof(ShowMoveHint));
+        OnPropertyChanged(nameof(MoveHint));
     }
 }

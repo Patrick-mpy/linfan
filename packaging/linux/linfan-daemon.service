@@ -19,13 +19,64 @@ WorkingDirectory=/opt/linfan
 
 # systemd creates /run/linfan (0755, root) and cleans it up on stop - the socket lives there.
 RuntimeDirectory=linfan
+# Kept on stop: it may hold the socket of another daemon this unit stood down for.
+RuntimeDirectoryPreserve=yes
 Environment=LINFAN_SOCKET=/run/linfan/linfan.sock
 # systemd creates /etc/linfan (0755, root) - the shared configuration used by the daemon and CLI.
 ConfigurationDirectory=linfan
 Environment=LINFAN_CONFIG=/etc/linfan/config.json
 
+# Sandbox: the root daemon needs sysfs (hwmon), its socket in /run/linfan and its config in /etc/linfan - nothing
+# else. A bug in it must not reach further. /sys stays writable under ProtectSystem=strict (an API file system);
+# never add ProtectKernelTunables=, it makes /sys read-only and every PWM write fail. No MemoryDenyWriteExecute=
+# either: the .NET JIT writes code at run time. ProtectHome= hides /home and /root, so the .NET runtime must live
+# outside them.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc/linfan
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectProc=invisible
+# No network: the daemon talks to the GUI over its Unix socket only (a path, unaffected by the network namespace).
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# CAP_CHOWN hands the socket to the linfan group; CAP_DAC_OVERRIDE keeps sysfs and config files writable that are
+# not root's own. Every other root capability is dropped.
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE
+# Files the daemon creates are root's alone; the socket's mode is set explicitly.
+UMask=0077
+# A handful of descriptors in normal operation (16 IPC connections at most): a leak hits this ceiling first.
+LimitNOFILE=1024
+
 Restart=on-failure
 RestartSec=3
+
+# Fail-safe after every stop, a crash, an OOM kill or a SIGKILL included - cases where the daemon's own restore never
+# ran: every fan back to hardware auto. "-": a channel that cannot be restored is reported in the journal, but does not
+# mark the unit failed.
+# Exit code 3: another daemon holds the socket (e.g. `sudo … run` started before the service) - its fans are
+# not this unit's to restore, and restarting would only fight it. ($$ hands the variables to the shell.)
+ExecStopPost=-/bin/sh -c 'if [ "$$EXIT_CODE" = exited ] && [ "$$EXIT_STATUS" = 3 ]; then echo "LinFan: another daemon holds the socket - its fans are left alone."; else exec /opt/linfan/LinFan.Daemon restore; fi'
+RestartPreventExitStatus=3
+
+# The daemon reports after every control tick in which its over-temperature watchdog ran. If that stops for 30 s
+# (a loop stuck in a hardware call), systemd kills and restarts it; ExecStopPost puts the fans on auto in between.
+# NotifyAccess=main is what WatchdogSec= implies anyway - stated so the WATCHDOG=1 path does not hinge on it.
+# TimeoutAbortSec: the watchdog's abort must not wait out TimeoutStopSec (plus a core dump) before ExecStopPost runs.
+WatchdogSec=30
+NotifyAccess=main
+TimeoutAbortSec=5
 
 # Fail-Safe: der Daemon stellt beim Stop den sicheren Hardware-Auto-Zustand wieder her
 # (RestoreDefaults im finally). Genug Zeit vor einem SIGKILL lassen, damit das garantiert läuft.

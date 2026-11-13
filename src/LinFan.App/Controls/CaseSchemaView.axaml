@@ -1,0 +1,174 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:LinFan.App.Controllers"
+             xmlns:ctrl="clr-namespace:LinFan.App.Controls"
+             xmlns:lconv="clr-namespace:LinFan.App.Converters"
+             xmlns:l="clr-namespace:LinFan.App.Localization"
+             x:Class="LinFan.App.Controls.CaseSchemaView"
+             x:Name="Root">
+    <UserControl.Resources>
+        <!-- A zone's body: tint and frame behind the label, the fans in it and - in the dialog - "bisher hier". -->
+        <DataTemplate x:Key="ZoneBody" x:DataType="c:CaseZone">
+            <Panel>
+                <Border Classes="caseTint"
+                        Classes.dirIn="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Intake}"
+                        Classes.dirOut="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Exhaust}"
+                        Classes.dirInt="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Internal}"
+                        Classes.mixed="{Binding IsMixed}" Classes.outside="{Binding IsOutside}"
+                        Classes.empty="{Binding IsEmpty}" Classes.selected="{Binding IsSelected}" />
+                <!-- Intake and exhaust at one edge: the tint split half and half, clipped to the zone's corners. -->
+                <Border CornerRadius="{DynamicResource RadiusSm}" ClipToBounds="True" IsVisible="{Binding IsMixed}">
+                    <Grid ColumnDefinitions="*,*">
+                        <Border Grid.Column="0" Classes="caseTintHalf" Background="{DynamicResource IntakeBrush}" />
+                        <Border Grid.Column="1" Classes="caseTintHalf" Background="{DynamicResource ExhaustBrush}" />
+                    </Grid>
+                </Border>
+                <Border Classes="caseFrame" Classes.outside="{Binding IsOutside}" Classes.empty="{Binding IsEmpty}"
+                        Classes.selected="{Binding IsSelected}" />
+                <DockPanel Margin="6,4" Classes.flat="{Binding IsFlat}">
+                    <TextBlock DockPanel.Dock="Top" Classes="caseLabel" Classes.empty="{Binding IsEmpty}" Classes.tray="{Binding IsTray}"
+                               Classes.outside="{Binding IsOutside}">
+                        <Run Text="{Binding Label}" />
+                        <Run Text="{Binding Arrow}" Classes="caseArrow"
+                             Classes.dirIn="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Intake}"
+                             Classes.dirOut="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Exhaust}" />
+                    </TextBlock>
+                    <TextBlock DockPanel.Dock="Bottom" Classes="caseWas" Text="{Binding $parent[ctrl:CaseSchemaView].WasHereText}"
+                               IsVisible="{Binding WasHere}" HorizontalAlignment="Center" />
+                    <ItemsControl ItemsSource="{Binding Fans}" ItemTemplate="{Binding $parent[ctrl:CaseSchemaView].FanTemplate}"
+                                  VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="10" LineSpacing="4" HorizontalAlignment="Center" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </DockPanel>
+            </Panel>
+        </DataTemplate>
+
+        <!-- Airflow page: each fan is a button that opens "Position wählen"; name, speed and - while the daemon drives
+             it - the power as a thin bar. -->
+        <DataTemplate x:Key="FanButton" x:DataType="c:CaseFan">
+            <Button Classes="caseFan" Command="{Binding Open}" ToolTip.Tip="{Binding Tooltip}"
+                    AutomationProperties.Name="{Binding Tooltip}">
+                <StackPanel Spacing="2">
+                    <StackPanel Classes="caseFanLines" Spacing="1">
+                        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Classes="fanArrow" Text="{Binding Arrow}" IsVisible="{Binding ShowsArrow}"
+                                       Classes.dirIn="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Intake}"
+                                       Classes.dirOut="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Exhaust}" />
+                            <TextBlock Classes="caseFanName" Text="{Binding Name}" />
+                        </StackPanel>
+                        <TextBlock Classes="caseFanRpm" Text="{Binding Live.LiveRpm}" />
+                    </StackPanel>
+                    <ProgressBar Classes="pwmBar" Minimum="0" Maximum="100" Value="{Binding Live.LivePercent}"
+                                 IsVisible="{Binding Live.LivePercent, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <!-- Dialog: the other fans are dimmed text; the one being placed shows in the pick with "bisher" / "neu". -->
+        <DataTemplate x:Key="FanText" x:DataType="c:CaseFan">
+            <StackPanel Classes="caseFanText" Classes.self="{Binding IsSelf}" Spacing="1" HorizontalAlignment="Center">
+                <StackPanel Classes="caseFanLines" Spacing="1" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                        <TextBlock Classes="fanArrow" Text="{Binding Arrow}" IsVisible="{Binding ShowsArrow}"
+                                   Classes.dirIn="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Intake}"
+                                   Classes.dirOut="{Binding Direction, Converter={x:Static lconv:EnumMatchConverter.Instance}, ConverterParameter=Exhaust}" />
+                        <TextBlock Classes="caseFanName" Text="{Binding Name}" />
+                        <Border Classes="caseTag" IsVisible="{Binding HasTag}">
+                            <TextBlock Text="{Binding Tag}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Classes="caseFanRpm" Text="{Binding Live.LiveRpm}" HorizontalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ZoneStatic" x:DataType="c:CaseZone">
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ZoneBody}"
+                            AutomationProperties.Name="{Binding AutomationName}" />
+        </DataTemplate>
+
+        <!-- Dialog: the zones are the choice - radio buttons; only the pick is a tab stop, the arrow keys walk the rest. -->
+        <DataTemplate x:Key="ZonePick" x:DataType="c:CaseZone">
+            <RadioButton Classes="caseZone" GroupName="{Binding $parent[ctrl:CaseSchemaView].GroupName}"
+                         IsChecked="{Binding IsSelected, Mode=OneWay}" Command="{Binding Pick}"
+                         IsEnabled="{Binding !IsOutside}"
+                         IsTabStop="{Binding IsTabStop}" AutomationProperties.Name="{Binding AutomationName}">
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ZoneBody}" />
+            </RadioButton>
+        </DataTemplate>
+
+        <!-- One grid per case type - the zones' Row/Column/Span come from CaseSchema's slot tables, keep both in step. -->
+        <ItemsPanelTemplate x:Key="TowerPanel">
+            <Grid ColumnDefinitions="20*,15*,45*,20*" RowDefinitions="14*,18*,18*,18*,18*,14*" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="ServerPanel">
+            <Grid ColumnDefinitions="19*,17*,45*,19*" RowDefinitions="*,*,*,*" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="LaptopPanel">
+            <Grid ColumnDefinitions="16*,42*,42*" RowDefinitions="16*,30*,26*,28*" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="OpenPanel">
+            <Grid ColumnDefinitions="*,*" RowDefinitions="*,*" />
+        </ItemsPanelTemplate>
+    </UserControl.Resources>
+
+    <StackPanel Spacing="4">
+        <!-- The grid panel follows CaseType (see ApplyCaseType). -->
+        <ItemsControl x:Name="GridItems" ItemsSource="{Binding #Root.Zones}" Height="{Binding #Root.CaseHeight}">
+            <ItemsControl.Styles>
+                <Style Selector="ItemsControl#GridItems > ContentPresenter" x:DataType="c:CaseZone">
+                    <Setter Property="Grid.Row" Value="{Binding Row}" />
+                    <Setter Property="Grid.Column" Value="{Binding Column}" />
+                    <Setter Property="Grid.RowSpan" Value="{Binding RowSpan}" />
+                    <Setter Property="Grid.ColumnSpan" Value="{Binding ColumnSpan}" />
+                    <Setter Property="Margin" Value="2" />
+                </Style>
+            </ItemsControl.Styles>
+        </ItemsControl>
+        <!-- What the view shows, and the colours of the zones. -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="2,2,2,0">
+            <TextBlock Grid.Column="0" Classes="caseCaption" Text="{Binding #Root.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Border Classes="legendSwatch" Background="{DynamicResource IntakeBrush}" />
+                    <TextBlock Classes="caseCaption" Text="{l:Tr FanLocation.Intake}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Border Classes="legendSwatch" Background="{DynamicResource ExhaustBrush}" />
+                    <TextBlock Classes="caseCaption" Text="{l:Tr FanLocation.Exhaust}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Border Classes="legendSwatch" Background="{DynamicResource InternalBrush}" />
+                    <TextBlock Classes="caseCaption" Text="{l:Tr Airflow.Component}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Border Classes="legendSwatch" ClipToBounds="True">
+                        <Grid ColumnDefinitions="*,*">
+                            <Border Grid.Column="0" Background="{DynamicResource IntakeBrush}" />
+                            <Border Grid.Column="1" Background="{DynamicResource ExhaustBrush}" />
+                        </Grid>
+                    </Border>
+                    <TextBlock Classes="caseCaption" Text="{l:Tr FanDiagram.MixedLegend}" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+        <ItemsControl x:Name="TrayItems" ItemsSource="{Binding #Root.Tray}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <!-- One row: „Ohne Position", „Sonstige" and, while a fan has one the type lacks, „Nicht im Schema". -->
+                    <UniformGrid Rows="1" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.Styles>
+                <Style Selector="ItemsControl#TrayItems > ContentPresenter">
+                    <Setter Property="Margin" Value="2" />
+                    <Setter Property="MinHeight" Value="38" />
+                </Style>
+            </ItemsControl.Styles>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

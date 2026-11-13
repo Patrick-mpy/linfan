@@ -12,10 +12,10 @@
 ; the optional GUI autostart.
 
 #define AppName "LinFan"
-; Fallback for manual builds; the release pipeline injects the version from the git tag
+; Fallback for manual builds (marked as not a release); the release pipeline injects the version from the git tag
 ; via ISCC /DAppVersion=X.Y.Z (single source of truth = git tag).
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.0.0-dev"
 #endif
 #define AppPublisher "LinFan"
 ; Source of the published artifacts, relative to this script (packaging\windows\ -> repo root\artifacts).

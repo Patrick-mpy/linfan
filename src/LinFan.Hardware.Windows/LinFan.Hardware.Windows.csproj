@@ -5,6 +5,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- On upgrade: WindowsLhmBackend drops Intel's "… Distance to TjMax" sensors by that literal name
+         (IsDistanceToTjMax) - check that LHM still names them so, or they come back as temperatures that fall as
+         the core heats up. -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
   </ItemGroup>
 

@@ -17,7 +17,7 @@ public class Tier4SmokeTests
     {
         var fake = new FakeLiveMonitor(initial);
         // Kurzes (injiziertes) Intervall → die Schleife iteriert schnell mehrfach.
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
         return (ctrl, fake);
     }
 

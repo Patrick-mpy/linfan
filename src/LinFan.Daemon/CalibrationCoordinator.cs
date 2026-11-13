@@ -24,12 +24,12 @@ internal sealed class CalibrationCoordinator
     private readonly ISensorBackend _sensors;
     private readonly IFanController _fans;
     private readonly ILogger _log;
-    private readonly Action<string> _suspend;
+    private readonly Action<string, FanControlState> _suspend;
     private readonly Action<string> _resume;
     private readonly Action<string, FanCalibration> _onResult;
     private readonly Func<ISensorBackend, IFanController, CalibrationService> _calibrationFactory;
     private readonly Func<double>? _failSafeTempC;
-    private readonly Func<FanId, SensorId?>? _tachometerOverride;
+    private readonly Func<IReadOnlyList<FanConfig>>? _couplings;
 
     private readonly RunGate _run;
     private volatile IpcCalibration? _status;
@@ -43,18 +43,17 @@ internal sealed class CalibrationCoordinator
     /// Start ausgewertet, damit Config-Änderungen greifen). <c>null</c> ⇒ Vorgabe
     /// (<see cref="CalibrationOptions.DefaultFailSafeTempC"/>).
     /// </param>
-    /// <param name="tachometerOverride">
-    /// Liefert den explizit zugeordneten Drehzahl-Sensor eines Lüfters (aus <see cref="FanConfig.RpmSource"/>),
-    /// der den Backend-Guess für die RPM-Messung übersteuert; bei jedem Start ausgewertet. <c>null</c> bzw.
-    /// Rückgabe <c>null</c> ⇒ den Tacho des <c>FanDescriptor</c> verwenden.
+    /// <param name="couplings">
+    /// The configured fans with their speed-sensor couplings (<see cref="CalibrationOptions.Couplings"/>), evaluated at
+    /// every start - a coupling may have changed since the last run. <c>null</c> ⇒ none, the backend's pairing counts.
     /// </param>
     public CalibrationCoordinator(
         ISensorBackend sensors, IFanController fans, ILogger log,
-        Action<string> suspend, Action<string> resume, Action<string, FanCalibration> onResult,
+        Action<string, FanControlState> suspend, Action<string> resume, Action<string, FanCalibration> onResult,
         CancellationToken hostToken,
         Func<ISensorBackend, IFanController, CalibrationService>? calibrationFactory = null,
         Func<double>? failSafeTempC = null,
-        Func<FanId, SensorId?>? tachometerOverride = null)
+        Func<IReadOnlyList<FanConfig>>? couplings = null)
     {
         _sensors = sensors;
         _fans = fans;
@@ -65,7 +64,7 @@ internal sealed class CalibrationCoordinator
         _run = new RunGate(hostToken);
         _calibrationFactory = calibrationFactory ?? ((s, f) => new CalibrationService(s, f));
         _failSafeTempC = failSafeTempC;
-        _tachometerOverride = tachometerOverride;
+        _couplings = couplings;
     }
 
     /// <summary>Aktueller Kalibrier-Status (für den Snapshot); <c>null</c> = inaktiv/quittiert.</summary>
@@ -97,7 +96,7 @@ internal sealed class CalibrationCoordinator
 
     private async Task RunAsync(FanId fanId, CancellationToken ct)
     {
-        _suspend(fanId.Value); // Lüfter dem Tick-Loop entziehen, bevor die Rampe schreibt
+        _suspend(fanId.Value, FanControlState.Calibrating); // Lüfter dem Tick-Loop entziehen, bevor die Rampe schreibt
         var progress = new Progress<CalibrationProgress>(p =>
         {
             IpcCalibration? s = _status;
@@ -107,12 +106,11 @@ internal sealed class CalibrationCoordinator
 
         try
         {
-            // Watchdog-Obergrenze aus der Live-Config (nicht fest 90 °C), bei jedem Start frisch ausgewertet;
-            // ebenso das RpmSource-Override (explizit zugeordneter Tacho gewinnt vor dem Backend-Guess).
+            // The watchdog limit from the live config (not a fixed 90 °C) and the couplings, both read at every start.
             var options = new CalibrationOptions
             {
                 FailSafeTempC = _failSafeTempC?.Invoke() ?? CalibrationOptions.DefaultFailSafeTempC,
-                TachometerOverride = _tachometerOverride?.Invoke(fanId),
+                Couplings = _couplings?.Invoke() ?? [],
             };
             FanCalibration result = await _calibrationFactory(_sensors, _fans)
                 .CalibrateAsync(fanId, options, ct, progress)
@@ -153,6 +151,11 @@ internal sealed class CalibrationCoordinator
             // Fail-Safe-Abbruch (kein Watchdog möglich) - bekannte Ursache, daher Warnung ohne Trace.
             _status = Fail(fanId, CalibrationFailReason.NoTemperatureReading);
             _log.LogWarning("Kalibrierung abgebrochen (kein Watchdog): {Fan} - {Reason}", fanId.Value, ex.Message);
+        }
+        catch (ManualWritesBlockedException)
+        {
+            _status = Fail(fanId, CalibrationFailReason.Canceled);
+            _log.LogInformation("Kalibrierung beim Herunterfahren beendet: {Fan}", fanId.Value);
         }
         catch (Exception ex)
         {

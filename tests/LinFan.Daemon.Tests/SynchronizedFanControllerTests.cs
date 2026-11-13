@@ -97,6 +97,105 @@ public class SynchronizedFanControllerTests
         Assert.Contains(log.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("Max-Hardware-Write-Latenz"));
     }
 
+    [Fact]
+    public void BlockManualWrites_RejectsManualWrites_ButStillRestoresTheSafeState()
+    {
+        var inner = new RecordingController(TimeSpan.Zero);
+        var sut = new SynchronizedFanController(inner, new CapturingLogger());
+
+        sut.BlockManualWrites();
+
+        Assert.Throws<ManualWritesBlockedException>(() => sut.SetPwm(new FanId("fan0"), 0));
+        Assert.Throws<ManualWritesBlockedException>(() => sut.SetMode(new FanId("fan0"), FanMode.Manual));
+        Assert.Empty(inner.Writes);
+        Assert.Empty(inner.Modes);
+
+        sut.SetMode(new FanId("fan0"), FanMode.Auto);
+        sut.RestoreDefaults();
+        Assert.Equal(FanMode.Auto, Assert.Single(inner.Modes));
+        Assert.Equal(1, inner.RestoreCount);
+    }
+
+    [Fact]
+    public void Dispose_BlocksManualWrites()
+    {
+        var inner = new RecordingController(TimeSpan.Zero);
+        var sut = new SynchronizedFanController(inner, new CapturingLogger());
+
+        sut.Dispose();
+
+        Assert.Throws<ManualWritesBlockedException>(() => sut.SetPwm(new FanId("fan0"), 0));
+        Assert.Empty(inner.Writes);
+    }
+
+    /// <summary>
+    /// A write wedged in the driver holds the gate. Every other read and write gives up after a bounded wait instead of
+    /// stalling its caller - the control loop among them, and with it the over-temperature watchdog. Discovery and
+    /// CanControl need no gate at all, so a stall cannot make a fan look uncontrollable.
+    /// </summary>
+    [Fact]
+    public void ReadsAndWrites_GiveUp_WhileTheGateIsWedged()
+    {
+        var inner = new WedgingController();
+        var sut = new SynchronizedFanController(inner, new CapturingLogger(), gateTimeout: TimeSpan.FromMilliseconds(50));
+        var fan = new FanId("fan0");
+        var wedged = new Thread(() => sut.SetPwm(fan, 128)) { IsBackground = true };
+        wedged.Start();
+        Assert.True(inner.Entered.Wait(TimeSpan.FromSeconds(5)));
+        try
+        {
+            Assert.Throws<TimeoutException>(() => sut.GetPwm(fan));
+            Assert.Throws<TimeoutException>(() => sut.GetMode(fan));
+            Assert.Throws<TimeoutException>(() => sut.SetPwm(fan, 10));
+            Assert.Throws<TimeoutException>(() => sut.SetMode(fan, FanMode.Auto));
+            Assert.True(sut.CanControl(fan));
+            Assert.Empty(sut.DiscoverFans());
+        }
+        finally
+        {
+            inner.Release.Set();
+            wedged.Join(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    /// <summary>The fail-safe restores every tick while it holds: a channel that will not go back is logged once.</summary>
+    [Fact]
+    public void RestoreProblems_AreLoggedOncePerChange()
+    {
+        var inner = new ReportingController();
+        var log = new CapturingLogger();
+        var sut = new SynchronizedFanController(inner, log);
+
+        inner.Problems = ["thinkpad/pwm1: Hardware-Auto nicht setzbar (EIO) - stattdessen Volllast."];
+        for (int i = 0; i < 3; i++)
+            sut.RestoreDefaults();
+        Assert.Single(log.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("thinkpad/pwm1"));
+
+        inner.Problems = [];
+        sut.RestoreDefaults();
+        sut.RestoreDefaults();
+        Assert.Single(log.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("wieder auf Hardware-Auto"));
+
+        inner.Problems = ["thinkpad/pwm1: weder Hardware-Auto (EIO) noch Volllast (EIO) setzbar."];
+        sut.RestoreDefaults();
+        Assert.Equal(2, log.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("thinkpad/pwm1")));
+    }
+
+    private sealed class ReportingController : IFanController, IRestoreDiagnostics
+    {
+        public IReadOnlyList<string> Problems { get; set; } = [];
+        public IReadOnlyList<string> LastRestoreProblems { get; private set; } = [];
+
+        public void RestoreDefaults() => LastRestoreProblems = Problems;
+        public void SetPwm(FanId id, byte value) { }
+        public void SetMode(FanId id, FanMode mode) { }
+        public IReadOnlyList<FanDescriptor> DiscoverFans() => Array.Empty<FanDescriptor>();
+        public bool CanControl(FanId id) => true;
+        public FanMode GetMode(FanId id) => FanMode.Auto;
+        public byte GetPwm(FanId id) => 0;
+        public void Dispose() { }
+    }
+
     /// <summary>Minimaler <see cref="IFanController"/>: protokolliert Writes und verzögert optional (langsames Backend).</summary>
     private sealed class RecordingController : IFanController
     {
@@ -118,7 +217,14 @@ public class SynchronizedFanControllerTests
             RestoreCount++;
         }
 
-        public void SetMode(FanId id, FanMode mode) => Thread.Sleep(_delay);
+        public List<FanMode> Modes { get; } = new();
+
+        public void SetMode(FanId id, FanMode mode)
+        {
+            Thread.Sleep(_delay);
+            Modes.Add(mode);
+        }
+
         public IReadOnlyList<FanDescriptor> DiscoverFans() => Array.Empty<FanDescriptor>();
         public bool CanControl(FanId id) => true;
         public FanMode GetMode(FanId id) => FanMode.Manual;

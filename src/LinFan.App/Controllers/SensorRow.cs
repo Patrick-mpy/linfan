@@ -21,13 +21,18 @@ public partial class SensorRow : ObservableObject
     [ObservableProperty] private string _display = "-";
 
     /// <summary>Letzter numerischer Messwert (°C) oder <c>NaN</c> - treibt die Schwere-Farbe (Sparkline/Wert).</summary>
-    [ObservableProperty] private double _value = double.NaN;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsHot))]
+    private double _value = double.NaN;
+
+    /// <summary>At or above the hot mark - shown with an icon and in bold, not by colour alone.</summary>
+    public bool IsHot => TemperatureLevels.IsHot(Value);
 
     /// <summary>Dezenter Zusatz (Hardware-Id) - nur gesetzt, wenn der Anzeigename im Dashboard mehrfach vorkommt.</summary>
     [ObservableProperty] private string _disambiguator = "";
 
-    /// <summary>Gruppenschlüssel fürs Dashboard (Gruppe, sonst „Ungruppiert").</summary>
-    public string GroupKey { get; private set; } = SensorGroup.Ungrouped;
+    /// <summary>The configured group as a key (see <see cref="SensorGroup.KeyOf"/>): "" while ungrouped.</summary>
+    public string GroupKey { get; private set; } = "";
 
     /// <summary>Rollender Verlauf der letzten Messwerte für die Sparkline.</summary>
     public ObservableCollection<double> History { get; } = new();
@@ -40,8 +45,7 @@ public partial class SensorRow : ObservableObject
     }
 
     /// <summary>Setzt die Gruppe aus der Konfiguration (für die Dashboard-Gruppierung).</summary>
-    public void SetGroup(string? group) =>
-        GroupKey = string.IsNullOrWhiteSpace(group) ? SensorGroup.Ungrouped : group.Trim();
+    public void SetGroup(string? group) => GroupKey = SensorGroup.KeyOf(group);
 
     public void Update(string name, double value)
     {

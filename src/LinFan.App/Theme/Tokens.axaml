@@ -1,11 +1,15 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:svc="using:LinFan.App.Services">
     <!--
       Layout-Skala: zentrale Abstands- und Eckenradius-Werte, damit „über Styles" wirklich eine
       Skala greift statt verstreuter Literale. Die Spacing-Skala ist an den vorhandenen dominanten
       Werten ausgerichtet (minimaler optischer Drift); seltene Ausreißer (4/14/18) ziehen auf die
       nächste Stufe. Die Radius-Tokens spiegeln die Ist-Werte exakt (Single-Source, keine Optik-
       Änderung) und werden u. a. von den Border-Klassen in Layout.axaml genutzt.
+      Radii and the font differ per theme (Terminal is square and monospace): they live in the theme dictionaries below
+      and are only ever used as {DynamicResource …} - a StaticResource would keep the value of the theme that was on
+      screen when the view loaded.
     -->
 
     <!-- Spacing-Skala (StackPanel-Abstände). -->
@@ -16,10 +20,49 @@
     <x:Double x:Key="SpacingLg">12</x:Double>
     <x:Double x:Key="SpacingXl">16</x:Double>
 
-    <!-- Eckenradius-Stufen. -->
-    <CornerRadius x:Key="RadiusSm">6</CornerRadius>
-    <CornerRadius x:Key="RadiusMd">8</CornerRadius>
-    <CornerRadius x:Key="RadiusLg">10</CornerRadius>
-    <CornerRadius x:Key="RadiusXl">12</CornerRadius>
-    <CornerRadius x:Key="RadiusXxl">14</CornerRadius>
+    <!-- The area tabs in the header (ListBox.navTabs): 52 px tall next to the wordmark, 44 px once they take a row of
+         their own below it (narrow window). -->
+    <x:Double x:Key="NavTabFontSize">15</x:Double>
+    <x:Double x:Key="NavTabHeight">52</x:Double>
+    <x:Double x:Key="NavTabHeightNarrow">44</x:Double>
+
+    <!-- Monospace for values that must line up (ids, paths) - and the whole interface of the terminal theme. Each system's
+         own terminal face first (Windows Terminal, macOS Terminal, Ubuntu, GNOME, KDE), then the common ones. -->
+    <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Menlo, Ubuntu Sans Mono, Ubuntu Mono, Adwaita Mono, Hack, JetBrains Mono, Noto Sans Mono, DejaVu Sans Mono, Liberation Mono, monospace</FontFamily>
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- Every theme without a dictionary of its own (light, dark, high contrast). -->
+        <ResourceDictionary x:Key="{x:Static ThemeVariant.Default}">
+            <!-- Eckenradius-Stufen; Pill rounds a bar or chip fully, whatever its height. -->
+            <CornerRadius x:Key="RadiusXxs">2</CornerRadius>
+            <CornerRadius x:Key="RadiusXs">4</CornerRadius>
+            <CornerRadius x:Key="RadiusSm">6</CornerRadius>
+            <CornerRadius x:Key="RadiusMd">8</CornerRadius>
+            <CornerRadius x:Key="RadiusLg">10</CornerRadius>
+            <CornerRadius x:Key="RadiusXl">12</CornerRadius>
+            <CornerRadius x:Key="RadiusXxl">14</CornerRadius>
+            <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+        </ResourceDictionary>
+
+        <!-- Terminal: everything square, one monospace face. The Fluent keys reach its own controls (buttons, fields,
+             checks, menus, tooltips) and the window font. -->
+        <ResourceDictionary x:Key="{x:Static svc:ThemeVariantMap.Terminal}">
+            <CornerRadius x:Key="RadiusXxs">0</CornerRadius>
+            <CornerRadius x:Key="RadiusXs">0</CornerRadius>
+            <CornerRadius x:Key="RadiusSm">0</CornerRadius>
+            <CornerRadius x:Key="RadiusMd">0</CornerRadius>
+            <CornerRadius x:Key="RadiusLg">0</CornerRadius>
+            <CornerRadius x:Key="RadiusXl">0</CornerRadius>
+            <CornerRadius x:Key="RadiusXxl">0</CornerRadius>
+            <CornerRadius x:Key="RadiusPill">0</CornerRadius>
+            <CornerRadius x:Key="ControlCornerRadius">0</CornerRadius>
+            <CornerRadius x:Key="OverlayCornerRadius">0</CornerRadius>
+            <CornerRadius x:Key="SliderThumbCornerRadius">0</CornerRadius>
+            <StaticResource x:Key="ContentControlThemeFontFamily" ResourceKey="MonoFontFamily" />
+            <!-- Monospace runs wider: a point smaller keeps fixed-width places (side menus, tiles, chips) from cutting off. -->
+            <x:Double x:Key="ControlContentThemeFontSize">13</x:Double>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

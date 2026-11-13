@@ -17,7 +17,7 @@ public class MainControllerLoopTests
     {
         var fake = new FakeLiveMonitor(UiTestHelpers.SampleSnapshot());
         // Kurzes (injiziertes) Intervall → die Schleife iteriert mehrfach.
-        var ctrl = new MainController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
+        var ctrl = UiTestHelpers.NewController(fake, pollInterval: TimeSpan.FromMilliseconds(10));
 
         UiTestHelpers.PumpUntil(() => fake.ReadCount >= 3);
         Assert.True(fake.ReadCount >= 3); // Loop läuft (und das injizierte Intervall greift)

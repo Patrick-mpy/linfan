@@ -2,6 +2,7 @@
 
 using LinFan.Core.Abstractions;
 using LinFan.Core.Models;
+using LinFan.Core.Services;
 using LinFan.Hardware.Windows.Lhm;
 
 namespace LinFan.Hardware.Windows.Tests;
@@ -112,6 +113,7 @@ public sealed class WindowsLhmBackendTests
 
         var fan = Assert.Single(backend.DiscoverFans());
         Assert.False(fan.CanControl);
+        Assert.Equal(FanReadOnlyReason.NoControlInterface, fan.ReadOnlyReason);
     }
 
     [Fact]
@@ -131,7 +133,7 @@ public sealed class WindowsLhmBackendTests
     [Fact]
     public void Discovery_DuplicateChipNames_YieldDistinctIds_ViaLhmInstanceIndex()
     {
-        // Untermauert die Doc-Entscheidung „Windows braucht keine Id-Migration": LHM-Identifier sind durch
+        // Windows-Ids sind stabil: LHM-Identifier sind durch
         // den Instanz-Index (…/0/… vs …/1/…) selbst bei zwei gleichnamigen Chips kollisionsfrei.
         var lhm = new FakeLhmComputer();
         lhm.Add(FakeLhmSensor.Controllable("/lpc/nct6797d/0/control/1", "Fan Control #1", "NCT6797D", new FakeLhmControl()));
@@ -142,6 +144,72 @@ public sealed class WindowsLhmBackendTests
         var ids = backend.DiscoverFans().Select(f => f.Id.Value).ToArray();
         Assert.Equal(2, ids.Length);
         Assert.Equal(2, ids.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    /// <summary>LHM's hardware name is the device's name and its only fingerprint, on every channel of that hardware.</summary>
+    [Fact]
+    public void Discovery_NamesTheHardware_AsTheDeviceOfEveryChannel()
+    {
+        var lhm = new FakeLhmComputer();
+        lhm.Add(FakeLhmSensor.Controllable("/lpc/nct6798d/0/control/1", "Fan Control #1", "Nuvoton NCT6798D",
+            new FakeLhmControl()));
+        lhm.Add(FakeLhmSensor.ReadOnlyControl("/lpc/nct6798d/0/control/2", "Fan Control #2", "Nuvoton NCT6798D"));
+        lhm.Add(FakeLhmSensor.Reading("/lpc/nct6798d/0/fan/1", "Fan #1", "Nuvoton NCT6798D", LhmSensorType.Fan, 900f));
+        lhm.Add(FakeLhmSensor.Reading("/gpu-amd/0/temperature/0", "GPU Core", " AMD Radeon RX 7800 XT\n",
+            LhmSensorType.Temperature, 50f));
+
+        using var backend = new WindowsLhmBackend(lhm);
+
+        var board = new HardwareDevice("Nuvoton NCT6798D", "Nuvoton NCT6798D");
+        Assert.All(backend.DiscoverFans(), f => Assert.Equal(board, f.Device));
+        var devices = backend.DiscoverSensors().ToDictionary(s => s.Id.Value, s => s.Device);
+        Assert.Equal(board, devices["/lpc/nct6798d/0/fan/1"]);
+        Assert.Equal(new HardwareDevice("AMD Radeon RX 7800 XT", "AMD Radeon RX 7800 XT"),
+            devices["/gpu-amd/0/temperature/0"]); // trimmed, without control characters
+    }
+
+    // --- Discovery filter: Intel "Distance to TjMax" -------------------------
+
+    [Fact]
+    public void Discovery_SkipsDistanceToTjMaxSensors_ButKeepsRealCoreTemperatures()
+    {
+        // Sensor names as LHM 0.9.6 builds them for a hybrid Intel CPU (core name + " Distance to TjMax").
+        var lhm = new FakeLhmComputer();
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/0", "P-Core #1", 70f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/1", "E-Core #1", 60f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/2", "CPU Core #3", 65f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/3", "CPU Package", 72f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/4", "Core Max", 70f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/5", "Core Average", 65f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/6", "P-Core #1 Distance to TjMax", 30f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/7", "E-Core #1 Distance to TjMax", 40f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/8", "CPU Core #3 Distance to TjMax", 35f));
+
+        using var backend = new WindowsLhmBackend(lhm);
+
+        Assert.Equal(
+            new[]
+            {
+                "/intelcpu/0/temperature/0", "/intelcpu/0/temperature/1", "/intelcpu/0/temperature/2",
+                "/intelcpu/0/temperature/3", "/intelcpu/0/temperature/4", "/intelcpu/0/temperature/5",
+            },
+            backend.DiscoverSensors().Select(s => s.Id.Value));
+    }
+
+    [Fact]
+    public void ConfigSourcePointingAtAFilteredSensor_JustStopsBeingASource()
+    {
+        // A CPU-average curve saved before the filter still lists the Distance sensor next to the real core.
+        var lhm = new FakeLhmComputer();
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/0", "CPU Core #1", 70f));
+        lhm.Add(IntelCpuTemp("/intelcpu/0/temperature/2", "CPU Core #1 Distance to TjMax", 30f));
+
+        using var backend = new WindowsLhmBackend(lhm);
+
+        Assert.Throws<KeyNotFoundException>(() => backend.ReadValue(new SensorId("/intelcpu/0/temperature/2")));
+        double avg = SensorAggregator.Aggregate(
+            new[] { "/intelcpu/0/temperature/0", "/intelcpu/0/temperature/2" }, backend, SensorAggregation.Avg);
+        Assert.Equal(70.0, avg);
     }
 
     // --- Start-Diagnose (nur-GPU-Erkennung) ----------------------------------
@@ -187,6 +255,36 @@ public sealed class WindowsLhmBackendTests
 
         Assert.Null(((IBackendDiagnostics)backend).StartupWarning);
     }
+
+    [Fact]
+    public void SensorIds_KeepTheLhmHardwareClassFirst_WhereTheSensorClassifierReadsIt()
+    {
+        // The GUI groups sensors by the identifier's first segment; the ids must stay LHM's identifiers.
+        var lhm = new FakeLhmComputer();
+        lhm.Add(FakeLhmSensor.Reading("/amdcpu/0/temperature/2", "Core (Tctl/Tdie)", "AMD Ryzen 7 5800X", LhmSensorType.Temperature, 50f));
+        lhm.Add(GpuReading("/gpu-nvidia/0/temperature/0", "GPU Core", LhmSensorType.Temperature, 45f));
+        lhm.Add(FakeLhmSensor.Reading("/lpc/nct6797d/0/temperature/1", "CPUTIN", "Nuvoton NCT6797D", LhmSensorType.Temperature, 38f));
+        lhm.Add(FakeLhmSensor.Reading("/nvme/0/temperature/0", "Composite Temperature", "Samsung SSD 980", LhmSensorType.Temperature, 41f));
+
+        using var backend = new WindowsLhmBackend(lhm);
+
+        var categories = backend.DiscoverSensors().ToDictionary(s => s.Id.Value, s => SensorClassifier.Classify(s.Id.Value));
+        Assert.Equal(SensorCategory.Cpu, categories["/amdcpu/0/temperature/2"]);
+        Assert.Equal(SensorCategory.Gpu, categories["/gpu-nvidia/0/temperature/0"]);
+        Assert.Equal(SensorCategory.Mainboard, categories["/lpc/nct6797d/0/temperature/1"]);
+        Assert.Equal(SensorCategory.Storage, categories["/nvme/0/temperature/0"]);
+    }
+
+    private static FakeLhmSensor IntelCpuTemp(string id, string name, float value) =>
+        new()
+        {
+            Identifier = id,
+            Name = name,
+            HardwareName = "Intel Core i7-12700K",
+            Type = LhmSensorType.Temperature,
+            Value = value,
+            HardwareType = LhmHardwareType.Cpu,
+        };
 
     private static FakeLhmSensor GpuReading(string id, string name, LhmSensorType type, float value) =>
         new()
@@ -298,17 +396,35 @@ public sealed class WindowsLhmBackendTests
         var backend = new WindowsLhmBackend(lhm);
 
         var ex = Record.Exception(() => backend.Dispose());
-        Assert.Null(ex);           // Dispose-Pfad (RestoreDefaults) reißt nicht (INV-2b)
-        Assert.True(lhm.Disposed); // Computer.Close() wurde dennoch erreicht
+        Assert.Null(ex);                           // Dispose-Pfad (RestoreDefaults) reißt nicht (INV-2b)
+        Assert.Equal(100f, failing.SoftwareValue); // fell back to full speed ...
+        Assert.False(lhm.Disposed);                // ... so LHM's Close() must not write its saved state over it
     }
 
     [Fact]
-    public void GetMode_ReturnsAuto_WhenLhmReadThrows()
+    public void Dispose_ClosesLhm_WhenEveryChannelVerifiablyReachedFirmwareAuto()
+    {
+        var ctl = new FakeLhmControl();
+        var lhm = new FakeLhmComputer();
+        lhm.Add(FakeLhmSensor.Controllable("io/control/1", "Fan Control #1", "SuperIO", ctl));
+        lhm.Add(FakeLhmSensor.ReadOnlyControl("io/control/2", "Fan Control #2", "SuperIO"));
+        var backend = new WindowsLhmBackend(lhm);
+        backend.SetPwm(backend.DiscoverFans().First().Id, 50);
+
+        backend.Dispose();
+
+        Assert.Equal(LhmControlMode.Default, ctl.Mode);
+        Assert.True(lhm.Disposed);
+    }
+
+    [Fact]
+    public void GetMode_Throws_WhenLhmReadThrows()
     {
         using var backend = new WindowsLhmBackend(SingleControl(new FakeLhmControl { ThrowOnRead = true }));
         var id = backend.DiscoverFans().Single().Id;
 
-        Assert.Equal(FanMode.Auto, backend.GetMode(id)); // werfender Getter → sicherer Default, kein Wurf
+        // An unreadable mode is no mode - a manual channel must not show as Auto (IFanController.GetMode).
+        Assert.Throws<IOException>(() => backend.GetMode(id));
     }
 
     [Fact]

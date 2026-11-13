@@ -41,11 +41,11 @@ public class CalibrationCoordinatorTests
 
     private static CalibrationCoordinator NewCoordinator(
         FakeHardware hw, CancellationToken hostToken,
-        Action<string>? onSuspend = null, Action<string>? onResume = null,
+        Action<string, FanControlState>? onSuspend = null, Action<string>? onResume = null,
         Action<string, FanCalibration>? onResult = null) =>
         new(
             hw, hw, NullLogger.Instance,
-            onSuspend ?? (_ => { }),
+            onSuspend ?? ((_, _) => { }),
             onResume ?? (_ => { }),
             onResult ?? ((_, _) => { }),
             hostToken,
@@ -89,7 +89,7 @@ public class CalibrationCoordinatorTests
         var hw = FanRig();
         using var cts = new CancellationTokenSource();
         var coordinator = new CalibrationCoordinator(
-            hw, hw, NullLogger.Instance, _ => { }, _ => { }, (_, _) => { }, cts.Token,
+            hw, hw, NullLogger.Instance, (_, _) => { }, _ => { }, (_, _) => { }, cts.Token,
             (s, f) => new CalibrationService(s, f, (d, ct) => Task.Delay(50, ct)));
 
         coordinator.Start(new FanId("hwmon7/pwm1"));
@@ -123,7 +123,7 @@ public class CalibrationCoordinatorTests
         bool resultDelivered = false;
         using var cts = new CancellationTokenSource();
         var coordinator = new CalibrationCoordinator(
-            hw, hw, NullLogger.Instance, _ => { }, _ => { }, (_, _) => resultDelivered = true, cts.Token,
+            hw, hw, NullLogger.Instance, (_, _) => { }, _ => { }, (_, _) => resultDelivered = true, cts.Token,
             (s, f) => new CalibrationService(s, f, (d, ct) => Task.Delay(20, ct)));
 
         coordinator.Start(new FanId("hwmon7/pwm1"));
@@ -143,7 +143,7 @@ public class CalibrationCoordinatorTests
         using var cts = new CancellationTokenSource();
         var coordinator = NewCoordinator(
             hw, cts.Token,
-            onSuspend: _ => Interlocked.Increment(ref suspend),
+            onSuspend: (_, _) => Interlocked.Increment(ref suspend),
             onResume: _ => Interlocked.Increment(ref resume));
 
         coordinator.Start(new FanId("hwmon7/pwm1"));
@@ -155,6 +155,21 @@ public class CalibrationCoordinatorTests
     }
 
     [Fact]
+    public async Task Suspend_MarksOnlyTheTarget_AsCalibrating()
+    {
+        var hw = FanRig();
+        var owners = new System.Collections.Concurrent.ConcurrentDictionary<string, FanControlState>();
+        using var cts = new CancellationTokenSource();
+        var coordinator = NewCoordinator(hw, cts.Token, onSuspend: (id, owner) => owners[id] = owner);
+
+        coordinator.Start(new FanId("hwmon7/pwm1"));
+        await coordinator.StopAsync();
+
+        KeyValuePair<string, FanControlState> only = Assert.Single(owners);
+        Assert.Equal(("hwmon7/pwm1", FanControlState.Calibrating), (only.Key, only.Value));
+    }
+
+    [Fact]
     public async Task Calibration_AbortsWhenTempExceedsConfiguredLimit()
     {
         // 60 °C liegt unter der Vorgabe (90), aber über dem konfigurierten Limit (50) → Watchdog bricht ab.
@@ -162,7 +177,7 @@ public class CalibrationCoordinatorTests
         FanCalibration? delivered = null;
         using var cts = new CancellationTokenSource();
         var coordinator = new CalibrationCoordinator(
-            hw, hw, NullLogger.Instance, _ => { }, _ => { }, (_, c) => delivered = c, cts.Token,
+            hw, hw, NullLogger.Instance, (_, _) => { }, _ => { }, (_, c) => delivered = c, cts.Token,
             (s, f) => new CalibrationService(s, f, NoDelay),
             failSafeTempC: () => 50);
 
@@ -201,7 +216,7 @@ public class CalibrationCoordinatorTests
         var log = new CapturingLogger();
         using var cts = new CancellationTokenSource();
         var coordinator = new CalibrationCoordinator(
-            hw, hw, log, _ => { }, _ => { }, (_, _) => { }, cts.Token,
+            hw, hw, log, (_, _) => { }, _ => { }, (_, _) => { }, cts.Token,
             (s, f) => new CalibrationService(s, f, NoDelay));
 
         coordinator.Start(new FanId("hwmon7/pwm1"));
@@ -223,7 +238,7 @@ public class CalibrationCoordinatorTests
         using var cts = new CancellationTokenSource();
         var coordinator = new CalibrationCoordinator(
             hw, hw, NullLogger.Instance,
-            _ => Interlocked.Increment(ref suspend),
+            (_, _) => Interlocked.Increment(ref suspend),
             _ => Interlocked.Increment(ref resume),
             (_, _) => { }, cts.Token,
             (s, f) => new CalibrationService(s, f, (d, ct) => Task.Delay(50, ct)));
@@ -253,5 +268,48 @@ public class CalibrationCoordinatorTests
             public static readonly NullScope Instance = new();
             public void Dispose() { }
         }
+    }
+
+    [Fact]
+    public async Task Calibration_OfAPairingAnotherFanIsCoupledTo_EndsAsNoTacho_WithoutAWrite()
+    {
+        // The backend pairs pwm1 with fan1, but another fan is coupled to fan1: no ramp on that sensor.
+        var hw = FanRig();
+        int suspends = 0, resumes = 0;
+        using var cts = new CancellationTokenSource();
+        var coordinator = new CalibrationCoordinator(
+            hw, hw, NullLogger.Instance, (_, _) => suspends++, _ => resumes++, (_, _) => { }, cts.Token,
+            (s, f) => new CalibrationService(s, f, NoDelay),
+            couplings: () => [new FanConfig { FanId = "hwmon7/pwm2", RpmSource = "hwmon7/fan1" }]);
+
+        coordinator.Start(new FanId("hwmon7/pwm1"));
+        await coordinator.StopAsync();
+
+        Assert.Equal(CalibrationFailReason.NoTacho, coordinator.Status!.FailReason);
+        Assert.Empty(hw.Writes);
+        Assert.Equal((1, 1), (suspends, resumes));                  // handed back to the loop exactly once
+    }
+
+    [Fact]
+    public async Task Calibration_MeasuresWithTheCoupledSensor()
+    {
+        var hw = new FakeHardware();
+        hw.AddTempSensor("t", 40);
+        hw.AddFanSensor("hwmon7/fan1", 0);
+        hw.AddFanSensor("hwmon7/fan9", 0);
+        hw.AddFan("hwmon7/pwm1", canControl: true, tachId: "hwmon7/fan1");
+        hw.TachId = "hwmon7/fan9";                                  // only fan9 follows the PWM
+        hw.RpmForPwm = pwm => pwm < 96 ? 0 : 300 + pwm * 4;
+        FanCalibration? delivered = null;
+        using var cts = new CancellationTokenSource();
+        var coordinator = new CalibrationCoordinator(
+            hw, hw, NullLogger.Instance, (_, _) => { }, _ => { }, (_, cal) => delivered = cal, cts.Token,
+            (s, f) => new CalibrationService(s, f, NoDelay),
+            couplings: () => [new FanConfig { FanId = "hwmon7/pwm1", RpmSource = "hwmon7/fan9" }]);
+
+        coordinator.Start(new FanId("hwmon7/pwm1"));
+        await coordinator.StopAsync();
+
+        Assert.Equal((byte)96, delivered!.StartPwm);
     }
 }

@@ -29,10 +29,10 @@ public class TachMappingCoordinatorTests
     private static TachMappingCoordinator New(
         FakeHardware hw, CancellationToken token,
         Action<string, string>? onMatched = null,
-        Action<string>? suspend = null, Action<string>? resume = null,
+        Action<string, FanControlState>? suspend = null, Action<string>? resume = null,
         Func<double>? failSafe = null, TimeSpan? cooldown = null, Func<DateTimeOffset>? now = null,
         Func<TimeSpan, CancellationToken, Task>? delay = null) =>
-        new(hw, hw, NullLogger.Instance, suspend ?? (_ => { }), resume ?? (_ => { }),
+        new(hw, hw, NullLogger.Instance, suspend ?? ((_, _) => { }), resume ?? (_ => { }),
             onMatched ?? ((_, __) => { }), token,
             mappingFactory: (s, f) => new TachometerMappingService(s, f, NoDelay),
             failSafeTempC: failSafe, cooldown: cooldown, now: now, delay: delay ?? NoDelay);
@@ -123,7 +123,7 @@ public class TachMappingCoordinatorTests
         int suspend = 0, resume = 0;
         using var cts = new CancellationTokenSource();
         var co = New(hw, cts.Token,
-            suspend: _ => Interlocked.Increment(ref suspend),
+            suspend: (_, _) => Interlocked.Increment(ref suspend),
             resume: _ => Interlocked.Increment(ref resume));
 
         co.Start(new FanId("f1"));
@@ -131,6 +131,24 @@ public class TachMappingCoordinatorTests
 
         Assert.Equal(3, suspend);
         Assert.Equal(3, resume);             // finally gibt jeden Lüfter wieder frei
+    }
+
+    [Fact]
+    public async Task Map_SuspendsTargetAsCoupling_AndOthersAsThrottled()
+    {
+        var hw = Rig();
+        hw.AddFan("f2", canControl: true);
+        hw.AddFan("f3", canControl: true);
+        var owners = new System.Collections.Concurrent.ConcurrentDictionary<string, FanControlState>();
+        using var cts = new CancellationTokenSource();
+        var co = New(hw, cts.Token, suspend: (id, owner) => owners[id] = owner);
+
+        co.Start(new FanId("f1"));
+        await co.StopAsync();
+
+        Assert.Equal(FanControlState.Coupling, owners["f1"]);
+        Assert.Equal(FanControlState.CouplingThrottled, owners["f2"]);
+        Assert.Equal(FanControlState.CouplingThrottled, owners["f3"]);
     }
 
     [Fact]
@@ -194,7 +212,7 @@ public class TachMappingCoordinatorTests
         using var cts = new CancellationTokenSource();
         int suspended = 0;
         var co = New(hw, cts.Token,
-            suspend: _ => Interlocked.Increment(ref suspended),
+            suspend: (_, _) => Interlocked.Increment(ref suspended),
             cooldown: TimeSpan.FromSeconds(3), now: () => clock.Now,
             delay: (_, __) => { suspendedAtWait = Volatile.Read(ref suspended); return Task.CompletedTask; });
 

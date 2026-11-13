@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using LinFan.App.Localization;
+using LinFan.Core.Models;
 
 namespace LinFan.App.Services;
 
@@ -11,8 +12,11 @@ namespace LinFan.App.Services;
 /// </summary>
 internal static class CalibrationBadge
 {
+    /// <summary>A calibration found a start point (<see cref="FanCalibration.NoSafeStart"/>: the fan never started).</summary>
+    public static bool HasSafeStart(byte startPwm) => startPwm != FanCalibration.NoSafeStart;
+
     public static string Hint(byte startPwm) =>
-        startPwm >= 255
+        !HasSafeStart(startPwm)
             ? Localizer.Instance["CalibrationBadge.NoSafeStart"]
             : Localizer.Instance.Format("CalibrationBadge.StartAt", PwmScale.ToPercent(startPwm));
 }

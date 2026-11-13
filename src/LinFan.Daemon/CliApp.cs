@@ -8,6 +8,7 @@ using LinFan.Core.Models;
 using LinFan.Core.Services;
 using LinFan.Ipc;
 using LinFan.Ipc.Messages;
+using LinFan.Ipc.Transport;
 
 namespace LinFan.Daemon;
 
@@ -27,7 +28,32 @@ internal static class CliApp
     /// </summary>
     private const int MaxBlindHolds = 3;
 
-    public static async Task<int> RunAsync(string[] args)
+    public static Task<int> RunAsync(string[] args) =>
+        RunAsync(args, BackendFactory.Create, IpcEndpoint.ClientCandidates());
+
+    /// <param name="args">The command line.</param>
+    /// <param name="createBackends">The hardware backends - created only once the command may run (a test seam).</param>
+    /// <param name="daemonEndpoints">Where a running daemon could be (see <see cref="RefusedNextToDaemon"/>).</param>
+    internal static async Task<int> RunAsync(
+        string[] args, Func<(ISensorBackend Sensors, IFanController Fans)> createBackends,
+        IReadOnlyList<string> daemonEndpoints)
+    {
+        // Set on every way out, after the restore: a closing console window holds its signal handler until then (see
+        // ConsoleCloseHold). Never disposed - the handler may still be waiting on it.
+        var finished = new ManualResetEventSlim();
+        try
+        {
+            return await RunCoreAsync(args, createBackends, daemonEndpoints, finished);
+        }
+        finally
+        {
+            finished.Set();
+        }
+    }
+
+    private static async Task<int> RunCoreAsync(
+        string[] args, Func<(ISensorBackend Sensors, IFanController Fans)> createBackends,
+        IReadOnlyList<string> daemonEndpoints, ManualResetEventSlim finished)
     {
         string command = args.Length > 0 ? args[0].ToLowerInvariant() : "list";
 
@@ -37,6 +63,19 @@ internal static class CliApp
             e.Cancel = true;   // sauber beenden statt hartem Abbruch → finally läuft → Fail-Safe
             cts.Cancel();
         };
+        // Ctrl+C is not the only way out: `kill` (SIGTERM), a closed terminal or dropped SSH session (SIGHUP) and Ctrl+\
+        // (SIGQUIT) would end the process without the finally below - leaving a fan that `set`/`calibrate` drove on its
+        // manual value. Every command watches the token or ends on its own.
+        void Stop(PosixSignalContext context)
+        {
+            context.Cancel = true;
+            cts.Cancel();
+            // A closed console window (SIGHUP on Windows) ends the process as soon as this returns: wait for the restore.
+            ConsoleCloseHold.Hold(context, finished);
+        }
+        using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, Stop);
+        using var sighup = PosixSignalRegistration.Create(PosixSignal.SIGHUP, Stop);
+        using var sigquit = PosixSignalRegistration.Create(PosixSignal.SIGQUIT, Stop);
 
         // IPC-Client-Befehle sprechen nur mit dem Daemon - kein eigenes Hardware-Backend laden.
         switch (command)
@@ -46,21 +85,42 @@ internal static class CliApp
             case "help" or "-h" or "--help": return Help();
         }
 
+        // Before any backend exists: a refused command must not restore the fans of the daemon it stepped back for.
+        if (RefusedNextToDaemon(command, daemonEndpoints))
+            return 3;
+        if (cts.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("Abgebrochen - nichts geschrieben."); // Ctrl+C while the probe waited
+            return 1;
+        }
+
         ISensorBackend sensors;
         IFanController fans;
         try
         {
-            (sensors, fans) = BackendFactory.Create();
+            (sensors, fans) = createBackends();
         }
         catch (PlatformNotSupportedException ex)
         {
             Console.Error.WriteLine(ex.Message);
             return 2;
         }
+        catch (Exception ex)
+        {
+            // As in DaemonHost: an exit code, not an unhandled exception and its core dump - `restore` runs as the units'
+            // ExecStopPost and must end cleanly when the backend cannot start either.
+            Console.Error.WriteLine($"Hardware-Backend nicht startbar: {ex.Message}");
+            return 1;
+        }
+
+        // E.g. another LinFan process of this boot wrote the fans (Windows): explains why they end on 100 %.
+        if (sensors is IBackendDiagnostics diagnostics)
+            diagnostics.RuntimeWarning += message => Console.Error.WriteLine($"Warnung: {message}");
 
         // Fail-Safe-Restore nur nach Kommandos, die PWM tatsächlich verändern. Ein pauschales
         // RestoreDefaults nach read-only-Kommandos (`list`/`monitor`/`init`) würfe ALLE Lüfter kurz auf
         // Hardware-Auto - neben einem laufenden Daemon riss das dessen Kurvenregelung für einen Moment weg.
+        // The backend's Dispose below keeps to that too: it restores only if this process wrote a fan.
         bool touchesPwm = CommandTouchesPwm(command);
         try
         {
@@ -72,6 +132,7 @@ internal static class CliApp
                 "calibrate" => await CalibrateAsync(fans, sensors, args, cts.Token),
                 "set" => await SetAsync(fans, sensors, args, cts.Token),
                 "auto" => Auto(fans, args),
+                "restore" => Restore(fans),
                 _ => Unknown(command),
             };
         }
@@ -89,6 +150,36 @@ internal static class CliApp
     /// read-only und <c>auto</c> setzt genau einen Lüfter explizit auf Auto (kein Rückstellen aller nötig).
     /// </summary>
     internal static bool CommandTouchesPwm(string command) => command is "set" or "calibrate";
+
+    /// <summary>
+    /// Refuses <c>set</c>, <c>calibrate</c> and <c>init</c> while a daemon holds one of <paramref name="endpoints"/> -
+    /// every endpoint a client would try, not only the one this process would bind: a <c>LINFAN_SOCKET</c> in the CLI's
+    /// environment (<c>sudo -E</c>, <c>su</c> without <c>-</c>) or a CLI without root that may write the fans anyway must
+    /// not miss the service. Next to the daemon <c>set</c>/<c>calibrate</c> would fight its loop for the fan, and both
+    /// put every fan on hardware auto when they end. <c>init</c> would replace the config the daemon owns - on Windows
+    /// the service's own file, whose curves are gone at its next start, unless its next save overwrites
+    /// <c>init</c>'s first. <c>auto</c> and <c>restore</c> stay: they only move fans toward the safe state, and
+    /// <c>restore</c> is the emergency brake.
+    /// </summary>
+    internal static bool RefusedNextToDaemon(string command, IEnumerable<string> endpoints)
+    {
+        const string stopTheService = "Erst den Dienst stoppen (Linux: systemctl stop linfan-daemon, Windows: Stop-Service LinFan)";
+        string? why = command switch
+        {
+            "set" or "calibrate" => "würde gegen seine Regelung arbeiten und am Ende alle Lüfter auf Hardware-Auto stellen. "
+                + stopTheService + " oder für einen Test den Manuell-Modus der GUI nutzen. 'auto' und 'restore' laufen "
+                + "weiter, wirken neben dem Daemon aber nur bis zu seinem nächsten Write.",
+            "init" => "schreibt eine neue Konfiguration - solange der Daemon läuft, ist er ihr alleiniger Schreiber. "
+                + "Kurven und Zuordnungen in der GUI einrichten (Einstellungen › „Auf Werkszustand zurücksetzen“ startet "
+                + "die Einrichtung neu). " + stopTheService + ".",
+            _ => null,
+        };
+        if (why is null || endpoints.FirstOrDefault(IpcTransportFactory.IsEndpointHeld) is not { } held)
+            return false;
+
+        Console.Error.WriteLine($"Abbruch: an {held} läuft bereits ein LinFan-Daemon - '{command}' {why}");
+        return true;
+    }
 
     private static async Task<int> MonitorIpcAsync(CancellationToken ct)
     {
@@ -108,14 +199,22 @@ internal static class CliApp
         Console.WriteLine($"Verbunden mit {client.ConnectedPath} - Strg+C beendet.");
         try
         {
-            await foreach (IpcSnapshot snap in client.ReadSnapshotsAsync(ct))
+            await foreach (IpcSnapshot? snap in client.ReadSnapshotsAsync(ct))
             {
+                if (snap is null)
+                {
+                    Console.WriteLine($"── {DateTime.Now:HH:mm:ss} · Snapshot nicht lesbar (andere Version des Dienstes?)");
+                    continue;
+                }
+
                 var sb = new StringBuilder();
                 sb.AppendLine($"── {DateTime.Now:HH:mm:ss} · {snap.Status} · max {Fmt(snap.HottestTempC, "°C")}");
                 foreach (IpcFan f in snap.Fans)
                 {
                     string rpm = f.Rpm is { } r ? Fmt(r, "RPM") : "n/a";
-                    sb.AppendLine($"  {f.Name,-22} {rpm,-12} pwm {f.Pwm} ({f.Pwm * 100 / 255}%) · {f.Mode}");
+                    // Names are peer-authored (any client may rename a fan): never let them steer this terminal.
+                    sb.AppendLine($"  {UntrustedText.Escape(f.Name),-22} {rpm,-12} pwm {f.Pwm} ({f.Pwm * 100 / 255}%) · "
+                                  + UntrustedText.Escape(f.Mode));
                 }
                 Console.Write(sb.ToString());
                 Console.Out.Flush(); // sofort sichtbar, auch wenn per Signal beendet
@@ -147,6 +246,20 @@ internal static class CliApp
         return 0;
     }
 
+    /// <summary>
+    /// A channel's control column in <c>list</c>: the reason the backend gives for a read-only one, since root only helps
+    /// a channel that lacks write access - not one without a control interface (an SMC channel without target and mode
+    /// keys, for instance) or a driver lock.
+    /// </summary>
+    internal static string ControlText(FanDescriptor fan, bool elevated) => fan.CanControl ? "steuerbar" : fan.ReadOnlyReason switch
+    {
+        FanReadOnlyReason.NoWriteAccess when !elevated => $"read-only ({Privileges.ElevationTerm} nötig)",
+        FanReadOnlyReason.NoWriteAccess => "read-only (kein Schreibzugriff)",
+        FanReadOnlyReason.DriverLocked => "read-only (Treiber-Sperre)",
+        FanReadOnlyReason.NoControlInterface => "read-only (keine Steuerung)",
+        _ => "read-only",
+    };
+
     private static int List(ISensorBackend sensors, IFanController fans)
     {
         Console.WriteLine($"LinFan Phase-0-Spike · {Runtime()}");
@@ -166,17 +279,17 @@ internal static class CliApp
             Console.WriteLine($"  {s.Name,-24} {Fmt(sensors.ReadValue(s.Id), "RPM"),-12} [{s.Id}]");
 
         var fanList = fans.DiscoverFans();
+        bool elevated = Privileges.IsElevated();
         Console.WriteLine();
         Console.WriteLine($"PWM-/Lüfter-Kanäle ({fanList.Count}):");
         foreach (var f in fanList)
         {
             byte pwm = fans.GetPwm(f.Id);
-            string control = f.CanControl ? "steuerbar" : "read-only (Root nötig)";
             Console.WriteLine(
-                $"  {f.Name,-24} pwm={pwm,3} ({Percent(pwm),3}%) mode={fans.GetMode(f.Id),-6} {control}  [{f.Id}]");
+                $"  {f.Name,-24} pwm={pwm,3} ({Percent(pwm),3}%) mode={ModeText(fans, f.Id),-6} {ControlText(f, elevated)}  [{f.Id}]");
         }
 
-        if (!Privileges.IsElevated())
+        if (!elevated)
         {
             Console.WriteLine();
             Console.WriteLine("Hinweis: Ohne Root sind nur Lesezugriffe möglich. Für 'set' mit sudo starten.");
@@ -322,11 +435,52 @@ internal static class CliApp
             Console.WriteLine($"{id}: Hardware-Auto-Modus gesetzt.");
             return 0;
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             Console.Error.WriteLine($"Fehler: {ex.Message}");
             return 1;
         }
+        catch (Exception ex)
+        {
+            // `auto` is what one reaches for after a crashed `set`: the fan may still sit at a low manual value. If it
+            // cannot be put on auto, every channel goes to its safe state (full speed where auto fails), as `restore` does.
+            Console.Error.WriteLine($"Fehler: {ex.Message}");
+            if (!fans.DiscoverFans().Any(f => f.CanControl))
+                return 1; // nothing this process could write (no root)
+            fans.RestoreDefaults();
+            foreach (string problem in (fans as IRestoreDiagnostics)?.LastRestoreProblems ?? [])
+                Console.Error.WriteLine(problem);
+            Console.Error.WriteLine("Stattdessen alle Lüfter-Kanäle in den sicheren Zustand gesetzt (wie 'restore').");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Puts every fan on hardware auto (full speed where a channel has none). The systemd unit runs it as
+    /// <c>ExecStopPost=</c>: it also reaches the fans after a SIGKILL, an OOM kill or a watchdog kill, when the daemon's
+    /// own restore never ran. Fails (exit 1) if a channel could not be put in its safe state.
+    /// </summary>
+    private static int Restore(IFanController fans)
+    {
+        // Without the rights every channel reads as not controllable and the restore would skip them all - that must
+        // not pass for success.
+        if (!Privileges.IsElevated())
+        {
+            Console.Error.WriteLine($"restore braucht {Privileges.ElevationTerm}-Rechte - nichts zurückgesetzt.");
+            return 1;
+        }
+        // Also without a controllable channel: the restore still reports a read-only fan stuck on a manual level.
+        int controllable = fans.DiscoverFans().Count(f => f.CanControl);
+        fans.RestoreDefaults();
+        IReadOnlyList<string> problems = (fans as IRestoreDiagnostics)?.LastRestoreProblems ?? [];
+        foreach (string problem in problems)
+            Console.Error.WriteLine(problem);
+        if (problems.Count > 0)
+            return 1;
+        Console.WriteLine(controllable == 0
+            ? "Keine steuerbaren Lüfter-Kanäle - nichts zurückzusetzen."
+            : $"{controllable} Lüfter-Kanal/Kanäle auf Hardware-Auto zurückgesetzt.");
+        return 0;
     }
 
     private static int Init(ISensorBackend sensors, IFanController fans)
@@ -355,15 +509,16 @@ internal static class CliApp
             },
         };
 
-        // Ohne Namen anlegen: FanConfig.Name ist der EIGENE Name des Nutzers, leer heißt „keiner" - dann
-        // greift überall die Hardware-Bezeichnung. Sie hier einzutragen fröre sie als eigenen Namen ein.
-        var fanConfigs = fans.DiscoverFans()
+        // No names, for fans and sensors alike: Name is the user's own, empty means none and the hardware label applies.
+        // Writing the label in would freeze it as an own name - it would stay when the hardware behind the id changes.
+        var discovered = fans.DiscoverFans();
+        var fanConfigs = discovered
             .Select(f => new FanConfig { FanId = f.Id.Value, AssignedCurveId = curve.Id })
             .ToList();
 
         var config = new AppConfig
         {
-            Sensors = temps.Select(t => new SensorConfig { SensorId = t.Id.Value, Name = t.Name }).ToList(),
+            Sensors = temps.Select(t => new SensorConfig { SensorId = t.Id.Value }).ToList(),
             Fans = fanConfigs,
             Curves = new[] { curve },
         };
@@ -374,8 +529,8 @@ internal static class CliApp
         Console.WriteLine($"Start-Konfiguration geschrieben: {store.ConfigPath}");
         Console.WriteLine($"  Kurve 'Balanced' ← Quelle: {source.Name} [{source.Id}]");
         Console.WriteLine($"  {fanConfigs.Count} Lüfter zugeordnet:");
-        foreach (var f in fanConfigs)
-            Console.WriteLine($"    {f.Name}  [{f.FanId}]");
+        foreach (FanDescriptor f in discovered)
+            Console.WriteLine($"    {f.Name}  [{f.Id.Value}]");
         Console.WriteLine();
         Console.WriteLine("Weiter mit:  dotnet run --project src/LinFan.Daemon -- run");
         return 0;
@@ -422,11 +577,12 @@ internal static class CliApp
 
         // Anders als der Daemon hat der CLI-Pfad keinen zweiten Loop-Watchdog - die Obergrenze daher hier
         // defensiv durch denselben Sanitizer klemmen (handeditierte 200 °C / NaN dürfen den Watchdog nicht entschärfen).
-        double failSafeTempC = ConfigSanitizer.Sanitize(config, out _).FailSafeTempC;
-        var options = new CalibrationOptions { FailSafeTempC = failSafeTempC };
+        AppConfig sanitized = ConfigSanitizer.Sanitize(config, out _);
+        // The couplings too: the same speed sensor the daemon would measure with (one sensor, one fan).
+        var options = new CalibrationOptions { FailSafeTempC = sanitized.FailSafeTempC, Couplings = sanitized.Fans };
         Console.WriteLine(
-            $"Kalibriere {fan.Name} … Rampe in {options.StepSize}-Schritten, " +
-            $"{options.SettleTime.TotalSeconds:0}s Settle pro Stufe (Strg+C bricht ab).");
+            $"Kalibriere {fan.Name} … erst Auslauf bei pwm=0 (bis {options.RunOutTime.TotalSeconds:0}s), dann Rampe in " +
+            $"{options.StepSize}-Schritten, {options.SettleTime.TotalSeconds:0}s Settle pro Stufe (Strg+C bricht ab).");
 
         FanCalibration result;
         try
@@ -456,7 +612,7 @@ internal static class CliApp
         AppConfig seeded = config.Fans.Any(f => f.FanId == id.Value)
             ? config
             : config with { Fans = config.Fans.Append(new FanConfig { FanId = id.Value }).ToList() };
-        store.Save(ConfigMapper.ApplyCalibration(seeded, id.Value, result));
+        store.Save(ConfigMapper.ApplyCalibration(seeded, id.Value, result, fan.Device));
 
         Console.WriteLine(result.MinRpm > 0
             ? $"In {store.ConfigPath} gespeichert (MinPwm = {result.StartPwm})."
@@ -473,11 +629,12 @@ internal static class CliApp
             Befehle:
               list                 Sensoren & Lüfter anzeigen (Standard)
               monitor              Live-Anzeige von Temperaturen & Drehzahlen (Strg+C beendet)
-              init                 Start-Konfiguration aus der Hardware erzeugen (Kurve + Zuordnung)
+              init                 Start-Konfiguration aus der Hardware erzeugen (Kurve + Zuordnung; nicht neben 'run')
               run                  Regel-Loop + IPC-Server im Dauerbetrieb (ohne Root Dry-Run; Strg+C)
-              calibrate <fanId>    Lüfter kalibrieren: Anlaufpunkt & Drehzahlbereich (Root)
-              set <fanId> <0-255>  Lüfter manuell setzen (Root; mit Temperatur-Watchdog)
+              calibrate <fanId>    Lüfter kalibrieren: Anlaufpunkt & Drehzahlbereich (Root; nicht neben 'run')
+              set <fanId> <0-255>  Lüfter manuell setzen (Root, mit Temperatur-Watchdog; nicht neben 'run')
               auto <fanId>         Lüfter zurück in den Hardware-Auto-Modus
+              restore              alle Lüfter zurück in den Hardware-Auto-Modus (Root)
 
             IPC-Client (spricht mit einem laufenden 'run'):
               monitor-ipc          Live-Snapshots vom Daemon anzeigen (Strg+C beendet)
@@ -501,6 +658,19 @@ internal static class CliApp
         double.IsNaN(v) ? "n/a" : string.Create(CultureInfo.InvariantCulture, $"{v:0.0} {unit}");
 
     private static int Percent(byte pwm) => pwm * 100 / 255;
+
+    /// <summary>The fan's mode, or <c>?</c> when the backend cannot read it right now.</summary>
+    private static string ModeText(IFanController fans, FanId id)
+    {
+        try
+        {
+            return fans.GetMode(id).ToString();
+        }
+        catch (IOException)
+        {
+            return "?";
+        }
+    }
 
     private static string Runtime() =>
         $"{RuntimeInformation.OSDescription.Trim()} · {(Privileges.IsElevated() ? Privileges.ElevationTerm.ToLowerInvariant() : "user")}";

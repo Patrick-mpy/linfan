@@ -17,7 +17,13 @@ internal static class BackendFactory
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("Dieser Build wurde für Windows erzeugt.");
 
-        var backend = new WindowsLhmBackend();
+        // Same condition as the control loop's dry-run (ControlLoopService): a non-elevated instance must neither
+        // judge nor touch the crash markers of a live daemon. Fixed machine-wide folder, deliberately independent of
+        // LINFAN_CONFIG: every writing LinFan process must see every other one's marker.
+        string? markerDirectory = Privileges.IsElevated()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "linfan")
+            : null;
+        var backend = new WindowsLhmBackend(markerDirectory);
         return (backend, backend);
     }
 }

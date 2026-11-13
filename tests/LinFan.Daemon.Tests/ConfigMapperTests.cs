@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using LinFan.Core.Models;
+using LinFan.Core.Services;
 using LinFan.Daemon;
 using LinFan.Ipc.Messages;
 using Xunit;
@@ -45,6 +46,66 @@ public class ConfigMapperTests
         Assert.Same(cal, fan.Calibration);             // Kalibrierung unangetastet
     }
 
+    // --- Merge: MinPwm three ways against the sender's base -----------------------------------------
+
+    private static AppConfig CalibratedTo(byte minPwm) => new()
+    {
+        Fans = new[] { new FanConfig { FanId = "f1", Name = "F", MinPwm = minPwm, Calibration = Cal(minPwm, 400, 1800) } },
+    };
+
+    [Fact]
+    public void Merge_MinPwmTheSenderLeftAlone_KeepsTheCalibratedStartPoint()
+    {
+        // The GUI built its save from MinPwm 40; the calibration set 96 before the save arrived.
+        var incoming = IpcWith(new IpcFanAssignment("f1", "F", 40, 255, null, BaseMinPwm: 40));
+
+        FanConfig fan = Assert.Single(ConfigMapper.Merge(CalibratedTo(96), incoming).Fans);
+
+        Assert.Equal((byte)96, fan.MinPwm);
+    }
+
+    [Fact]
+    public void Merge_MinPwmTheSenderChanged_Wins()
+    {
+        var incoming = IpcWith(new IpcFanAssignment("f1", "F", 60, 255, null, BaseMinPwm: 40));
+
+        FanConfig fan = Assert.Single(ConfigMapper.Merge(CalibratedTo(96), incoming).Fans);
+
+        Assert.Equal((byte)60, fan.MinPwm);
+    }
+
+    [Fact]
+    public void Merge_WithoutABase_TheSentMinPwmWins()
+    {
+        // An older GUI sends no base - as before, its value is taken.
+        var incoming = IpcWith(new IpcFanAssignment("f1", "F", 40, 255, null));
+
+        FanConfig fan = Assert.Single(ConfigMapper.Merge(CalibratedTo(96), incoming).Fans);
+
+        Assert.Equal((byte)40, fan.MinPwm);
+    }
+
+    [Fact]
+    public void Merge_ANewFanWithABase_TakesTheSentMinPwm()
+    {
+        var incoming = IpcWith(new IpcFanAssignment("new", "F", 40, 255, null, BaseMinPwm: 40));
+
+        FanConfig fan = Assert.Single(ConfigMapper.Merge(AppConfig.Empty, incoming).Fans);
+
+        Assert.Equal((byte)40, fan.MinPwm); // the daemon has no value of its own to keep
+    }
+
+    [Fact]
+    public void Merge_ComparesTheBaseAfterClamping()
+    {
+        // Out-of-range values are clamped before the comparison: -5 and 0 are both "0, unchanged".
+        var incoming = IpcWith(new IpcFanAssignment("f1", "F", -5, 255, null, BaseMinPwm: 0));
+
+        FanConfig fan = Assert.Single(ConfigMapper.Merge(CalibratedTo(96), incoming).Fans);
+
+        Assert.Equal((byte)96, fan.MinPwm);
+    }
+
     [Fact]
     public void Merge_ClampsMinAndMaxPwm_To_0_255()
     {
@@ -75,15 +136,14 @@ public class ConfigMapperTests
     [InlineData("")]
     [InlineData("Garbage")]
     [InlineData("not-a-location")]
-    public void Merge_InvalidFanLocation_FallsBackToUnspecified(string raw)
+    [InlineData("999")] // Enum.TryParse alone would persist an undefined numeric value
+    [InlineData("-1")]
+    public void Merge_And_Replace_InvalidFanLocation_FallsBackToUnspecified(string raw)
     {
-        // Hinweis: Enum.TryParse akzeptiert numerische Strings ("123") als Roh-Enumwert - das ist
-        // bewusst NICHT als "ungültig" getestet, da es die tatsächliche (existierende) Semantik wäre.
         var incoming = IpcWith(new IpcFanAssignment("f1", "F", 0, 255, null, Location: raw));
 
-        AppConfig merged = ConfigMapper.Merge(AppConfig.Empty, incoming);
-
-        Assert.Equal(FanLocation.Unspecified, Assert.Single(merged.Fans).Location);
+        Assert.Equal(FanLocation.Unspecified, Assert.Single(ConfigMapper.Merge(AppConfig.Empty, incoming).Fans).Location);
+        Assert.Equal(FanLocation.Unspecified, Assert.Single(ConfigMapper.Replace(AppConfig.Empty, incoming).Fans).Location);
     }
 
     [Fact]
@@ -125,11 +185,15 @@ public class ConfigMapperTests
     }
 
     [Fact]
-    public void Merge_TakesSensors_WhenIncomingProvidesThem()
+    public void Merge_TakesTheSentSensors_AndKeepsTheOnesNotSent()
     {
         var current = new AppConfig
         {
-            Sensors = new[] { new SensorConfig { SensorId = "old", Name = "Alt" } },
+            Sensors = new[]
+            {
+                new SensorConfig { SensorId = "s1", Name = "Vorher" },
+                new SensorConfig { SensorId = "old", Name = "Alt", Group = "GPU" }, // a device that is off right now
+            },
         };
         var incoming = IpcConfig.Empty with
         {
@@ -138,11 +202,35 @@ public class ConfigMapperTests
 
         AppConfig merged = ConfigMapper.Merge(current, incoming);
 
-        SensorConfig s = Assert.Single(merged.Sensors);
-        Assert.Equal("s1", s.SensorId);
+        Assert.Equal(new[] { "s1", "old" }, merged.Sensors.Select(s => s.SensorId));
+        SensorConfig s = merged.Sensors[0];
         Assert.Equal("CPU", s.Name);                   // getrimmt
         Assert.Equal("Zone", s.Group);                 // getrimmt
         Assert.True(s.Hidden);
+        Assert.Equal(("Alt", "GPU"), (merged.Sensors[1].Name, merged.Sensors[1].Group)); // name and group come back with it
+    }
+
+    [Fact]
+    public void Merge_KeepsTheRecordedDeviceOfASentSensor()
+    {
+        // The device is daemon-owned: a save from the GUI, which knows nothing of it, must not wipe it.
+        var gpu = new HardwareDevice("amdgpu", "pci:1002:73bf:1849:5201");
+        var current = new AppConfig
+        {
+            Sensors = new[] { new SensorConfig { SensorId = "s1", Name = "Vorher", Device = gpu } },
+            Fans = new[] { new FanConfig { FanId = "f1", Device = gpu } },
+        };
+        var incoming = IpcWith(new IpcFanAssignment("f1", "GPU", 0)) with
+        {
+            Sensors = new[] { new IpcSensorName("s1", "Hotspot", "GPU", Hidden: true), new IpcSensorName("new", "Neu") },
+        };
+
+        AppConfig merged = ConfigMapper.Merge(current, incoming);
+
+        Assert.Equal(new SensorConfig { SensorId = "s1", Name = "Hotspot", Group = "GPU", Hidden = true, Device = gpu },
+            merged.Sensors[0]);
+        Assert.Null(merged.Sensors.Single(s => s.SensorId == "new").Device); // the daemon records it when it normalizes
+        Assert.Equal(gpu, Assert.Single(merged.Fans).Device);
     }
 
     [Fact]
@@ -437,6 +525,97 @@ public class ConfigMapperTests
         Assert.True(merged.OnboardingCompleted);
     }
 
+    // --- Sensor group list ----------------------------------------------------------------------
+
+    [Fact]
+    public void ToIpc_Then_Merge_CarriesTheSensorGroupsInOrder()
+    {
+        var desired = AppConfig.Empty with { SensorGroups = new[] { "GPU", "Leer", "CPU" } };
+
+        IpcConfig ipc = ConfigMapper.ToIpc(desired);
+        AppConfig merged = ConfigMapper.Merge(AppConfig.Empty with { SensorGroups = new[] { "Alt" } }, ipc);
+
+        Assert.Equal(new[] { "GPU", "Leer", "CPU" }, ipc.SensorGroups);
+        Assert.Equal(new[] { "GPU", "Leer", "CPU" }, merged.SensorGroups);
+    }
+
+    [Fact]
+    public void Merge_SensorGroupsNull_KeepsTheDaemonsList()
+    {
+        // A GUI that predates the field sends nothing and must not wipe the groups another client set up.
+        var current = AppConfig.Empty with { SensorGroups = new[] { "CPU", "Leer" } };
+
+        AppConfig merged = ConfigMapper.Merge(current, IpcConfig.Empty with { SensorGroups = null });
+
+        Assert.Equal(new[] { "CPU", "Leer" }, merged.SensorGroups);
+    }
+
+    [Fact]
+    public void Merge_EmptySensorGroups_ClearsTheList()
+    {
+        // Unlike the sensors (empty = "sent nothing"), an empty list is a deliberate state: every group deleted.
+        var current = AppConfig.Empty with { SensorGroups = new[] { "CPU" } };
+
+        AppConfig merged = ConfigMapper.Merge(current, IpcConfig.Empty with { SensorGroups = Array.Empty<string>() });
+
+        Assert.Empty(merged.SensorGroups);
+    }
+
+    [Fact]
+    public void Replace_TakesTheIncomingSensorGroups_AndNullClearsThem()
+    {
+        var current = AppConfig.Empty with { SensorGroups = new[] { "Alt" } };
+
+        Assert.Equal(new[] { "Neu" },
+            ConfigMapper.Replace(current, IpcConfig.Empty with { SensorGroups = new[] { "Neu" } }).SensorGroups);
+        // A backup from before the field restores to no groups, like its missing sensors.
+        Assert.Empty(ConfigMapper.Replace(current, IpcConfig.Empty with { SensorGroups = null }).SensorGroups);
+    }
+
+    // --- Case type --------------------------------------------------------------------------------
+
+    [Fact]
+    public void ToIpc_Then_Merge_CarriesTheCaseType_AndAFanWall()
+    {
+        var desired = AppConfig.Empty with
+        {
+            CaseType = CaseType.Server,
+            Fans = new[] { new FanConfig { FanId = "f1", Location = FanLocation.FanWall } },
+        };
+
+        IpcConfig ipc = ConfigMapper.ToIpc(desired);
+        AppConfig merged = ConfigMapper.Merge(AppConfig.Empty, ipc);
+
+        Assert.Equal("Server", ipc.CaseType);
+        Assert.Equal("FanWall", Assert.Single(ipc.Fans).Location);
+        Assert.Equal(CaseType.Server, merged.CaseType);
+        Assert.Equal(FanLocation.FanWall, Assert.Single(merged.Fans).Location);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Submarine")]
+    public void Merge_ACaseTypeItCannotRead_KeepsTheDaemonsType(string? sent)
+    {
+        // null: a GUI that predates the field; an unknown name: a newer one - neither may reset the type.
+        var current = AppConfig.Empty with { CaseType = CaseType.Open };
+
+        AppConfig merged = ConfigMapper.Merge(current, IpcConfig.Empty with { CaseType = sent });
+
+        Assert.Equal(CaseType.Open, merged.CaseType);
+    }
+
+    [Fact]
+    public void Replace_TakesTheIncomingCaseType_AndNullIsATower_AsIsAReset()
+    {
+        var current = AppConfig.Empty with { CaseType = CaseType.Open };
+
+        Assert.Equal(CaseType.Server, ConfigMapper.Replace(current, IpcConfig.Empty with { CaseType = "Server" }).CaseType);
+        // A backup from before the field restores the standard case.
+        Assert.Equal(CaseType.Tower, ConfigMapper.Replace(current, IpcConfig.Empty with { CaseType = null }).CaseType);
+        Assert.Equal(CaseType.Tower, ConfigMapper.Reset(current).CaseType);
+    }
+
     // --- Replace: Voll-Ersetzen (Import/Restore) ------------------------------------------------
 
     [Fact]
@@ -481,6 +660,84 @@ public class ConfigMapperTests
     }
 
     [Fact]
+    public void ToIpc_Then_Replace_KeepsTheCalibrationsSensorAndSeries()
+    {
+        // An export and its import: the plausibility check compares with exactly this.
+        var cal = new FanCalibration
+        {
+            StartPwm = 64,
+            MinRpm = 800,
+            MaxRpm = 1800,
+            Tachometer = "nct/fan1",
+            Samples = [new(0, 1500), new(32, 0), new(64, 800), new(224, 1800)],
+        };
+        var config = new AppConfig { Fans = [new FanConfig { FanId = "nct/pwm1", MinPwm = 64, Calibration = cal }] };
+
+        IpcFanCalibration sent = ConfigMapper.ToIpc(config).Fans.Single().Calibration!;
+        FanCalibration restored = ConfigMapper.Replace(AppConfig.Empty, ConfigMapper.ToIpc(config)).Fans.Single().Calibration!;
+
+        Assert.Equal("nct/fan1", sent.Tachometer);
+        Assert.Equal([new(0, 1500), new(32, 0), new(64, 800), new(224, 1800)], sent.Samples!);
+        Assert.Equal(cal with { Samples = restored.Samples }, restored);
+        Assert.Equal(cal.Samples, restored.Samples);
+    }
+
+    [Fact]
+    public void Replace_FromAPeerWithoutTheSensorAndSeries_StoresNoneOfThem()
+    {
+        AppConfig replaced = ConfigMapper.Replace(AppConfig.Empty,
+            IpcWith(new IpcFanAssignment("f1", "F", 96, Calibration: new IpcFanCalibration(96, 400, 1800))));
+
+        FanCalibration cal = replaced.Fans.Single().Calibration!;
+        Assert.Null(cal.Tachometer);
+        Assert.Empty(cal.Samples);
+    }
+
+    [Fact]
+    public void Replace_DropsSamplesWhosePwmIsNoRawValue_AndTrimsTheSensor()
+    {
+        AppConfig replaced = ConfigMapper.Replace(AppConfig.Empty, IpcWith(new IpcFanAssignment("f1", "F", 96,
+            Calibration: new IpcFanCalibration(96, 400, 1800, " nct/fan1 ", [new(-1, 0), new(0, 0), new(96, 400), new(256, 1800)]))));
+        AppConfig blank = ConfigMapper.Replace(AppConfig.Empty, IpcWith(new IpcFanAssignment("f1", "F", 96,
+            Calibration: new IpcFanCalibration(96, 400, 1800, "  "))));
+
+        FanCalibration cal = replaced.Fans.Single().Calibration!;
+        Assert.Equal([new(0, 0), new(96, 400)], cal.Samples); // not clamped onto 0 and 255, where they were not measured
+        Assert.Equal("nct/fan1", cal.Tachometer);
+        Assert.Null(blank.Fans.Single().Calibration!.Tachometer);
+    }
+
+    [Fact]
+    public void Replace_SkipsANullSample_InsteadOfDroppingTheImport()
+    {
+        AppConfig replaced = ConfigMapper.Replace(AppConfig.Empty, IpcWith(new IpcFanAssignment("f1", "F", 96,
+            Calibration: new IpcFanCalibration(96, 400, 1800, "nct/fan1", [null!, new(96, 400)]))));
+
+        Assert.Equal([new(96, 400)], replaced.Fans.Single().Calibration!.Samples);
+    }
+
+    [Fact]
+    public void Replace_KeepsTheRecordedDevices_OfTheIdsItAlreadyHas()
+    {
+        // A backup carries no device, and an import settles no replacement: what the daemon recorded stays.
+        var gpu = new HardwareDevice("amdgpu", "pci:1002:73bf:1849:5201");
+        var current = new AppConfig
+        {
+            Fans = new[] { new FanConfig { FanId = "f1", Device = gpu }, new FanConfig { FanId = "gone", Device = gpu } },
+            Sensors = new[] { new SensorConfig { SensorId = "s1", Device = gpu } },
+        };
+        var incoming = IpcWith(new IpcFanAssignment("f1", "GPU", 0), new IpcFanAssignment("f2", "Neu", 0)) with
+        {
+            Sensors = new[] { new IpcSensorName("s1", "Hotspot"), new IpcSensorName("s2", "Neu") },
+        };
+
+        AppConfig replaced = ConfigMapper.Replace(current, incoming);
+
+        Assert.Equal(new HardwareDevice?[] { gpu, null }, replaced.Fans.Select(f => f.Device));
+        Assert.Equal(new HardwareDevice?[] { gpu, null }, replaced.Sensors.Select(s => s.Device));
+    }
+
+    [Fact]
     public void Replace_EmptyIncomingSensors_ClearsSensors()
     {
         // Anders als Merge (das leere Sensoren als „nichts geschickt" behandelt): Replace leert wirklich.
@@ -505,6 +762,38 @@ public class ConfigMapperTests
         Assert.Equal(77.0, replaced.FailSafeTempC);
         Assert.Equal(2500, replaced.PollIntervalMs);
         Assert.Equal(3, replaced.SchemaVersion);
+    }
+
+    [Fact]
+    public void Reset_ClearsWhatTheGuiEdits_ButKeepsDaemonOnlyFields()
+    {
+        // An operator's stricter over-temperature limit must survive a reset that any client can send.
+        var current = AppConfig.Empty with
+        {
+            FailSafeTempC = 72.0,
+            PollIntervalMs = 2500,
+            SchemaVersion = 3,
+            Fans = new[] { new FanConfig { FanId = "f1", Calibration = Cal(96, 400, 1800) } },
+            Curves = new[] { new CurveConfig { Id = "c1" } },
+            Sensors = new[] { new SensorConfig { SensorId = "s1" } },
+            SensorGroups = new[] { "CPU" },
+            Profiles = new[] { new Profile { Id = "p1" } },
+            ActiveProfileId = "p1",
+            OnboardingCompleted = false,
+        };
+
+        AppConfig reset = ConfigMapper.Reset(current);
+
+        Assert.Equal(72.0, reset.FailSafeTempC);
+        Assert.Equal(2500, reset.PollIntervalMs);
+        Assert.Equal(3, reset.SchemaVersion);
+        Assert.Empty(reset.Fans);
+        Assert.Empty(reset.Curves);
+        Assert.Empty(reset.Sensors);
+        Assert.Empty(reset.SensorGroups);
+        Assert.Empty(reset.Profiles);
+        Assert.Null(reset.ActiveProfileId);
+        Assert.True(reset.OnboardingCompleted);
     }
 
     [Fact]
@@ -541,7 +830,7 @@ public class ConfigMapperTests
         };
         var cal = Cal(96, 400, 1800);
 
-        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", cal);
+        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", cal, device: null);
 
         FanConfig fan = Assert.Single(result.Fans);
         Assert.Equal((byte)96, fan.MinPwm);            // Anlaufpunkt übernommen
@@ -557,7 +846,7 @@ public class ConfigMapperTests
         };
         var cal = Cal(255, 0, 0);                      // nicht angelaufen → StartPwm=255
 
-        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", cal);
+        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", cal, device: null);
 
         FanConfig fan = Assert.Single(result.Fans);
         Assert.Equal((byte)10, fan.MinPwm);            // unverändert (Fail-Safe: kein Zwang auf Volllast)
@@ -573,7 +862,7 @@ public class ConfigMapperTests
         };
         var cal = Cal(64, 300, 1500);
 
-        AppConfig result = ConfigMapper.ApplyCalibration(current, "new", cal);
+        AppConfig result = ConfigMapper.ApplyCalibration(current, "new", cal, device: null);
 
         Assert.Equal(2, result.Fans.Count);
         FanConfig added = result.Fans.Single(f => f.FanId == "new");
@@ -581,6 +870,47 @@ public class ConfigMapperTests
         Assert.Equal((byte)64, added.MinPwm);
         Assert.Same(cal, added.Calibration);
         Assert.NotNull(result.Fans.Single(f => f.FanId == "other"));
+    }
+
+    [Fact]
+    public void ApplyCalibration_RecordsTheDeviceItMeasured_AlsoOverAnotherOne()
+    {
+        // The result belongs to the device behind the id now - the fan leaves a pending replacement with it.
+        var old = new HardwareDevice("amdgpu", "pci:1002:73bf:1849:5201");
+        var measured = new HardwareDevice("amdgpu", "pci:1002:744c:1da2:e471");
+        var current = new AppConfig { Fans = new[] { new FanConfig { FanId = "f1", Device = old } } };
+
+        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", Cal(96, 400, 1800), measured);
+        AppConfig added = ConfigMapper.ApplyCalibration(AppConfig.Empty, "f1", Cal(96, 400, 1800), measured);
+
+        Assert.Equal(measured, Assert.Single(result.Fans).Device);
+        Assert.Equal(measured, Assert.Single(added.Fans).Device);
+    }
+
+    [Fact]
+    public void ApplyCalibration_WithoutAStartPoint_KeepsTheRecordedDevice()
+    {
+        // MinPwm stays the old device's, so the replacement must stay reported.
+        var old = new HardwareDevice("amdgpu", "pci:1002:73bf:1849:5201");
+        var measured = new HardwareDevice("amdgpu", "pci:1002:744c:1da2:e471");
+        var current = new AppConfig { Fans = new[] { new FanConfig { FanId = "f1", MinPwm = 70, Device = old } } };
+
+        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", Cal(255, 0, 0), measured);
+
+        FanConfig fan = Assert.Single(result.Fans);
+        Assert.Equal(((byte)70, old), (fan.MinPwm, fan.Device));
+        Assert.NotNull(fan.Calibration);
+    }
+
+    [Fact]
+    public void ApplyCalibration_WithoutADevice_KeepsTheRecordedOne()
+    {
+        var old = new HardwareDevice("thinkpad", null);
+        var current = new AppConfig { Fans = new[] { new FanConfig { FanId = "f1", Device = old } } };
+
+        AppConfig result = ConfigMapper.ApplyCalibration(current, "f1", Cal(96, 400, 1800), device: null);
+
+        Assert.Equal(old, Assert.Single(result.Fans).Device);
     }
 
     // --- RpmSource-Override (Tacho-Zuordnung, daemon-verwaltet) ----------------------------------
@@ -638,7 +968,7 @@ public class ConfigMapperTests
             Fans = new[] { new FanConfig { FanId = "f1", Name = "F" } },
         };
 
-        AppConfig result = ConfigMapper.ApplyTachometer(current, "f1", "io/fan/1");
+        AppConfig result = ConfigMapper.ApplyTachometer(current, "f1", "io/fan/1", out _);
 
         Assert.Equal("io/fan/1", Assert.Single(result.Fans).RpmSource);
     }
@@ -654,7 +984,8 @@ public class ConfigMapperTests
             Fans = new[] { new FanConfig { FanId = "f1", Name = "F", RpmSource = "io/fan/1" } },
         };
 
-        AppConfig result = ConfigMapper.ApplyTachometer(current, "f1", blank);
+        AppConfig result = ConfigMapper.ApplyTachometer(current, "f1", blank, out string? previous);
+        Assert.Null(previous);
 
         Assert.Null(Assert.Single(result.Fans).RpmSource);
     }
@@ -667,7 +998,7 @@ public class ConfigMapperTests
             Fans = new[] { new FanConfig { FanId = "other", Name = "Andere" } },
         };
 
-        AppConfig result = ConfigMapper.ApplyTachometer(current, "new", "io/fan/9");
+        AppConfig result = ConfigMapper.ApplyTachometer(current, "new", "io/fan/9", out _);
 
         FanConfig added = result.Fans.Single(f => f.FanId == "new");
         // No name: Name is the user's OWN name, empty ⇒ the hardware label applies. Putting the FanId here
@@ -675,5 +1006,24 @@ public class ConfigMapperTests
         Assert.Equal("", added.Name);
         Assert.Equal("io/fan/9", added.RpmSource);
         Assert.Equal(2, result.Fans.Count);
+    }
+
+    [Fact]
+    public void ApplyTachometer_TakesTheSensorFromTheFanThatHadIt()
+    {
+        var current = new AppConfig
+        {
+            Fans = new[]
+            {
+                new FanConfig { FanId = "f1", RpmSource = "io/fan/1" },
+                new FanConfig { FanId = "f2", RpmSource = "io/fan/2" },
+            },
+        };
+
+        AppConfig result = ConfigMapper.ApplyTachometer(current, "f2", "io/fan/1", out string? previous);
+
+        Assert.Equal("f1", previous);
+        Assert.Null(result.Fans.Single(f => f.FanId == "f1").RpmSource);       // one sensor, one fan
+        Assert.Equal("io/fan/1", result.Fans.Single(f => f.FanId == "f2").RpmSource);
     }
 }

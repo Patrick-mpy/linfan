@@ -1,0 +1,129 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="clr-namespace:LinFan.App.Controls"
+        xmlns:c="clr-namespace:LinFan.App.Controllers"
+        xmlns:l="clr-namespace:LinFan.App.Localization"
+        x:Class="LinFan.App.Views.HardwareChangeDialog"
+        x:DataType="c:HardwareChangeController"
+        Icon="/Assets/icon.png"
+        Title="{l:Tr HardwareDialog.WindowTitle}"
+        Width="580" SizeToContent="Height" MaxHeight="760"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="{DynamicResource BgWindow}">
+    <Grid Margin="24" RowDefinitions="Auto,*,Auto" RowSpacing="{StaticResource SpacingLg}">
+        <StackPanel Grid.Row="0" Spacing="2">
+            <TextBlock Text="{l:Tr HardwareDialog.Heading}" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" />
+            <TextBlock Text="{l:Tr HardwareDialog.Hint}" Foreground="{DynamicResource TextFaint}" FontSize="12" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="{StaticResource SpacingMd}">
+                <!-- Offline the cards show the last report and nothing can be sent. -->
+                <Border Name="OfflineNote" Classes="banner warning" Margin="0" IsVisible="{Binding IsOffline}">
+                    <TextBlock Classes="bannerText" Text="{l:Tr FanSections.BlockedOffline}" />
+                </Border>
+
+                <ItemsControl Name="CardList" ItemsSource="{Binding Cards}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="{StaticResource SpacingMd}" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="c:HardwareChangeCard">
+                            <Border Classes="block" AutomationProperties.Name="{Binding AccessibleName}">
+                                <StackPanel Spacing="{StaticResource SpacingMd}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Classes="blockTitle" Text="{Binding Title}" />
+                                            <TextBlock Classes="blockSub" Text="{Binding Summary}" />
+                                        </StackPanel>
+                                        <ctrl:StatusChip Grid.Column="1" VerticalAlignment="Top" Text="{Binding KindLabel}" Tone="{Binding KindTone}" />
+                                    </Grid>
+
+                                    <!-- Before → now: the names, or the fingerprints where the names are the same. -->
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2"
+                                          IsVisible="{Binding IsReplaced}">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:Tr HardwareDialog.Before}" FontSize="12"
+                                                   Foreground="{DynamicResource TextMuted}" />
+                                        <SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="{Binding OldDevice}" FontSize="12"
+                                                             Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr HardwareDialog.Now}" FontSize="12"
+                                                   Foreground="{DynamicResource TextMuted}" />
+                                        <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding NewDevice}" FontSize="12"
+                                                             Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" />
+                                    </Grid>
+
+                                    <!-- The fans, each with "Recalibrate" as in the fan table (same command, lock and tooltip). -->
+                                    <StackPanel Spacing="{StaticResource SpacingXs}" IsVisible="{Binding HasFans}">
+                                        <TextBlock Text="{l:Tr MainWindow.Fans}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                                        <ItemsControl ItemsSource="{Binding Fans}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="c:HardwareChangeEntry">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,2">
+                                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource TextPrimary}" />
+                                                            <TextBlock Text="{Binding Fan.CalibrationState, FallbackValue=''}" FontSize="11"
+                                                                       Foreground="{DynamicResource TextFaint}"
+                                                                       IsVisible="{Binding HasFan}" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" FontSize="12" Padding="8,3" VerticalAlignment="Center"
+                                                                IsVisible="{Binding HasFan}"
+                                                                Command="{Binding Fan.CalibrateCommand, FallbackValue={x:Null}}"
+                                                                IsEnabled="{Binding Fan.CanCalibrate, FallbackValue=False}"
+                                                                ToolTip.Tip="{Binding Fan.CalibrateTooltip, FallbackValue=''}" ToolTip.ShowOnDisabled="True"
+                                                                AutomationProperties.Name="{Binding RecalibrateName}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXs}">
+                                                                <PathIcon Data="{StaticResource IconGauge}" Width="12" Height="12" />
+                                                                <TextBlock Text="{l:Tr FanAssignRow.Recalibrate}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SpacingSm}" IsVisible="{Binding ShowStartPointNote}">
+                                            <PathIcon Grid.Column="0" Data="{StaticResource IconAlert}" Width="12" Height="12" Margin="0,2,0,0"
+                                                      VerticalAlignment="Top" Foreground="{DynamicResource WarningText}" />
+                                            <TextBlock Grid.Column="1" Text="{l:Tr HardwareDialog.StartPointNote}" FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource WarningText}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="{StaticResource SpacingXs}" IsVisible="{Binding HasSensors}">
+                                        <TextBlock Text="{l:Tr MainWindow.Sensors}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                                        <TextBlock Text="{Binding Sensors}" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimary}" />
+                                    </StackPanel>
+
+                                    <CheckBox Name="ResetSensorNamesCheck" IsVisible="{Binding CanResetSensorNames}"
+                                              IsChecked="{Binding ResetSensorNames}" Content="{l:Tr HardwareDialog.ResetSensorNames}"
+                                              ToolTip.Tip="{l:Tr HardwareDialog.ResetSensorNamesTooltip}" />
+
+                                    <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" FontSize="12" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextMuted}" AutomationProperties.LiveSetting="Polite" />
+
+                                    <WrapPanel HorizontalAlignment="Right" ItemSpacing="{StaticResource SpacingSm}" LineSpacing="{StaticResource SpacingSm}">
+                                        <Button Name="SetUpAsNewButton" IsVisible="{Binding IsReplaced}" Command="{Binding ForgetCommand}"
+                                                Content="{l:Tr HardwareDialog.ForgetReplaced}"
+                                                ToolTip.Tip="{Binding ForgetTooltip}" ToolTip.ShowOnDisabled="True" />
+                                        <Button Name="AcceptButton" Classes="primary" IsVisible="{Binding IsReplaced}" Command="{Binding AcceptCommand}"
+                                                Content="{l:Tr HardwareDialog.Accept}" ToolTip.Tip="{l:Tr HardwareDialog.AcceptTooltip}" />
+                                        <Button Name="RemoveEntriesButton" IsVisible="{Binding IsMissing}" Command="{Binding ForgetCommand}"
+                                                Content="{l:Tr HardwareDialog.ForgetMissing}"
+                                                ToolTip.Tip="{Binding ForgetTooltip}" ToolTip.ShowOnDisabled="True" />
+                                        <Button Name="KeepButton" IsVisible="{Binding IsMissing}" Command="{Binding KeepCommand}"
+                                                Content="{l:Tr HardwareDialog.Keep}" ToolTip.Tip="{l:Tr HardwareDialog.KeepTooltip}" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Button Grid.Row="2" HorizontalAlignment="Right" Content="{l:Tr MainWindow.Close}" Click="OnClose" IsCancel="True" />
+    </Grid>
+</Window>

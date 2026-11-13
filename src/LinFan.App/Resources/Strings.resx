@@ -70,14 +70,8 @@
   <data name="Header.Theme" xml:space="preserve">
     <value>Theme</value>
   </data>
-  <data name="Header.ThemeTooltip" xml:space="preserve">
-    <value>Color scheme - System follows the operating system.</value>
-  </data>
   <data name="Header.Language" xml:space="preserve">
     <value>Language</value>
-  </data>
-  <data name="Header.LanguageTooltip" xml:space="preserve">
-    <value>Display language.</value>
   </data>
   <data name="Header.RunInBackground" xml:space="preserve">
     <value>Keep running in background</value>
@@ -86,7 +80,7 @@
     <value>Close to the notification area instead of quitting - fan control keeps running in the background.</value>
   </data>
   <data name="MainWindow.ApplyChangesTooltip" xml:space="preserve">
-    <value>Apply - applies the unsaved changes, saved via the background service.</value>
+    <value>Apply - applies the unsaved changes, saved via the background service (Ctrl+S).</value>
   </data>
   <data name="MainWindow.RevertTooltip" xml:space="preserve">
     <value>Discard - discards all changes since the last save.</value>
@@ -94,8 +88,116 @@
   <data name="MainWindow.Revert" xml:space="preserve">
     <value>Discard</value>
   </data>
-  <data name="MainWindow.DaemonUnreachable" xml:space="preserve">
-    <value>Background service unreachable - is the service running? Check with: systemctl status linfan-daemon</value>
+  <data name="UnsavedBar.Title" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="UnsavedBar.Summary" xml:space="preserve">
+    <value>Changed: {0}</value>
+  </data>
+  <data name="UnsavedBar.Detail" xml:space="preserve">
+    <value>{0} · not handed to the background service yet.</value>
+  </data>
+  <data name="UnsavedBar.SummaryGeneric" xml:space="preserve">
+    <value>Changed</value>
+  </data>
+  <data name="UnsavedBar.OneCurve" xml:space="preserve">
+    <value>1 curve</value>
+  </data>
+  <data name="UnsavedBar.Curves" xml:space="preserve">
+    <value>{0} curves</value>
+  </data>
+  <data name="UnsavedBar.Profiles" xml:space="preserve">
+    <value>profiles</value>
+  </data>
+  <data name="UnsavedBar.Fans" xml:space="preserve">
+    <value>fans</value>
+  </data>
+  <data name="UnsavedBar.Sensors" xml:space="preserve">
+    <value>sensors &amp; groups</value>
+  </data>
+  <data name="UnsavedBar.CaseType" xml:space="preserve">
+    <value>case type</value>
+  </data>
+  <data name="UnsavedBar.Undo" xml:space="preserve">
+    <value>Undo the last step (Ctrl+Z)</value>
+  </data>
+  <data name="UnsavedBar.Redo" xml:space="preserve">
+    <value>Redo the step (Ctrl+Y)</value>
+  </data>
+  <data name="UnsavedBar.DiscardAll" xml:space="preserve">
+    <value>Discard all</value>
+  </data>
+  <data name="UnsavedBar.Apply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="DirtyDot.Name" xml:space="preserve">
+    <value>unsaved changes</value>
+  </data>
+  <data name="DirtyDot.Tooltip" xml:space="preserve">
+    <value>Unsaved changes in this area</value>
+  </data>
+  <data name="DirtyDot.SettingsTooltip" xml:space="preserve">
+    <value>Unsaved changes in the settings</value>
+  </data>
+  <data name="OfflineBanner.Title" xml:space="preserve">
+    <value>Background service unreachable</value>
+  </data>
+  <data name="OfflineBanner.Text" xml:space="preserve">
+    <value>Control, calibration and saving are locked until the connection is back. Is the service running?</value>
+  </data>
+  <data name="OfflineBanner.TextManualStart" xml:space="preserve">
+    <value>Control, calibration and saving are locked until the connection is back. On macOS the background service does not start on its own - start it by hand with sudo (LinFan.Daemon run).</value>
+  </data>
+  <data name="OfflineBanner.AccessDeniedTitle" xml:space="preserve">
+    <value>Access to the background service denied</value>
+  </data>
+  <data name="OfflineBanner.Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="OfflineBanner.Copied" xml:space="preserve">
+    <value>Copied</value>
+  </data>
+  <data name="OfflineBanner.CopyTooltip" xml:space="preserve">
+    <value>Copy the command to the clipboard.</value>
+  </data>
+  <data name="OfflineBanner.Reconnect" xml:space="preserve">
+    <value>Reconnect</value>
+  </data>
+  <data name="OfflineBanner.Reconnecting" xml:space="preserve">
+    <value>Connecting …</value>
+  </data>
+  <data name="OfflineBanner.ReconnectTooltip" xml:space="preserve">
+    <value>Tries to reach the background service again right away.</value>
+  </data>
+  <data name="OfflineBanner.Reconnected" xml:space="preserve">
+    <value>Reconnected to the background service.</value>
+  </data>
+  <data name="OfflineBanner.StillNotConnected" xml:space="preserve">
+    <value>Still not connected</value>
+  </data>
+  <data name="OfflineBanner.Status" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="OfflineBanner.UnreadableTitle" xml:space="preserve">
+    <value>Data from the background service cannot be read</value>
+  </data>
+  <data name="OfflineBanner.UnreadableText" xml:space="preserve">
+    <value>The service sends data this app cannot read - does it run another version? Control, calibration and saving are locked. Details in the app's log:</value>
+  </data>
+  <data name="OfflineBanner.UnreadableTextVersions" xml:space="preserve">
+    <value>The service runs version {0} and sends data this app (version {1}) cannot read. Control, calibration and saving are locked. Details in the app's log:</value>
+  </data>
+  <data name="OfflineBanner.UnreadableStatus" xml:space="preserve">
+    <value>Data not readable</value>
+  </data>
+  <data name="ErrorNotice.Text" xml:space="preserve">
+    <value>Unexpected error - LinFan keeps running, but may not show everything correctly. If in doubt, restart it. Details in the app's log:</value>
+  </data>
+  <data name="DryRunBanner.Title" xml:space="preserve">
+    <value>Dry run - the curves do not drive the fans</value>
+  </data>
+  <data name="DryRunBanner.Text" xml:space="preserve">
+    <value>The background service lacks elevated privileges. Curves and values are computed and shown; the control loop writes no PWM values.</value>
   </data>
   <data name="MainWindow.Close" xml:space="preserve">
     <value>Close</value>
@@ -103,11 +205,92 @@
   <data name="MainWindow.TabOverview" xml:space="preserve">
     <value>Overview</value>
   </data>
-  <data name="MainWindow.Profile" xml:space="preserve">
+  <data name="MainWindow.TabCurves" xml:space="preserve">
+    <value>Profiles &amp; curves</value>
+  </data>
+  <data name="Nav.Name" xml:space="preserve">
+    <value>Areas</value>
+  </data>
+  <data name="Nav.HintOne" xml:space="preserve">
+    <value>1 notice</value>
+  </data>
+  <data name="Nav.Hints" xml:space="preserve">
+    <value>{0} notices</value>
+  </data>
+  <data name="Nav.ItemState" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="ProfileButton.Caption" xml:space="preserve">
     <value>Profile</value>
   </data>
-  <data name="MainWindow.Profiles" xml:space="preserve">
-    <value>Profiles</value>
+  <data name="ProfileButton.Running" xml:space="preserve">
+    <value>Profile running</value>
+  </data>
+  <data name="ProfileButton.DryRun" xml:space="preserve">
+    <value>Profile · dry run</value>
+  </data>
+  <data name="ProfileButton.Offline" xml:space="preserve">
+    <value>Profile · service disconnected</value>
+  </data>
+  <data name="ProfileButton.Unreadable" xml:space="preserve">
+    <value>Profile · data not readable</value>
+  </data>
+  <data name="ProfileButton.Tooltip" xml:space="preserve">
+    <value>{0} - switch profile</value>
+  </data>
+  <data name="ProfileButton.Name" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="ProfileMenu.Heading" xml:space="preserve">
+    <value>Switch profile</value>
+  </data>
+  <data name="ProfileMenu.Running" xml:space="preserve">
+    <value>running</value>
+  </data>
+  <data name="ProfileMenu.Summary" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="ProfileMenu.OneCurve" xml:space="preserve">
+    <value>1 curve</value>
+  </data>
+  <data name="ProfileMenu.Curves" xml:space="preserve">
+    <value>{0} curves</value>
+  </data>
+  <data name="ProfileMenu.OneFan" xml:space="preserve">
+    <value>1 fan</value>
+  </data>
+  <data name="ProfileMenu.Fans" xml:space="preserve">
+    <value>{0} fans</value>
+  </data>
+  <data name="ProfileMenu.Edit" xml:space="preserve">
+    <value>Edit profiles …</value>
+  </data>
+  <data name="ProfileMenu.New" xml:space="preserve">
+    <value>New profile</value>
+  </data>
+  <data name="ProfileSwitch.Title" xml:space="preserve">
+    <value>Switch to “{0}”?</value>
+  </data>
+  <data name="ProfileSwitch.Message" xml:space="preserve">
+    <value>The service activates the profile as it was saved. Your changes ({0}) have not been applied yet.</value>
+  </data>
+  <data name="ProfileSwitch.MessageGeneric" xml:space="preserve">
+    <value>The service activates the profile as it was saved. Your changes have not been applied yet.</value>
+  </data>
+  <data name="ProfileSwitch.Discard" xml:space="preserve">
+    <value>Discard &amp; switch</value>
+  </data>
+  <data name="ProfileSwitch.Save" xml:space="preserve">
+    <value>Apply &amp; switch</value>
+  </data>
+  <data name="ProfileSwitch.DiscardDraftOnly" xml:space="preserve">
+    <value>“{0}” exists only in the unsaved changes - after discarding them there would be nothing to switch to.</value>
+  </data>
+  <data name="ProfileSwitch.Pending" xml:space="preserve">
+    <value>The last switch is still being applied …</value>
+  </data>
+  <data name="ProfileSwitch.Saving" xml:space="preserve">
+    <value>The changes are still being applied …</value>
   </data>
   <data name="MainWindow.EditProfile" xml:space="preserve">
     <value>Edit profile</value>
@@ -115,11 +298,23 @@
   <data name="MainWindow.ProfileActive" xml:space="preserve">
     <value>Active</value>
   </data>
-  <data name="MainWindow.ProfileActiveTooltip" xml:space="preserve">
-    <value>Hands the fans to this profile. Apply pending changes first - the service would switch to its saved copy of the profile, not to what is on screen.</value>
+  <data name="MainWindow.ProfileSwitchOffline" xml:space="preserve">
+    <value>Not connected - the service has to be reachable to switch the profile.</value>
   </data>
-  <data name="MainWindow.ProfileSwitchLocked" xml:space="preserve">
-    <value>Locked while changes are unsaved - apply or revert them first.</value>
+  <data name="MainWindow.ActivateProfile" xml:space="preserve">
+    <value>Activate this profile</value>
+  </data>
+  <data name="MainWindow.ActivateProfileTooltip" xml:space="preserve">
+    <value>Hands the fans over to this profile.</value>
+  </data>
+  <data name="MainWindow.ActivateProfileTooltipDirty" xml:space="preserve">
+    <value>Hands the fans over to this profile. With pending changes you are asked whether to apply them first.</value>
+  </data>
+  <data name="MainWindow.InactiveProfileNote" xml:space="preserve">
+    <value>Changes here take effect once this profile runs.</value>
+  </data>
+  <data name="MainWindow.ProfileRunning" xml:space="preserve">
+    <value>Running</value>
   </data>
   <data name="MainWindow.ProfileCurves" xml:space="preserve">
     <value>Curves in this profile</value>
@@ -130,14 +325,383 @@
   <data name="MainWindow.ProfileCurvesSubtitle" xml:space="preserve">
     <value>Click a curve to edit it; the side menu lists them as well</value>
   </data>
-  <data name="MainWindow.ProfileNotActiveNote" xml:space="preserve">
-    <value>This profile is not regulating right now - it can be edited without affecting the fans.</value>
+  <data name="Overview.Status" xml:space="preserve">
+    <value>Status</value>
   </data>
-  <data name="MainWindow.ActiveCurvesToggleTooltip" xml:space="preserve">
-    <value>Expand/collapse active curves.</value>
+  <data name="Overview.StatusOk" xml:space="preserve">
+    <value>OK</value>
   </data>
-  <data name="MainWindow.ActiveCurves" xml:space="preserve">
-    <value>Active curves</value>
+  <data name="Overview.StatusAllWithinRange" xml:space="preserve">
+    <value>Temperatures and fans within range</value>
+  </data>
+  <data name="Overview.StatusNoticeOne" xml:space="preserve">
+    <value>1 notice</value>
+  </data>
+  <data name="Overview.StatusNotices" xml:space="preserve">
+    <value>{0} notices</value>
+  </data>
+  <data name="Overview.StatusCritical" xml:space="preserve">
+    <value>Critical</value>
+  </data>
+  <data name="Overview.StatusMore" xml:space="preserve">
+    <value>{0} · +{1} more</value>
+  </data>
+  <data name="Overview.StatusTooltip" xml:space="preserve">
+    <value>Show/hide all notices</value>
+  </data>
+  <data name="Overview.TileName" xml:space="preserve">
+    <value>{0}: {1}, {2}</value>
+  </data>
+  <data name="Overview.HintsName" xml:space="preserve">
+    <value>Notices</value>
+  </data>
+  <data name="Overview.HintAccessible" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Overview.SeverityCritical" xml:space="preserve">
+    <value>Critical</value>
+  </data>
+  <data name="Overview.SeverityNotice" xml:space="preserve">
+    <value>Notice</value>
+  </data>
+  <data name="Overview.SeverityInfo" xml:space="preserve">
+    <value>Info</value>
+  </data>
+  <data name="Overview.HottestSensor" xml:space="preserve">
+    <value>Hottest sensor</value>
+  </data>
+  <data name="Overview.NoSensorsShort" xml:space="preserve">
+    <value>No sensors</value>
+  </data>
+  <data name="Overview.ToTemperatures" xml:space="preserve">
+    <value>To the temperatures</value>
+  </data>
+  <data name="Overview.HotTooltip" xml:space="preserve">
+    <value>Hot (80 °C and above)</value>
+  </data>
+  <data name="Overview.HotName" xml:space="preserve">
+    <value>hot</value>
+  </data>
+  <data name="Overview.FanAveragePercent" xml:space="preserve">
+    <value>Ø {0} %</value>
+  </data>
+  <data name="Overview.FanAverage" xml:space="preserve">
+    <value>Ø {0} % · {1} RPM</value>
+  </data>
+  <data name="Overview.FanControllable" xml:space="preserve">
+    <value>{0} controllable</value>
+  </data>
+  <data name="Overview.FanByCurves" xml:space="preserve">
+    <value>{0} by curves</value>
+  </data>
+  <data name="Overview.FanManual" xml:space="preserve">
+    <value>{0} manual</value>
+  </data>
+  <data name="Overview.FanOther" xml:space="preserve">
+    <value>{0} other</value>
+  </data>
+  <data name="Overview.ProfileTile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="Overview.ProfileOneActive" xml:space="preserve">
+    <value>1 curve active</value>
+  </data>
+  <data name="Overview.ProfileActive" xml:space="preserve">
+    <value>{0} curves active</value>
+  </data>
+  <data name="Overview.ProfileUnsaved" xml:space="preserve">
+    <value>unsaved changes</value>
+  </data>
+  <data name="Overview.OpenProfile" xml:space="preserve">
+    <value>Open the profile in the editor</value>
+  </data>
+  <data name="Overview.FrozenAt" xml:space="preserve">
+    <value>As of {0}</value>
+  </data>
+  <data name="Overview.FrozenTooltip" xml:space="preserve">
+    <value>No connection - the overview shows the last known state.</value>
+  </data>
+  <data name="Overview.HintOffline" xml:space="preserve">
+    <value>Background service unreachable - control and saving are locked.</value>
+  </data>
+  <data name="Overview.HintUnreadable" xml:space="preserve">
+    <value>Data from the background service cannot be read - control and saving are locked.</value>
+  </data>
+  <data name="Overview.HintFailSafeOverTemperature" xml:space="preserve">
+    <value>Fail-safe active - over-temperature: all fans on hardware auto.</value>
+  </data>
+  <data name="Overview.HintFailSafeBlind" xml:space="preserve">
+    <value>Fail-safe active - temperatures cannot be watched (a sensor stopped reporting): all fans on hardware auto.</value>
+  </data>
+  <data name="Overview.HintFailSafeError" xml:space="preserve">
+    <value>Fail-safe active - the service's control loop failed: all fans on hardware auto. Details in the service log.</value>
+  </data>
+  <data name="Overview.HintFailSafeOverTemperatureDryRun" xml:space="preserve">
+    <value>Over-temperature - in a dry run the fail-safe does not step in.</value>
+  </data>
+  <data name="Overview.HintFailSafeBlindDryRun" xml:space="preserve">
+    <value>Temperatures cannot be watched (a sensor stopped reporting) - in a dry run the fail-safe does not step in.</value>
+  </data>
+  <data name="Overview.HintFailSafeErrorDryRun" xml:space="preserve">
+    <value>The service's control loop failed - in a dry run the fail-safe does not step in. Details in the service log.</value>
+  </data>
+  <data name="Overview.HintDryRun" xml:space="preserve">
+    <value>Dry run - the control loop writes no values to the fans.</value>
+  </data>
+  <data name="Overview.HintDriverLocked" xml:space="preserve">
+    <value>The driver locks fan control - the affected fans are read-only. ThinkPad: load thinkpad_acpi with fan_control=1, see the installation guide.</value>
+  </data>
+  <data name="Overview.HintConfigNotLoaded" xml:space="preserve">
+    <value>The saved configuration could not be loaded - the service runs without curves (fans on hardware auto). The next change overwrites the file; details in the service log.</value>
+  </data>
+  <data name="Overview.HintConfigSetAside" xml:space="preserve">
+    <value>The saved configuration was unusable and was moved to {0} - the service runs without curves until you set LinFan up again.</value>
+  </data>
+  <data name="Overview.HintHot" xml:space="preserve">
+    <value>{0} is hot ({1} °C).</value>
+  </data>
+  <data name="Overview.HintStandstill" xml:space="preserve">
+    <value>{0} reports 0 RPM at {1} % - has the fan stopped?</value>
+  </data>
+  <data name="Overview.HintFailed" xml:space="preserve">
+    <value>{0}: the last control step could not be carried out - the fan keeps what the hardware has.</value>
+  </data>
+  <data name="Overview.HintManual" xml:space="preserve">
+    <value>{0} is controlled manually.</value>
+  </data>
+  <data name="Overview.HintManualOverrides" xml:space="preserve">
+    <value>{0} is controlled manually and overrides “{1}”.</value>
+  </data>
+  <data name="Overview.HintCurveOffOne" xml:space="preserve">
+    <value>Curve “{0}” is off - 1 fan runs on hardware auto.</value>
+  </data>
+  <data name="Overview.HintCurveOff" xml:space="preserve">
+    <value>Curve “{0}” is off - {1} fans run on hardware auto.</value>
+  </data>
+  <data name="Overview.HintCurveNoSensor" xml:space="preserve">
+    <value>Curve “{0}” has no sensor - its fans keep their last value.</value>
+  </data>
+  <data name="Overview.HintCurveUnreadable" xml:space="preserve">
+    <value>Curve “{0}”: no readable sensor - fans keep their last value.</value>
+  </data>
+  <data name="Overview.HintCurveNoFan" xml:space="preserve">
+    <value>Curve “{0}” drives no fan.</value>
+  </data>
+  <data name="Overview.HintUncalibratedOne" xml:space="preserve">
+    <value>1 fan is not calibrated yet.</value>
+  </data>
+  <data name="Overview.HintUncalibrated" xml:space="preserve">
+    <value>{0} fans are not calibrated yet.</value>
+  </data>
+  <data name="Overview.ActionShow" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Overview.ActionEnable" xml:space="preserve">
+    <value>Switch on</value>
+  </data>
+  <data name="Overview.ActionToCurve" xml:space="preserve">
+    <value>To the curve</value>
+  </data>
+  <data name="Overview.ActionToFans" xml:space="preserve">
+    <value>To the fans</value>
+  </data>
+  <data name="Overview.BackToCurve" xml:space="preserve">
+    <value>Back to the curve</value>
+  </data>
+  <data name="Overview.BackToAuto" xml:space="preserve">
+    <value>Back to auto</value>
+  </data>
+  <data name="Overview.Loops" xml:space="preserve">
+    <value>Control loops</value>
+  </data>
+  <data name="Overview.LoopsSubtitle" xml:space="preserve">
+    <value>Sensor → curve → fans · profile “{0}”</value>
+  </data>
+  <data name="Overview.NoLoops" xml:space="preserve">
+    <value>No curve with a sensor and a fan in the running profile.</value>
+  </data>
+  <data name="Overview.LoopSources" xml:space="preserve">
+    <value>{0} sensors · {1}</value>
+  </data>
+  <data name="Overview.LoopSwitchName" xml:space="preserve">
+    <value>Curve “{0}” on/off</value>
+  </data>
+  <data name="Overview.LoopEditTooltip" xml:space="preserve">
+    <value>Open the curve in the editor</value>
+  </data>
+  <data name="Overview.LoopOutput" xml:space="preserve">
+    <value>≈ {0} %</value>
+  </data>
+  <data name="Overview.LoopOff" xml:space="preserve">
+    <value>off</value>
+  </data>
+  <data name="Overview.LoopOutputTooltip" xml:space="preserve">
+    <value>Approximate: the background service smooths the input and applies the hysteresis and the fans’ limits.</value>
+  </data>
+  <data name="Overview.SensorCountOne" xml:space="preserve">
+    <value>1 sensor</value>
+  </data>
+  <data name="Overview.SensorCount" xml:space="preserve">
+    <value>{0} sensors</value>
+  </data>
+  <data name="Overview.NoSensors" xml:space="preserve">
+    <value>No visible temperature sensors.</value>
+  </data>
+  <data name="Overview.TileHighestOf" xml:space="preserve">
+    <value>Highest of {0} sensors</value>
+  </data>
+  <data name="Overview.TileToggleTooltip" xml:space="preserve">
+    <value>Show/hide the sensors of this group</value>
+  </data>
+  <data name="Overview.BarTooltip" xml:space="preserve">
+    <value>Bar up to 100 °C, mark = warning threshold 80 °C</value>
+  </data>
+  <data name="Overview.FanCountOne" xml:space="preserve">
+    <value>1 fan · history: last 60 sec.</value>
+  </data>
+  <data name="Overview.FanCount" xml:space="preserve">
+    <value>{0} fans · history: last 60 sec.</value>
+  </data>
+  <data name="Overview.NoFans" xml:space="preserve">
+    <value>No visible fans.</value>
+  </data>
+  <data name="Overview.ColFan" xml:space="preserve">
+    <value>Fan</value>
+  </data>
+  <data name="Overview.ColPower" xml:space="preserve">
+    <value>Power</value>
+  </data>
+  <data name="Overview.ColSpeed" xml:space="preserve">
+    <value>Speed</value>
+  </data>
+  <data name="Overview.ColHistory" xml:space="preserve">
+    <value>History</value>
+  </data>
+  <data name="Overview.ColControl" xml:space="preserve">
+    <value>Controlled by</value>
+  </data>
+  <data name="Overview.ControlName" xml:space="preserve">
+    <value>Controlled by: {0}</value>
+  </data>
+  <data name="Overview.MoreTooltip" xml:space="preserve">
+    <value>Control manually, calibrate</value>
+  </data>
+  <data name="Overview.MoreName" xml:space="preserve">
+    <value>Controls for {0}</value>
+  </data>
+  <data name="Overview.ManualOverridden" xml:space="preserve">
+    <value>manually overridden</value>
+  </data>
+  <data name="Overview.OverrideNote" xml:space="preserve">
+    <value>Overrides “{0}” - the curve takes over again in auto mode.</value>
+  </data>
+  <data name="Overview.ReadOnlyNote" xml:space="preserve">
+    <value>Display only - this fan cannot be controlled.</value>
+  </data>
+  <data name="Overview.NotCalibrated" xml:space="preserve">
+    <value>Not calibrated yet</value>
+  </data>
+  <data name="Overview.CalibratedStartAt" xml:space="preserve">
+    <value>Calibrated · starts at {0} %</value>
+  </data>
+  <data name="Overview.CalibratedNoSafeStart" xml:space="preserve">
+    <value>Calibrated · no safe start point</value>
+  </data>
+  <data name="Overview.ControlUnknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <data name="Overview.ControlUnknownTooltip" xml:space="preserve">
+    <value>Without a connection to the background service it is not known what controls the fan right now.</value>
+  </data>
+  <data name="Overview.ControlNotControllable" xml:space="preserve">
+    <value>Not controllable</value>
+  </data>
+  <data name="Overview.ControlNotControllableTooltip" xml:space="preserve">
+    <value>This fan only reports readings.</value>
+  </data>
+  <data name="ReadOnly.NoWriteAccess" xml:space="preserve">
+    <value>The service may not write this fan - it runs without root or administrator rights.</value>
+  </data>
+  <data name="ReadOnly.DriverLocked" xml:space="preserve">
+    <value>The driver locks fan control, for the service too (ThinkPad: thinkpad_acpi loaded without fan_control=1) - the installation guide shows how to unlock it.</value>
+  </data>
+  <data name="ReadOnly.NoControlInterface" xml:space="preserve">
+    <value>The hardware offers no control for this channel, only readings.</value>
+  </data>
+  <data name="Overview.ControlCurveTooltip" xml:space="preserve">
+    <value>“{0}” controls this fan - click to open the curve in the editor.</value>
+  </data>
+  <data name="Overview.ControlCurveDryRun" xml:space="preserve">
+    <value>{0} (dry run)</value>
+  </data>
+  <data name="Overview.ControlCurveDryRunTooltip" xml:space="preserve">
+    <value>Dry run - “{0}” computes, but the value is not written. Click to open the curve.</value>
+  </data>
+  <data name="Overview.ControlHolding" xml:space="preserve">
+    <value>{0} (holds last value)</value>
+  </data>
+  <data name="Overview.ControlHoldingTooltip" xml:space="preserve">
+    <value>“{0}” has no readable sensor - the fan keeps its last value. Click to open the curve.</value>
+  </data>
+  <data name="Overview.ControlCurveUnnamed" xml:space="preserve">
+    <value>Curve</value>
+  </data>
+  <data name="Overview.ControlCurveUnnamedTooltip" xml:space="preserve">
+    <value>The background service did not name the curve.</value>
+  </data>
+  <data name="Overview.ControlManual" xml:space="preserve">
+    <value>Manual</value>
+  </data>
+  <data name="Overview.ControlManualTooltip" xml:space="preserve">
+    <value>Set by hand.</value>
+  </data>
+  <data name="Overview.ControlHardwareAuto" xml:space="preserve">
+    <value>Hardware auto</value>
+  </data>
+  <data name="Overview.ControlHardwareAutoTooltip" xml:space="preserve">
+    <value>No active curve - the mainboard controls the fan itself.</value>
+  </data>
+  <data name="Overview.ControlHardwareAutoCurveOffTooltip" xml:space="preserve">
+    <value>Curve “{0}” is off - the mainboard controls the fan itself.</value>
+  </data>
+  <data name="Overview.ControlCalibrating" xml:space="preserve">
+    <value>Calibration</value>
+  </data>
+  <data name="Overview.ControlIdentifying" xml:space="preserve">
+    <value>Identify (100 %)</value>
+  </data>
+  <data name="Overview.ControlIdentifyThrottled" xml:space="preserve">
+    <value>Throttled (identify)</value>
+  </data>
+  <data name="Overview.ControlIdentifyTooltip" xml:space="preserve">
+    <value>Driven temporarily for the identification.</value>
+  </data>
+  <data name="Overview.ControlCoupling" xml:space="preserve">
+    <value>Tach coupling</value>
+  </data>
+  <data name="Overview.ControlCouplingThrottled" xml:space="preserve">
+    <value>Throttled (tach coupling)</value>
+  </data>
+  <data name="Overview.ControlCouplingTooltip" xml:space="preserve">
+    <value>Driven temporarily for the tach coupling.</value>
+  </data>
+  <data name="Overview.ControlFailSafe" xml:space="preserve">
+    <value>Fail-safe</value>
+  </data>
+  <data name="Overview.ControlFailSafeTooltip" xml:space="preserve">
+    <value>The watchdog put the fans into the safe state (hardware auto).</value>
+  </data>
+  <data name="Overview.ControlFailSafeDryRun" xml:space="preserve">
+    <value>Fail-safe (dry run)</value>
+  </data>
+  <data name="Overview.ControlFailSafeDryRunTooltip" xml:space="preserve">
+    <value>Dry run - the watchdog tripped but does not put the fans into the safe state: nothing is written.</value>
+  </data>
+  <data name="Overview.ControlFailed" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Overview.ControlFailedTooltip" xml:space="preserve">
+    <value>The last value could not be set - the fan keeps what the hardware has.</value>
   </data>
   <data name="MainWindow.CurveOn" xml:space="preserve">
     <value>Active</value>
@@ -151,32 +715,14 @@
   <data name="MainWindow.CurveOffHardwareAuto" xml:space="preserve">
     <value>off → hardware auto</value>
   </data>
-  <data name="MainWindow.EditCurveTooltip" xml:space="preserve">
-    <value>Switches to the “Curves &amp; assignment” tab and selects this curve.</value>
-  </data>
   <data name="MainWindow.EditCurve" xml:space="preserve">
     <value>Edit curve</value>
-  </data>
-  <data name="MainWindow.TemperaturesToggleTooltip" xml:space="preserve">
-    <value>Expand/collapse temperatures.</value>
   </data>
   <data name="MainWindow.Temperatures" xml:space="preserve">
     <value>Temperatures</value>
   </data>
-  <data name="MainWindow.History60s" xml:space="preserve">
-    <value>History: last 60 sec.</value>
-  </data>
-  <data name="MainWindow.NoTemperatureSensors" xml:space="preserve">
-    <value>No temperature sensors detected.</value>
-  </data>
-  <data name="MainWindow.FansToggleTooltip" xml:space="preserve">
-    <value>Expand/collapse fans.</value>
-  </data>
   <data name="MainWindow.Fans" xml:space="preserve">
     <value>Fans</value>
-  </data>
-  <data name="MainWindow.NoFans" xml:space="preserve">
-    <value>No fans detected.</value>
   </data>
   <data name="MainWindow.CalibrationRunning" xml:space="preserve">
     <value>Calibration running …</value>
@@ -196,9 +742,6 @@
   <data name="MainWindow.Calibrate" xml:space="preserve">
     <value>Calibrate</value>
   </data>
-  <data name="MainWindow.TabDevices" xml:space="preserve">
-    <value>Devices</value>
-  </data>
   <data name="MainWindow.NoDevices" xml:space="preserve">
     <value>No devices detected.</value>
   </data>
@@ -206,16 +749,43 @@
     <value>Temperature sensors</value>
   </data>
   <data name="MainWindow.SensorListSubtitle" xml:space="preserve">
-    <value>Live temperature · display name, group &amp; visibility</value>
+    <value>Live temperature · display name, group &amp; visibility. The group order also applies in the overview and the curve editor.</value>
   </data>
   <data name="MainWindow.SearchPlaceholder" xml:space="preserve">
-    <value>Search…</value>
+    <value>Search name or hardware ID …</value>
   </data>
-  <data name="MainWindow.HideHidden" xml:space="preserve">
-    <value>Hide here too</value>
+  <data name="MainWindow.OneHit" xml:space="preserve">
+    <value>1 match</value>
   </data>
-  <data name="MainWindow.HideHiddenSensorsTooltip" xml:space="preserve">
-    <value>Hides hidden sensors from this list too (does not delete them).</value>
+  <data name="MainWindow.Hits" xml:space="preserve">
+    <value>{0} matches</value>
+  </data>
+  <data name="MainWindow.ClearSearch" xml:space="preserve">
+    <value>Clear search</value>
+  </data>
+  <data name="MainWindow.ClearSearchTooltip" xml:space="preserve">
+    <value>Clear search (Esc)</value>
+  </data>
+  <data name="MainWindow.SearchSensors" xml:space="preserve">
+    <value>Search sensors</value>
+  </data>
+  <data name="MainWindow.SearchFans" xml:space="preserve">
+    <value>Search fans</value>
+  </data>
+  <data name="MainWindow.ShowHidden" xml:space="preserve">
+    <value>Show hidden ({0})</value>
+  </data>
+  <data name="MainWindow.ShowHiddenSensorsTooltip" xml:space="preserve">
+    <value>Hidden sensors are left out of the overview and the curve editor. Here they can still be shown, to edit them or show them again.</value>
+  </data>
+  <data name="MainWindow.ShowHiddenFansTooltip" xml:space="preserve">
+    <value>Hidden fans are left out of the overview but are still controlled. Here they can still be shown, to edit them or show them again.</value>
+  </data>
+  <data name="MainWindow.ShowAirflow" xml:space="preserve">
+    <value>View airflow</value>
+  </data>
+  <data name="MainWindow.ShowAirflowTooltip" xml:space="preserve">
+    <value>Case schema, pressure balance and fitting curves from the positions (Settings › Airflow).</value>
   </data>
   <data name="MainWindow.NameRequired" xml:space="preserve">
     <value>Name required</value>
@@ -223,23 +793,266 @@
   <data name="MainWindow.ToggleVisibleSensorTooltip" xml:space="preserve">
     <value>Show/hide everywhere except the settings (still measured).</value>
   </data>
-  <data name="MainWindow.GroupSensorTooltip" xml:space="preserve">
-    <value>Groups sensors into one block - same name = one block, in the dashboard and in the curves sensor pickers. Empty → “Ungrouped”.</value>
-  </data>
-  <data name="MainWindow.Optional" xml:space="preserve">
-    <value>optional</value>
-  </data>
-  <data name="MainWindow.AddGroup" xml:space="preserve">
-    <value>+ Group</value>
-  </data>
   <data name="MainWindow.HardwareAddressTooltip" xml:space="preserve">
     <value>Hardware address (kernel / hwmon path).</value>
   </data>
-  <data name="MainWindow.FanListSubtitle" xml:space="preserve">
-    <value>Live speed · name, position, group &amp; visibility</value>
+  <data name="MainWindow.AutoGroup" xml:space="preserve">
+    <value>Group automatically</value>
   </data>
-  <data name="MainWindow.HideHiddenFansTooltip" xml:space="preserve">
-    <value>Hides hidden fans from this list too (still controlled).</value>
+  <data name="MainWindow.NewGroup" xml:space="preserve">
+    <value>New group</value>
+  </data>
+  <data name="MainWindow.NewGroupTooltip" xml:space="preserve">
+    <value>Adds an empty group at the end.</value>
+  </data>
+  <data name="MainWindow.MoveTo" xml:space="preserve">
+    <value>Move to</value>
+  </data>
+  <data name="MainWindow.ClearSelection" xml:space="preserve">
+    <value>Clear selection</value>
+  </data>
+  <data name="MainWindow.GroupSelectAllTooltip" xml:space="preserve">
+    <value>Select all sensors of this group.</value>
+  </data>
+  <data name="MainWindow.GroupNamePlaceholder" xml:space="preserve">
+    <value>Group name</value>
+  </data>
+  <data name="MainWindow.GroupNameTooltip" xml:space="preserve">
+    <value>Group name - rename it right here. Another group’s name merges the two.</value>
+  </data>
+  <data name="MainWindow.GroupNameDuplicate" xml:space="preserve">
+    <value>Duplicate name</value>
+  </data>
+  <data name="MainWindow.GroupNameDuplicateTooltip" xml:space="preserve">
+    <value>This group exists already - committing the name merges the two.</value>
+  </data>
+  <data name="MainWindow.GroupMoveUp" xml:space="preserve">
+    <value>Move up</value>
+  </data>
+  <data name="MainWindow.GroupMoveUpTooltip" xml:space="preserve">
+    <value>Move up - sets the order, in the overview and the curve editor too.</value>
+  </data>
+  <data name="MainWindow.GroupMoveDown" xml:space="preserve">
+    <value>Move down</value>
+  </data>
+  <data name="MainWindow.GroupMoveDownTooltip" xml:space="preserve">
+    <value>Move down.</value>
+  </data>
+  <data name="MainWindow.GroupDelete" xml:space="preserve">
+    <value>Delete group</value>
+  </data>
+  <data name="MainWindow.GroupDeleteTooltip" xml:space="preserve">
+    <value>Delete the group - its sensors become “Ungrouped”.</value>
+  </data>
+  <data name="MainWindow.GroupEmptyHint" xml:space="preserve">
+    <value>Still empty - move sensors here with “Group” in their row, by multi-select or by dragging their grip.</value>
+  </data>
+  <data name="MainWindow.SensorGripTooltip" xml:space="preserve">
+    <value>Drag to move the sensor to another group.</value>
+  </data>
+  <data name="MainWindow.Group" xml:space="preserve">
+    <value>Group</value>
+  </data>
+  <data name="MainWindow.GroupChipTooltip" xml:space="preserve">
+    <value>Choose the group - moves the sensor into that block.</value>
+  </data>
+  <data name="SensorGroups.NothingToGroup" xml:space="preserve">
+    <value>All sensors are grouped already.</value>
+  </data>
+  <data name="SensorGroups.AutoGroupTooltip" xml:space="preserve">
+    <value>Sorts the ungrouped sensors ({0}) by their driver - CPU, GPU, storage, mainboard or other. Existing groups stay as they are.</value>
+  </data>
+  <data name="SensorGroups.CountEmpty" xml:space="preserve">
+    <value>empty</value>
+  </data>
+  <data name="SensorGroups.CountHidden" xml:space="preserve">
+    <value>{0} hidden</value>
+  </data>
+  <data name="SensorGroups.CountOne" xml:space="preserve">
+    <value>1 sensor</value>
+  </data>
+  <data name="SensorGroups.Count" xml:space="preserve">
+    <value>{0} sensors</value>
+  </data>
+  <data name="SensorGroups.SelectedOne" xml:space="preserve">
+    <value>1 sensor selected</value>
+  </data>
+  <data name="SensorGroups.Selected" xml:space="preserve">
+    <value>{0} sensors selected</value>
+  </data>
+  <data name="SensorGroups.SelectAllName" xml:space="preserve">
+    <value>Group {0}: select all</value>
+  </data>
+  <data name="SensorGroups.SelectSensor" xml:space="preserve">
+    <value>Select {0}</value>
+  </data>
+  <data name="SensorOption.ResetNameTooltip" xml:space="preserve">
+    <value>Use the hardware name: {0}</value>
+  </data>
+  <data name="SensorGroups.GroupChipName" xml:space="preserve">
+    <value>Group: {0}</value>
+  </data>
+  <data name="SensorGroups.NewGroupName" xml:space="preserve">
+    <value>New group</value>
+  </data>
+  <data name="SensorGroups.NewGroupEntry" xml:space="preserve">
+    <value>+ New group …</value>
+  </data>
+  <data name="SensorGroups.Created" xml:space="preserve">
+    <value>Group “{0}” added - rename it right in its header.</value>
+  </data>
+  <data name="SensorGroups.AutoGroupedOne" xml:space="preserve">
+    <value>1 sensor grouped automatically.</value>
+  </data>
+  <data name="SensorGroups.AutoGrouped" xml:space="preserve">
+    <value>{0} sensors grouped automatically.</value>
+  </data>
+  <data name="SensorGroups.MovedOne" xml:space="preserve">
+    <value>Sensor moved to “{0}”.</value>
+  </data>
+  <data name="SensorGroups.Moved" xml:space="preserve">
+    <value>{0} sensors moved to “{1}”.</value>
+  </data>
+  <data name="SensorGroups.Merged" xml:space="preserve">
+    <value>Group “{0}” merged into “{1}”.</value>
+  </data>
+  <data name="SensorGroups.Deleted" xml:space="preserve">
+    <value>Group “{0}” deleted.</value>
+  </data>
+  <data name="SensorGroups.DeletedOne" xml:space="preserve">
+    <value>Group “{0}” deleted - 1 sensor is “Ungrouped” now.</value>
+  </data>
+  <data name="SensorGroups.DeletedMany" xml:space="preserve">
+    <value>Group “{0}” deleted - {1} sensors are “Ungrouped” now.</value>
+  </data>
+  <data name="MainWindow.FanListSubtitle" xml:space="preserve">
+    <value>Live speed · name, position &amp; visibility. The mounting position decides the block in the overview and is the basis of the airflow analysis.</value>
+  </data>
+  <data name="MainWindow.FanGripTooltip" xml:space="preserve">
+    <value>Drag to change the mounting position.</value>
+  </data>
+  <data name="MainWindow.FanSelectAllTooltip" xml:space="preserve">
+    <value>Select all fans of this block.</value>
+  </data>
+  <data name="MainWindow.PositionChipTooltip" xml:space="preserve">
+    <value>Choose the mounting position in the case - moves the fan into that block.</value>
+  </data>
+  <data name="MainWindow.SetPosition" xml:space="preserve">
+    <value>Set position</value>
+  </data>
+  <data name="FanSections.NoPosition" xml:space="preserve">
+    <value>No position</value>
+  </data>
+  <data name="FanSections.PositionNotSet" xml:space="preserve">
+    <value>not set</value>
+  </data>
+  <data name="FanSections.FlowIntake" xml:space="preserve">
+    <value>Intake - blows air into the case.</value>
+  </data>
+  <data name="FanSections.FlowExhaust" xml:space="preserve">
+    <value>Exhaust - blows air out.</value>
+  </data>
+  <data name="FanSections.FlowInternal" xml:space="preserve">
+    <value>Cooler or internal - not part of the pressure balance.</value>
+  </data>
+  <data name="FanSections.FlowNone" xml:space="preserve">
+    <value>No position - not part of the pressure balance.</value>
+  </data>
+  <data name="FanSections.OneFan" xml:space="preserve">
+    <value>1 fan</value>
+  </data>
+  <data name="FanSections.Fans" xml:space="preserve">
+    <value>{0} fans</value>
+  </data>
+  <data name="FanSections.SelectedOne" xml:space="preserve">
+    <value>1 fan selected</value>
+  </data>
+  <data name="FanSections.Selected" xml:space="preserve">
+    <value>{0} fans selected</value>
+  </data>
+  <data name="FanSections.SelectAllName" xml:space="preserve">
+    <value>{0}: select all fans</value>
+  </data>
+  <data name="FanSections.SelectFan" xml:space="preserve">
+    <value>Select {0}</value>
+  </data>
+  <data name="FanSections.PositionChipName" xml:space="preserve">
+    <value>Position: {0}</value>
+  </data>
+  <data name="FanSections.BlockedOffline" xml:space="preserve">
+    <value>Locked - the background service is not reachable.</value>
+  </data>
+  <data name="FanSections.BlockedBusy" xml:space="preserve">
+    <value>Locked - a calibration, identification or tach coupling is running.</value>
+  </data>
+  <data name="FanSections.BlockedNoTach" xml:space="preserve">
+    <value>Locked - this fan has no detected speed sensor of its own to measure with. Couple a tacho first.</value>
+  </data>
+  <data name="FanSections.BlockedDryRun" xml:space="preserve">
+    <value>Not available in a dry run - the service runs without root or administrator rights and writes nothing to the fans.</value>
+  </data>
+  <data name="FanSections.Hide" xml:space="preserve">
+    <value>Hide</value>
+  </data>
+  <data name="FanSections.Show" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="FanSections.PositionSetOne" xml:space="preserve">
+    <value>Position: {0}.</value>
+  </data>
+  <data name="FanSections.PositionSet" xml:space="preserve">
+    <value>{0} fans → {1}.</value>
+  </data>
+  <data name="FanPositionMenu.Coolers" xml:space="preserve">
+    <value>Coolers</value>
+  </data>
+  <data name="FanPositionMenu.Intake" xml:space="preserve">
+    <value>Case · intake</value>
+  </data>
+  <data name="FanPositionMenu.Exhaust" xml:space="preserve">
+    <value>Case · exhaust</value>
+  </data>
+  <data name="FanPositionMenu.Other" xml:space="preserve">
+    <value>Other</value>
+  </data>
+  <data name="FanPositionMenu.ServerFlow" xml:space="preserve">
+    <value>Server · front to rear</value>
+  </data>
+  <data name="FanPositionMenu.ServerAgainst" xml:space="preserve">
+    <value>Server · against the flow</value>
+  </data>
+  <data name="FanPositionMenu.LaptopFans" xml:space="preserve">
+    <value>Fans</value>
+  </data>
+  <data name="FanPositionMenu.LaptopVents" xml:space="preserve">
+    <value>Laptop · vents</value>
+  </data>
+  <data name="FanPositionMenu.LaptopReversed" xml:space="preserve">
+    <value>Laptop · reversed</value>
+  </data>
+  <data name="FanPositionMenu.LaptopTop" xml:space="preserve">
+    <value>Keyboard</value>
+  </data>
+  <data name="FanPositionMenu.LaptopBottom" xml:space="preserve">
+    <value>Underside</value>
+  </data>
+  <data name="FanPositionMenu.Front" xml:space="preserve">
+    <value>Front</value>
+  </data>
+  <data name="FanPositionMenu.Bottom" xml:space="preserve">
+    <value>Bottom</value>
+  </data>
+  <data name="FanPositionMenu.Side" xml:space="preserve">
+    <value>Side</value>
+  </data>
+  <data name="FanPositionMenu.Top" xml:space="preserve">
+    <value>Top</value>
+  </data>
+  <data name="FanPositionMenu.Rear" xml:space="preserve">
+    <value>Rear</value>
+  </data>
+  <data name="FanPositionMenu.PickInDiagram" xml:space="preserve">
+    <value>Pick in the case diagram …</value>
   </data>
   <data name="MainWindow.CalibrationFailed" xml:space="preserve">
     <value>Calibration failed or was cancelled.</value>
@@ -250,17 +1063,11 @@
   <data name="MainWindow.Position" xml:space="preserve">
     <value>Position</value>
   </data>
-  <data name="MainWindow.PositionLabelTooltip" xml:space="preserve">
-    <value>Mounting position / airflow direction - basis for the planned airflow tuning.</value>
-  </data>
-  <data name="MainWindow.PickLocationTooltip" xml:space="preserve">
-    <value>Choose the mounting position in the case (interactive preview).</value>
-  </data>
   <data name="MainWindow.AdvancedToggleTooltip" xml:space="preserve">
-    <value>Expand/collapse limits &amp; calibration.</value>
+    <value>Expand/collapse power range, calibration &amp; test.</value>
   </data>
   <data name="MainWindow.AdvancedHeader" xml:space="preserve">
-    <value>Advanced · limits &amp; calibration</value>
+    <value>Advanced · power range, calibration &amp; test</value>
   </data>
   <data name="MainWindow.Min" xml:space="preserve">
     <value>Min</value>
@@ -280,47 +1087,14 @@
   <data name="MainWindow.Identify" xml:space="preserve">
     <value>Identify</value>
   </data>
-  <data name="MainWindow.ManualControl" xml:space="preserve">
-    <value>Control manually</value>
-  </data>
-  <data name="MainWindow.ManualControlTooltip" xml:space="preserve">
-    <value>Temporarily control the fan by hand to identify it physically. Reverts to curve/auto when the section is collapsed.</value>
-  </data>
-  <data name="MainWindow.Pwm" xml:space="preserve">
-    <value>PWM</value>
-  </data>
-  <data name="MainWindow.ManualPwmFloorHint" xml:space="preserve">
-    <value>0% is the hardware floor - some fans keep a minimum speed there and cannot be switched off entirely. For reliable identification use the pulse button (Identify) instead.</value>
-  </data>
-  <data name="MainWindow.AirflowAutoTune" xml:space="preserve">
-    <value>Airflow auto-tune</value>
-  </data>
-  <data name="MainWindow.AirflowAutoTuneSubtitle" xml:space="preserve">
-    <value>Derives a pressure balance and matching curves from the mounting positions. Review the suggestion, apply it, then save.</value>
-  </data>
-  <data name="MainWindow.AirflowStatusTitle" xml:space="preserve">
-    <value>Already applied</value>
-  </data>
-  <data name="MainWindow.AirflowStatusSubtitle" xml:space="preserve">
-    <value>These fans follow the airflow analysis' role curves in the profile being edited.</value>
-  </data>
-  <data name="MainWindow.AnalyzeAirflowTooltip" xml:space="preserve">
-    <value>Computes the pressure balance and matching curve suggestions from the fan positions.</value>
-  </data>
-  <data name="MainWindow.AnalyzeAirflow" xml:space="preserve">
-    <value>Analyze airflow</value>
-  </data>
-  <data name="MainWindow.ApplySuggestion" xml:space="preserve">
-    <value>Apply suggestion</value>
-  </data>
-  <data name="MainWindow.ApplySuggestionTooltip" xml:space="preserve">
-    <value>Loads the checked curves/assignments into the editor - then apply via Save.</value>
-  </data>
-  <data name="MainWindow.TabCurves" xml:space="preserve">
-    <value>Curves &amp; assignment</value>
-  </data>
   <data name="MainWindow.AddProfileTooltip" xml:space="preserve">
     <value>Creates an empty profile with a default curve.</value>
+  </data>
+  <data name="MainWindow.AddProfile" xml:space="preserve">
+    <value>Add profile</value>
+  </data>
+  <data name="MainWindow.ProfilesAndCurves" xml:space="preserve">
+    <value>Profiles &amp; curves</value>
   </data>
   <data name="MainWindow.DuplicateProfileTooltip" xml:space="preserve">
     <value>Duplicates the current profile (curves + assignments).</value>
@@ -328,11 +1102,8 @@
   <data name="MainWindow.Duplicate" xml:space="preserve">
     <value>Duplicate</value>
   </data>
-  <data name="MainWindow.Rename" xml:space="preserve">
-    <value>Rename</value>
-  </data>
   <data name="MainWindow.DeleteProfileTooltip" xml:space="preserve">
-    <value>Deletes the current profile.</value>
+    <value>Deletes the current profile. The running profile and the last one cannot be deleted.</value>
   </data>
   <data name="MainWindow.Delete" xml:space="preserve">
     <value>Delete</value>
@@ -340,11 +1111,20 @@
   <data name="MainWindow.NoDevicesForCurves" xml:space="preserve">
     <value>No devices detected - without sensors and fans no curves can be created.</value>
   </data>
-  <data name="MainWindow.Curves" xml:space="preserve">
-    <value>Curves</value>
-  </data>
   <data name="MainWindow.AddCurveTooltip" xml:space="preserve">
-    <value>Creates a new fan curve.</value>
+    <value>Adds a fan curve from a template to this profile.</value>
+  </data>
+  <data name="MainWindow.AddCurve" xml:space="preserve">
+    <value>Add curve</value>
+  </data>
+  <data name="MainWindow.TemplateMenuHeader" xml:space="preserve">
+    <value>Pick a template - it takes the sensors from the current curve</value>
+  </data>
+  <data name="MainWindow.TemplateConstant40Name" xml:space="preserve">
+    <value>Constant 40 %</value>
+  </data>
+  <data name="MainWindow.TemplateConstant40Desc" xml:space="preserve">
+    <value>Fixed speed - from 80 °C it still rises to 100 % by 86 °C.</value>
   </data>
   <data name="MainWindow.DuplicateCurveTooltip" xml:space="preserve">
     <value>Duplicates the selected curve.</value>
@@ -362,7 +1142,16 @@
     <value>Name</value>
   </data>
   <data name="MainWindow.CurveEditorHint" xml:space="preserve">
-    <value>Curve (temperature → power) · drag the points</value>
+    <value>Curve (temperature → power)</value>
+  </data>
+  <data name="MainWindow.CurveChartGestures" xml:space="preserve">
+    <value>Drag points · double-click adds · Del removes</value>
+  </data>
+  <data name="MainWindow.ChartLimitsCaption" xml:space="preserve">
+    <value>Grey: power limits of the assigned fans (Settings › Fans › Advanced).</value>
+  </data>
+  <data name="MainWindow.ChartHysteresisCaption" xml:space="preserve">
+    <value>Orange: hysteresis, drawn roughly around the live value - the service measures it from the temperature it last applied.</value>
   </data>
   <data name="MainWindow.NoSourceSensor" xml:space="preserve">
     <value>No source sensor selected - no live operating point.</value>
@@ -370,8 +1159,11 @@
   <data name="MainWindow.Sensors" xml:space="preserve">
     <value>Sensors</value>
   </data>
-  <data name="MainWindow.ToggleAllSensorsTooltip" xml:space="preserve">
-    <value>Shows or hides the remaining source sensors.</value>
+  <data name="MainWindow.SensorGroupToggleTooltip" xml:space="preserve">
+    <value>Selects or clears all sensors of this group.</value>
+  </data>
+  <data name="MainWindow.SensorGroupOpenTooltip" xml:space="preserve">
+    <value>Expand or collapse the group.</value>
   </data>
   <data name="MainWindow.Mix" xml:space="preserve">
     <value>Mix</value>
@@ -380,7 +1172,7 @@
     <value>How multiple source sensors are combined: Max (warmest) or Avg (mean).</value>
   </data>
   <data name="MainWindow.Interpolation" xml:space="preserve">
-    <value>Interpolation</value>
+    <value>Shape</value>
   </data>
   <data name="MainWindow.InterpolationTooltip" xml:space="preserve">
     <value>Linear = straight between the points. Step = holds a level and jumps at the next point. Spline = smooth rounded curve through the points.</value>
@@ -390,6 +1182,9 @@
   </data>
   <data name="MainWindow.HysteresisTooltip" xml:space="preserve">
     <value>Dead band in °C: prevents constant readjustment on small temperature fluctuations.</value>
+  </data>
+  <data name="MainWindow.HysteresisHint" xml:space="preserve">
+    <value>Dead band - prevents constant readjusting on small fluctuations.</value>
   </data>
   <data name="MainWindow.Smoothing" xml:space="preserve">
     <value>Smoothing</value>
@@ -403,8 +1198,11 @@
   <data name="MainWindow.DecreasingPercentWarning" xml:space="preserve">
     <value>Power drops as temperature rises - the fan then cools less the hotter it gets.</value>
   </data>
-  <data name="MainWindow.TempToPercentHeader" xml:space="preserve">
-    <value>°C → %</value>
+  <data name="MainWindow.PointTemperature" xml:space="preserve">
+    <value>Temperature</value>
+  </data>
+  <data name="MainWindow.PointPercent" xml:space="preserve">
+    <value>Power</value>
   </data>
   <data name="MainWindow.PointTempTooltip" xml:space="preserve">
     <value>Temperature of the point (°C).</value>
@@ -418,14 +1216,17 @@
   <data name="MainWindow.AddPointTooltip" xml:space="preserve">
     <value>Adds a point to the curve.</value>
   </data>
-  <data name="MainWindow.Point" xml:space="preserve">
-    <value>Point</value>
+  <data name="MainWindow.AddPoint" xml:space="preserve">
+    <value>Add point</value>
   </data>
   <data name="MainWindow.FansOfCurve" xml:space="preserve">
     <value>Fans on this curve</value>
   </data>
   <data name="MainWindow.FansOfCurveSubtitle" xml:space="preserve">
     <value>Check which fans use the selected curve</value>
+  </data>
+  <data name="MainWindow.FanBlockToggleTooltip" xml:space="preserve">
+    <value>Assigns all fans of this block to the curve, or removes them.</value>
   </data>
   <data name="Onboarding.WindowTitle" xml:space="preserve">
     <value>LinFan - Setup Assistant</value>
@@ -438,6 +1239,12 @@
   </data>
   <data name="Onboarding.WelcomeSkipHint" xml:space="preserve">
     <value>You can skip the assistant at any time and adjust the settings later in the main window.</value>
+  </data>
+  <data name="Onboarding.ConfigSetAside" xml:space="preserve">
+    <value>Your previous configuration was unusable and was moved to {0}. This assistant sets LinFan up again.</value>
+  </data>
+  <data name="Onboarding.CalibrationDryRun" xml:space="preserve">
+    <value>Calibrating is not possible in a dry run - the service runs without root or administrator rights. Skip this step; you can calibrate under Settings › Fans once the service runs with those rights.</value>
   </data>
   <data name="Onboarding.CalibrationTitle" xml:space="preserve">
     <value>Set up fans</value>
@@ -464,10 +1271,10 @@
     <value>Set up devices</value>
   </data>
   <data name="Onboarding.DevicesIntro" xml:space="preserve">
-    <value>Optional: assign each fan its mounting position (the basis for airflow tuning) and choose which sensors LinFan shows.</value>
+    <value>Optional: name your fans, assign each its mounting position (the basis for airflow tuning) and choose which sensors LinFan shows.</value>
   </data>
   <data name="Onboarding.FanPositionsLabel" xml:space="preserve">
-    <value>Fan positions (optional)</value>
+    <value>Fan names and positions (optional)</value>
   </data>
   <data name="Onboarding.IdentifyTooltip" xml:space="preserve">
     <value>Briefly spins the fan up to 100 % (others are throttled) to identify it physically.</value>
@@ -496,6 +1303,9 @@
   <data name="Onboarding.AirflowProfilesIntro" xml:space="preserve">
     <value>Fan positions detected: all three profiles are built from the airflow analysis - every fan follows a curve for its role (CPU, GPU, intake, exhaust).</value>
   </data>
+  <data name="Onboarding.PressureVerdict" xml:space="preserve">
+    <value>Pressure balance: {0}</value>
+  </data>
   <data name="Onboarding.AirflowFansLabel" xml:space="preserve">
     <value>Role and curve per fan</value>
   </data>
@@ -504,6 +1314,12 @@
   </data>
   <data name="Onboarding.PrimarySensorHint" xml:space="preserve">
     <value>This sensor drives all fan curves - usually the CPU sensor.</value>
+  </data>
+  <data name="Onboarding.PrimarySensorNone" xml:space="preserve">
+    <value>Choose a sensor</value>
+  </data>
+  <data name="Onboarding.PrimarySensorChipName" xml:space="preserve">
+    <value>Primary temperature sensor: {0}</value>
   </data>
   <data name="Onboarding.FanProfileLabel" xml:space="preserve">
     <value>Fan profile</value>
@@ -518,10 +1334,10 @@
     <value>• Overview - keep an eye on live temperatures, fan speeds and the active curves.</value>
   </data>
   <data name="Onboarding.DoneCurves" xml:space="preserve">
-    <value>• Curves &amp; assignment - adjust fan curves, assign fans and switch profiles.</value>
+    <value>• Profiles &amp; curves - adjust fan curves and assign fans. Switch profiles from the profile menu at the top right.</value>
   </data>
   <data name="Onboarding.DoneSettings" xml:space="preserve">
-    <value>• Settings - rename devices, adjust positions and visibility, or run the airflow analysis and this assistant again.</value>
+    <value>• Settings (gear at the top right) - rename devices, adjust positions and visibility, review the airflow or run this assistant again.</value>
   </data>
   <data name="Onboarding.Close" xml:space="preserve">
     <value>Close</value>
@@ -547,35 +1363,112 @@
   <data name="Onboarding.Finish" xml:space="preserve">
     <value>Finish</value>
   </data>
+  <data name="Onboarding.WelcomeSteps" xml:space="preserve">
+    <value>Four steps: Calibration · Devices · Profile · Done.</value>
+  </data>
+  <data name="OnboardingCtrl.StepCalibration" xml:space="preserve">
+    <value>Calibration</value>
+  </data>
+  <data name="OnboardingCtrl.StepDevices" xml:space="preserve">
+    <value>Devices</value>
+  </data>
+  <data name="OnboardingCtrl.StepProfile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="OnboardingCtrl.StepDone" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="Onboarding.SensorGroupsHint" xml:space="preserve">
+    <value>Groups were suggested from the drivers. You can rename and reorder them and move sensors later under Settings › Sensors.</value>
+  </data>
+  <data name="OnboardingCtrl.SensorGroupCountOne" xml:space="preserve">
+    <value>1 sensor</value>
+  </data>
+  <data name="OnboardingCtrl.SensorGroupCountMany" xml:space="preserve">
+    <value>{0} sensors</value>
+  </data>
+  <data name="OnboardingCtrl.SensorGroupVisible" xml:space="preserve">
+    <value>{0} of {1} visible</value>
+  </data>
+  <data name="SensorCategory.Cpu" xml:space="preserve">
+    <value>CPU</value>
+    <comment>Saved as a sensor group name. Keep "CPU" in every language: the airflow analysis finds CPU sensors by this word.</comment>
+  </data>
+  <data name="SensorCategory.Gpu" xml:space="preserve">
+    <value>GPU</value>
+    <comment>Saved as a sensor group name. Keep "GPU" in every language: the airflow analysis finds GPU sensors by this word.</comment>
+  </data>
+  <data name="SensorCategory.Storage" xml:space="preserve">
+    <value>Storage</value>
+  </data>
+  <data name="SensorCategory.Mainboard" xml:space="preserve">
+    <value>Mainboard</value>
+  </data>
+  <data name="SensorCategory.Other" xml:space="preserve">
+    <value>Other</value>
+  </data>
   <data name="FanLocationDialog.Hint" xml:space="preserve">
-    <value>Click a position on the case or pick one from the list below.</value>
+    <value>Click an area of the case (arrow keys move between them) or pick from the list below.</value>
   </data>
   <data name="FanLocationDialog.Direction" xml:space="preserve">
-    <value>Direction:</value>
-  </data>
-  <data name="FanLocationDialog.ToggleDirection" xml:space="preserve">
-    <value>Swap intake ⇄ exhaust</value>
+    <value>Direction</value>
   </data>
   <data name="FanLocationDialog.Position" xml:space="preserve">
     <value>Position</value>
   </data>
-  <data name="FanLocationDialog.ManualNudge" xml:space="preserve">
-    <value>Nudge fan manually</value>
-  </data>
-  <data name="FanLocationDialog.ManualNudgeTooltip" xml:space="preserve">
-    <value>Briefly spins this fan up so you can identify it physically. Reverts to auto/curve when closed.</value>
-  </data>
   <data name="FanLocationDialog.Pwm" xml:space="preserve">
     <value>PWM</value>
-  </data>
-  <data name="FanLocationDialog.HardwareFloorHint" xml:space="preserve">
-    <value>0 % is the hardware floor - some fans keep a minimum speed there and cannot be turned off completely.</value>
   </data>
   <data name="FanLocationDialog.Cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
   <data name="FanLocationDialog.Apply" xml:space="preserve">
     <value>Apply</value>
+  </data>
+  <data name="FanLocationDialog.ZonesName" xml:space="preserve">
+    <value>Mounting position in the case</value>
+  </data>
+  <data name="FanLocationDialog.PositionTooltip" xml:space="preserve">
+    <value>Pick the mounting position from the list</value>
+  </data>
+  <data name="FanLocationDialog.WasHere" xml:space="preserve">
+    <value>was here</value>
+  </data>
+  <data name="FanLocationDialog.TagNew" xml:space="preserve">
+    <value>new</value>
+  </data>
+  <data name="FanLocationDialog.TagUnchanged" xml:space="preserve">
+    <value>current</value>
+  </data>
+  <data name="FanLocationDialog.NoChange" xml:space="preserve">
+    <value>No change</value>
+  </data>
+  <data name="FanLocationDialog.CaseOnly" xml:space="preserve">
+    <value>Case becomes “{0}”</value>
+  </data>
+  <data name="FanLocationDialog.NudgeTitle" xml:space="preserve">
+    <value>Which fan is it?</value>
+  </data>
+  <data name="FanLocationDialog.NudgeSub" xml:space="preserve">
+    <value>Nudging spins it up - on closing it follows its curve again.</value>
+  </data>
+  <data name="FanLocationDialog.Nudge" xml:space="preserve">
+    <value>Nudge</value>
+  </data>
+  <data name="FanLocationDialog.NudgeStop" xml:space="preserve">
+    <value>Stop nudging</value>
+  </data>
+  <data name="FanLocationDialog.NudgeTooltip" xml:space="preserve">
+    <value>Spins this fan up for a moment to find it in the case. On closing it goes back to auto/curve.</value>
+  </data>
+  <data name="FanLocationDialog.NudgeBlocked" xml:space="preserve">
+    <value>Locked - the background service is unreachable, runs dry, or a device action is running.</value>
+  </data>
+  <data name="FanLocationDialog.NudgePower" xml:space="preserve">
+    <value>Power while nudging in %</value>
+  </data>
+  <data name="FanLocationDialog.LiveTooltip" xml:space="preserve">
+    <value>Live speed and current power</value>
   </data>
   <data name="UnsavedChanges.Title" xml:space="preserve">
     <value>Unsaved Changes</value>
@@ -615,9 +1508,6 @@
   </data>
   <data name="MainCtrl.LoadingCurves" xml:space="preserve">
     <value>Loading curves …</value>
-  </data>
-  <data name="MainCtrl.MaxTemp" xml:space="preserve">
-    <value>max {0}</value>
   </data>
   <data name="OnboardingCtrl.CalibrationHeadline" xml:space="preserve">
     <value>Fan {0} of {1}: {2}</value>
@@ -697,7 +1587,7 @@
   <data name="OnboardingCtrl.NoTemperatureSensor" xml:space="preserve">
     <value>No temperature sensor found.</value>
   </data>
-  <data name="OnboardingCtrl.FanDefaultName" xml:space="preserve">
+  <data name="DefaultFanNames.Name" xml:space="preserve">
     <value>Fan {0}</value>
   </data>
   <data name="OnboardingCtrl.SaveFailed" xml:space="preserve">
@@ -705,6 +1595,21 @@
   </data>
   <data name="CurveEditorCtrl.NewCurveName" xml:space="preserve">
     <value>New curve</value>
+  </data>
+  <data name="CurveEditorCtrl.TemplateCurveName" xml:space="preserve">
+    <value>New curve · {0}</value>
+  </data>
+  <data name="CurveEditorCtrl.CurveLimitReached" xml:space="preserve">
+    <value>A profile holds at most {0} curves.</value>
+  </data>
+  <data name="CurveEditorCtrl.EditingInactiveProfile" xml:space="preserve">
+    <value>You are editing “{0}” - “{1}” is active</value>
+  </data>
+  <data name="CurveEditorCtrl.OneFanAssigned" xml:space="preserve">
+    <value>1 fan selected</value>
+  </data>
+  <data name="CurveEditorCtrl.FansAssigned" xml:space="preserve">
+    <value>{0} fans selected</value>
   </data>
   <data name="CurveEditorCtrl.NewProfileName" xml:space="preserve">
     <value>New profile</value>
@@ -715,26 +1620,47 @@
   <data name="CurveEditorCtrl.NoCurveHardwareAuto" xml:space="preserve">
     <value>Hardware auto (no curve)</value>
   </data>
-  <data name="CurveEditorCtrl.AirflowApplied" xml:space="preserve">
-    <value>Airflow suggestion applied - now save.</value>
-  </data>
-  <data name="CurveEditorCtrl.AirflowWeights" xml:space="preserve">
-    <value> (Weighting intake {0} : exhaust {1})</value>
-  </data>
-  <data name="CurveEditorCtrl.PressurePositive" xml:space="preserve">
-    <value>Pressure balance: positive - good against dust.</value>
-  </data>
-  <data name="CurveEditorCtrl.PressureNegative" xml:space="preserve">
-    <value>Pressure balance: negative.</value>
-  </data>
-  <data name="CurveEditorCtrl.PressureBalanced" xml:space="preserve">
-    <value>Pressure balance: balanced.</value>
-  </data>
-  <data name="CurveEditorCtrl.PressureUnknown" xml:space="preserve">
-    <value>Pressure balance: undeterminable (no case fans with a position).</value>
-  </data>
   <data name="CurveEditorCtrl.ChangesReverted" xml:space="preserve">
     <value>Changes reverted.</value>
+  </data>
+  <data name="CurveEditorCtrl.Undone" xml:space="preserve">
+    <value>Undone.</value>
+  </data>
+  <data name="CurveEditorCtrl.Redone" xml:space="preserve">
+    <value>Redone.</value>
+  </data>
+  <data name="CurveEditorCtrl.UndoAction" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="CurveEditorCtrl.Switched" xml:space="preserve">
+    <value>Switched to “{0}”.</value>
+  </data>
+  <data name="CurveEditorCtrl.SwitchedDiscarded" xml:space="preserve">
+    <value>Switched to “{0}” - changes discarded (Ctrl+Z brings them back).</value>
+  </data>
+  <data name="CurveEditorCtrl.SwitchedBack" xml:space="preserve">
+    <value>Back to “{0}”.</value>
+  </data>
+  <data name="CurveEditorCtrl.SwitchNotConfirmed" xml:space="preserve">
+    <value>“{0}” was not activated - the service keeps running “{1}”.</value>
+  </data>
+  <data name="CurveEditorCtrl.SaveSwitchNotConfirmed" xml:space="preserve">
+    <value>“{0}” was not activated and your changes were not applied - the service keeps running “{1}”.</value>
+  </data>
+  <data name="CurveEditorCtrl.NotSwitched" xml:space="preserve">
+    <value>Not switched.</value>
+  </data>
+  <data name="CurveEditorCtrl.RunningProfileChanged" xml:space="preserve">
+    <value>The service now runs “{0}”.</value>
+  </data>
+  <data name="CurveEditorCtrl.RunningProfileRestored" xml:space="preserve">
+    <value>The service runs “{0}” - the profile was missing from your changes and is back.</value>
+  </data>
+  <data name="CurveEditorCtrl.CurveDeleted" xml:space="preserve">
+    <value>Curve “{0}” deleted.</value>
+  </data>
+  <data name="CurveEditorCtrl.ProfileDeleted" xml:space="preserve">
+    <value>Profile “{0}” deleted.</value>
   </data>
   <data name="CurveEditorCtrl.NotConnected" xml:space="preserve">
     <value>Not yet connected to the background service.</value>
@@ -745,23 +1671,62 @@
   <data name="CurveEditorCtrl.Saved" xml:space="preserve">
     <value>Saved - changes are being applied</value>
   </data>
+  <data name="CurveEditorCtrl.SavedOnly" xml:space="preserve">
+    <value>Saved.</value>
+  </data>
+  <data name="CurveEditorCtrl.SavedNotRunning" xml:space="preserve">
+    <value>Saved - “{0}” is not running; its changes take effect once you switch to it.</value>
+  </data>
+  <data name="CurveEditorCtrl.SavedNotRunningMany" xml:space="preserve">
+    <value>Saved - the changed profiles are not running; their changes take effect once you switch.</value>
+  </data>
   <data name="CurveEditorCtrl.SaveFailed" xml:space="preserve">
     <value>Not saved - the background service is currently unreachable.</value>
   </data>
   <data name="InterpolationOption.Linear" xml:space="preserve">
-    <value>Linear (safe, predictable)</value>
+    <value>Linear</value>
   </data>
   <data name="InterpolationOption.Spline" xml:space="preserve">
-    <value>Spline (smooth, monotonic)</value>
+    <value>Spline</value>
   </data>
   <data name="InterpolationOption.Step" xml:space="preserve">
-    <value>Step (holds until the next point)</value>
+    <value>Steps</value>
+  </data>
+  <data name="InterpolationOption.LinearHint" xml:space="preserve">
+    <value>Straight between the points - safe and predictable.</value>
+  </data>
+  <data name="InterpolationOption.SplineHint" xml:space="preserve">
+    <value>Smoothly rounded through the points, without overshoot.</value>
+  </data>
+  <data name="InterpolationOption.StepHint" xml:space="preserve">
+    <value>Holds the value and jumps at the next point.</value>
+  </data>
+  <data name="InterpolationOption.LinearSummary" xml:space="preserve">
+    <value>Safe and predictable</value>
+  </data>
+  <data name="InterpolationOption.SplineSummary" xml:space="preserve">
+    <value>Smooth, no overshoot</value>
+  </data>
+  <data name="InterpolationOption.StepSummary" xml:space="preserve">
+    <value>Holds until the next point</value>
   </data>
   <data name="AggregationOption.Max" xml:space="preserve">
-    <value>Maximum (hottest sensor)</value>
+    <value>Maximum</value>
   </data>
   <data name="AggregationOption.Avg" xml:space="preserve">
     <value>Average</value>
+  </data>
+  <data name="AggregationOption.MaxHint" xml:space="preserve">
+    <value>The hottest selected sensor drives the curve.</value>
+  </data>
+  <data name="AggregationOption.AvgHint" xml:space="preserve">
+    <value>The average of all selected sensors drives the curve.</value>
+  </data>
+  <data name="AggregationOption.MaxSummary" xml:space="preserve">
+    <value>The hottest sensor drives the curve</value>
+  </data>
+  <data name="AggregationOption.AvgSummary" xml:space="preserve">
+    <value>Average of all selected sensors</value>
   </data>
   <data name="FanLocationOption.Unspecified" xml:space="preserve">
     <value>- unassigned -</value>
@@ -811,6 +1776,9 @@
   <data name="FanLocationOption.Other" xml:space="preserve">
     <value>Other</value>
   </data>
+  <data name="FanLocationOption.FanWall" xml:space="preserve">
+    <value>Fan wall (server)</value>
+  </data>
   <data name="Group.Ungrouped" xml:space="preserve">
     <value>Ungrouped</value>
   </data>
@@ -859,29 +1827,17 @@
   <data name="FanLocationOption.Group.Other" xml:space="preserve">
     <value>Other</value>
   </data>
+  <data name="FanLocationOption.Group.FanWall" xml:space="preserve">
+    <value>Fan wall</value>
+  </data>
   <data name="Dialog.RevertTitle" xml:space="preserve">
-    <value>Discard changes?</value>
+    <value>Discard all changes?</value>
   </data>
   <data name="Dialog.RevertMessage" xml:space="preserve">
-    <value>All changes since the last save will be lost.</value>
-  </data>
-  <data name="Dialog.DeleteProfileTitle" xml:space="preserve">
-    <value>Delete profile?</value>
-  </data>
-  <data name="Dialog.DeleteProfileMessage" xml:space="preserve">
-    <value>The current profile, including its curves and assignments, will be deleted.</value>
-  </data>
-  <data name="Dialog.DeleteCurveTitle" xml:space="preserve">
-    <value>Delete curve?</value>
-  </data>
-  <data name="Dialog.DeleteCurveMessage" xml:space="preserve">
-    <value>The selected curve will be deleted.</value>
+    <value>All changes since the last save will be lost. Ctrl+Z brings them back right afterwards.</value>
   </data>
   <data name="FanLocationDialog.WindowTitle" xml:space="preserve">
     <value>Choose position</value>
-  </data>
-  <data name="FanLocationDialog.HeadingGeneric" xml:space="preserve">
-    <value>Choose mounting position</value>
   </data>
   <data name="FanLocationDialog.HeadingFor" xml:space="preserve">
     <value>Position of “{0}”</value>
@@ -938,13 +1894,85 @@
     <value>Other</value>
   </data>
   <data name="FanDiagram.Unspecified" xml:space="preserve">
-    <value>- unassigned -</value>
+    <value>No position</value>
+  </data>
+  <data name="FanDiagram.FanWall" xml:space="preserve">
+    <value>Fan wall</value>
+  </data>
+  <data name="FanDiagram.LaptopCpu" xml:space="preserve">
+    <value>CPU fan</value>
+  </data>
+  <data name="FanDiagram.LaptopGpu" xml:space="preserve">
+    <value>GPU fan</value>
+  </data>
+  <data name="FanDiagram.LaptopTopIntake" xml:space="preserve">
+    <value>Keyboard · Intake</value>
+  </data>
+  <data name="FanDiagram.LaptopTopExhaust" xml:space="preserve">
+    <value>Keyboard · Exhaust</value>
+  </data>
+  <data name="FanDiagram.LaptopBottomIntake" xml:space="preserve">
+    <value>Underside · Intake</value>
+  </data>
+  <data name="FanDiagram.LaptopBottomExhaust" xml:space="preserve">
+    <value>Underside · Exhaust</value>
+  </data>
+  <data name="FanDiagram.Mixed" xml:space="preserve">
+    <value>{0} · mixed</value>
+  </data>
+  <data name="FanDiagram.MixedLegend" xml:space="preserve">
+    <value>mixed</value>
+  </data>
+  <data name="FanDiagram.Outside" xml:space="preserve">
+    <value>Not in the diagram ({0})</value>
+  </data>
+  <data name="CaseType.Chip" xml:space="preserve">
+    <value>Case</value>
+  </data>
+  <data name="CaseType.ChipName" xml:space="preserve">
+    <value>Case: {0}</value>
+  </data>
+  <data name="CaseType.ChipTooltip" xml:space="preserve">
+    <value>Case type - decides the diagram, the positions and the pressure balance</value>
+  </data>
+  <data name="CaseType.Tower" xml:space="preserve">
+    <value>Tower</value>
+  </data>
+  <data name="CaseType.TowerDetail" xml:space="preserve">
+    <value>Standard PC · side view</value>
+  </data>
+  <data name="CaseType.TowerCaption" xml:space="preserve">
+    <value>Side view · front on the left, rear on the right</value>
+  </data>
+  <data name="CaseType.Server" xml:space="preserve">
+    <value>Server / rack</value>
+  </data>
+  <data name="CaseType.ServerDetail" xml:space="preserve">
+    <value>Top view · front → rear</value>
+  </data>
+  <data name="CaseType.ServerCaption" xml:space="preserve">
+    <value>Top view · air flows from the front (left) to the rear (right)</value>
+  </data>
+  <data name="CaseType.Laptop" xml:space="preserve">
+    <value>Laptop</value>
+  </data>
+  <data name="CaseType.LaptopDetail" xml:space="preserve">
+    <value>Top view · base</value>
+  </data>
+  <data name="CaseType.LaptopCaption" xml:space="preserve">
+    <value>Top view · hinge at the top · ⊙ in from below, ⊗ in through the keyboard, ↑ ← out</value>
+  </data>
+  <data name="CaseType.Open" xml:space="preserve">
+    <value>Open bench</value>
+  </data>
+  <data name="CaseType.OpenDetail" xml:space="preserve">
+    <value>Test bench · no case</value>
+  </data>
+  <data name="CaseType.OpenCaption" xml:space="preserve">
+    <value>Open bench · component fans only, no case edges and no pressure balance</value>
   </data>
   <data name="CurveChart.NoPoints" xml:space="preserve">
     <value>No points</value>
-  </data>
-  <data name="CurveEditRow.ShowAll" xml:space="preserve">
-    <value>Show all {0}</value>
   </data>
   <data name="CurveEditRow.PointsOne" xml:space="preserve">
     <value>1 point</value>
@@ -952,11 +1980,53 @@
   <data name="CurveEditRow.PointsMany" xml:space="preserve">
     <value>{0} points</value>
   </data>
+  <data name="CurveEditRow.SmoothingOff" xml:space="preserve">
+    <value>Off - the curve reacts at once. The overheat protection always reacts at once.</value>
+  </data>
+  <data name="CurveEditRow.SmoothingOn" xml:space="preserve">
+    <value>Averages the temperature over {0} s. The overheat protection always reacts at once.</value>
+  </data>
+  <data name="CurveEditRow.LimitMin" xml:space="preserve">
+    <value>Min {0} % · {1}</value>
+  </data>
+  <data name="CurveEditRow.LimitMax" xml:space="preserve">
+    <value>Max {0} % · {1}</value>
+  </data>
+  <data name="ProfileNavItem.RunningName" xml:space="preserve">
+    <value>{0}, running</value>
+  </data>
+  <data name="SensorCheckGroup.Selected" xml:space="preserve">
+    <value>{0} of {1} selected</value>
+  </data>
+  <data name="SensorCheckGroup.NoneSelected" xml:space="preserve">
+    <value>none selected</value>
+  </data>
+  <data name="SensorCheckGroup.ToggleAllName" xml:space="preserve">
+    <value>Sensors of the group {0} ({1} of {2} selected)</value>
+  </data>
+  <data name="FanCheckGroup.Assigned" xml:space="preserve">
+    <value>{0} of {1}</value>
+  </data>
+  <data name="FanCheckGroup.NoneAssigned" xml:space="preserve">
+    <value>none</value>
+  </data>
+  <data name="FanCheckGroup.ToggleAllName" xml:space="preserve">
+    <value>Fans in {0} ({1} of {2} selected)</value>
+  </data>
+  <data name="FanCurveCheck.MoveHint" xml:space="preserve">
+    <value>In “{0}” - ticking moves it here</value>
+  </data>
+  <data name="PointRow.TemperatureName" xml:space="preserve">
+    <value>Temperature of point {0} in °C</value>
+  </data>
+  <data name="PointRow.PercentName" xml:space="preserve">
+    <value>Power of point {0} in %</value>
+  </data>
+  <data name="PointRow.RemoveName" xml:space="preserve">
+    <value>Remove point {0}</value>
+  </data>
   <data name="CurveEditRow.SourceCount" xml:space="preserve">
     <value>{0} sensors</value>
-  </data>
-  <data name="CurveEditRow.ShowLess" xml:space="preserve">
-    <value>Show less</value>
   </data>
   <data name="CurveEditRow.ActiveHint" xml:space="preserve">
     <value>Active: source sensor and at least one fan assigned.</value>
@@ -985,14 +2055,140 @@
   <data name="FanAssignRow.CalibDone" xml:space="preserve">
     <value>Done - start at pwm {0}</value>
   </data>
+  <data name="FanAssignRow.CalibDoneNoSafeStart" xml:space="preserve">
+    <value>Done - no safe start point found</value>
+  </data>
+  <data name="FanAssignRow.PowerRangeTitle" xml:space="preserve">
+    <value>Power range</value>
+  </data>
+  <data name="FanAssignRow.PowerRangeDesc" xml:space="preserve">
+    <value>The curve only drives the fan within this range - no slower than Min, no faster than Max.</value>
+  </data>
+  <data name="FanAssignRow.PwmValue" xml:space="preserve">
+    <value>pwm {0}</value>
+  </data>
+  <data name="FanAssignRow.StartMark" xml:space="preserve">
+    <value>Start {0} %</value>
+  </data>
+  <data name="FanAssignRow.BelowStart" xml:space="preserve">
+    <value>Min is below the start point ({0} %) - below it the fan may stall.</value>
+  </data>
+  <data name="FanAssignRow.SetMinToStart" xml:space="preserve">
+    <value>Set Min to {0} %</value>
+  </data>
+  <data name="FanAssignRow.CalibrationTitle" xml:space="preserve">
+    <value>Calibration &amp; tach</value>
+  </data>
+  <data name="FanAssignRow.CalibrationDesc" xml:space="preserve">
+    <value>This fan's start point and speed sensor.</value>
+  </data>
+  <data name="FanAssignRow.StartPoint" xml:space="preserve">
+    <value>Start point</value>
+  </data>
+  <data name="FanAssignRow.StartValue" xml:space="preserve">
+    <value>{0} % · pwm {1}</value>
+  </data>
+  <data name="FanAssignRow.StartNone" xml:space="preserve">
+    <value>none found</value>
+  </data>
+  <data name="FanAssignRow.ChipCalibrating" xml:space="preserve">
+    <value>running … {0} %</value>
+  </data>
+  <data name="FanAssignRow.ChipNotCalibrated" xml:space="preserve">
+    <value>not calibrated</value>
+  </data>
+  <data name="FanAssignRow.ChipNoSafeStart" xml:space="preserve">
+    <value>no safe start point</value>
+  </data>
+  <data name="FanAssignRow.ChipCalibrated" xml:space="preserve">
+    <value>calibrated</value>
+  </data>
+  <data name="FanAssignRow.ChipCalibrationMismatch" xml:space="preserve">
+    <value>no longer fits</value>
+  </data>
+  <data name="FanAssignRow.MismatchStalls" xml:space="preserve">
+    <value>Barely turns although its calibration expects it to - recalibrating is recommended.</value>
+  </data>
+  <data name="FanAssignRow.MismatchSlower" xml:space="preserve">
+    <value>Turns much slower than its calibration suggests - was the fan replaced? Recalibrating is recommended.</value>
+  </data>
+  <data name="FanAssignRow.MismatchFaster" xml:space="preserve">
+    <value>Turns much faster than its calibration suggests - was the fan replaced? Recalibrating is recommended.</value>
+  </data>
+  <data name="FanAssignRow.MismatchOtherSensor" xml:space="preserve">
+    <value>The calibration was measured with another speed sensor than the current one - recalibrating is recommended.</value>
+  </data>
+  <data name="FanAssignRow.Recalibrate" xml:space="preserve">
+    <value>Recalibrate</value>
+  </data>
+  <data name="FanAssignRow.CancelCalibration" xml:space="preserve">
+    <value>Cancel · {0} %</value>
+  </data>
+  <data name="FanAssignRow.CancelCalibrationTooltip" xml:space="preserve">
+    <value>Cancels the running calibration.</value>
+  </data>
+  <data name="FanAssignRow.CalibrationDetail" xml:space="preserve">
+    <value>{0} · pwm {1} · {2} RPM</value>
+  </data>
+  <data name="FanAssignRow.ChipCoupling" xml:space="preserve">
+    <value>coupling …</value>
+  </data>
+  <data name="FanAssignRow.ChipTachShared" xml:space="preserve">
+    <value>used twice</value>
+  </data>
+  <data name="FanAssignRow.ChipNoSignal" xml:space="preserve">
+    <value>no signal</value>
+  </data>
+  <data name="FanAssignRow.ChipTachMissing" xml:space="preserve">
+    <value>sensor missing</value>
+  </data>
+  <data name="FanAssignRow.ChipCoupled" xml:space="preserve">
+    <value>coupled</value>
+  </data>
+  <data name="FanAssignRow.ChipTachAuto" xml:space="preserve">
+    <value>reports speed</value>
+  </data>
+  <data name="FanAssignRow.Couple" xml:space="preserve">
+    <value>Couple tach</value>
+  </data>
+  <data name="FanAssignRow.Recouple" xml:space="preserve">
+    <value>Couple tach again</value>
+  </data>
+  <data name="FanAssignRow.TachTakenBy" xml:space="preserve">
+    <value>used by {0}</value>
+  </data>
+  <data name="FanAssignRow.AssignByHand" xml:space="preserve">
+    <value>Assign by hand …</value>
+  </data>
+  <data name="FanAssignRow.TestTitle" xml:space="preserve">
+    <value>Test</value>
+  </data>
+  <data name="FanAssignRow.TestDesc" xml:space="preserve">
+    <value>Run the fan by hand for a moment to hear or place it. Collapsing “Advanced” returns it to its curve.</value>
+  </data>
+  <data name="FanAssignRow.TestCurve" xml:space="preserve">
+    <value>Curve</value>
+  </data>
+  <data name="FanAssignRow.TestManual" xml:space="preserve">
+    <value>Manual</value>
+  </data>
+  <data name="FanAssignRow.TestMode" xml:space="preserve">
+    <value>Control while testing</value>
+  </data>
+  <data name="FanAssignRow.TestPower" xml:space="preserve">
+    <value>Power while testing</value>
+  </data>
+  <data name="FanAssignRow.RpmLive" xml:space="preserve">
+    <value>RPM live</value>
+  </data>
+  <data name="FanAssignRow.TestFloorHint" xml:space="preserve">
+    <value>0 % is the hardware floor. To find a fan, use “Identify” instead.</value>
+  </data>
+  <data name="FanAssignRow.ReadOnlyNote" xml:space="preserve">
+    <value>Display only - power range, calibration and testing exist only for controllable fans.</value>
+  </data>
   <data name="FanAssignRow.Identifying" xml:space="preserve">
     <value>Identifying … (100 %, others throttled)</value>
-  </data>
-  <data name="FanAssignRow.MinClamped" xml:space="preserve">
-    <value>Min lowered to {0} % (must be ≤ Max)</value>
-  </data>
-  <data name="FanAssignRow.MaxClamped" xml:space="preserve">
-    <value>Max raised to {0} % (must be ≥ Min)</value>
   </data>
   <data name="CalibrationStatus.Aborted" xml:space="preserve">
     <value>Calibration aborted: {0}</value>
@@ -1014,6 +2210,9 @@
   </data>
   <data name="IpcLiveMonitor.AccessDenied" xml:space="preserve">
     <value>The background service is running, but access to it was denied. Make sure your user is in the IPC access group - "linfan" on Linux, "LinFan Users" on Windows - then log out and back in.</value>
+  </data>
+  <data name="IpcLiveMonitor.UnreadableData" xml:space="preserve">
+    <value>The background service sends data this app cannot read.</value>
   </data>
   <data name="Ipc.Status.Active" xml:space="preserve">
     <value>Active</value>
@@ -1057,23 +2256,26 @@
   <data name="Ipc.Tach.Ambiguous" xml:space="preserve">
     <value>Not unambiguous - please assign manually.</value>
   </data>
-  <data name="FanAssignRow.NoTachometer" xml:space="preserve">
-    <value>- (none) -</value>
+  <data name="FanAssignRow.TachAuto" xml:space="preserve">
+    <value>Automatic (hardware)</value>
+  </data>
+  <data name="FanAssignRow.TachAutoNamed" xml:space="preserve">
+    <value>Automatic: {0}</value>
+  </data>
+  <data name="FanAssignRow.TachAutoAt" xml:space="preserve">
+    <value>automatic for {0}</value>
+  </data>
+  <data name="FanAssignRow.TachMissing" xml:space="preserve">
+    <value>Not detected: {0}</value>
   </data>
   <data name="FanAssignRow.Coupling" xml:space="preserve">
     <value>Coupling … (spinning up, measuring speeds)</value>
-  </data>
-  <data name="MainWindow.TachometerHeader" xml:space="preserve">
-    <value>Speed sensor coupling</value>
-  </data>
-  <data name="MainWindow.CoupleSensor" xml:space="preserve">
-    <value>Couple sensor</value>
   </data>
   <data name="MainWindow.CoupleSensorTooltip" xml:space="preserve">
     <value>Automatically finds this fans speed sensor: spins the fan up, throttles the others, and assigns the tacho that responds.</value>
   </data>
   <data name="MainWindow.CancelCouple" xml:space="preserve">
-    <value>Cancel</value>
+    <value>Cancel coupling</value>
   </data>
   <data name="MainWindow.CancelCoupleTooltip" xml:space="preserve">
     <value>Cancel the running automatic coupling.</value>
@@ -1082,7 +2284,7 @@
     <value>Speed sensor</value>
   </data>
   <data name="MainWindow.TachometerTooltip" xml:space="preserve">
-    <value>Manually assign the speed sensor (tacho) that belongs to this fan. “- (none) -” clears the assignment.</value>
+    <value>Pick the speed sensor by hand. Sensors another fan already uses are locked.</value>
   </data>
   <data name="MainWindow.TabSettings" xml:space="preserve">
     <value>Settings</value>
@@ -1093,9 +2295,6 @@
   <data name="Settings.GroupApp" xml:space="preserve">
     <value>Application</value>
   </data>
-  <data name="Settings.GroupManage" xml:space="preserve">
-    <value>Management</value>
-  </data>
   <data name="Settings.SectionSensors" xml:space="preserve">
     <value>Sensors</value>
   </data>
@@ -1105,32 +2304,338 @@
   <data name="Settings.SectionAirflow" xml:space="preserve">
     <value>Airflow</value>
   </data>
+  <data name="Airflow.Title" xml:space="preserve">
+    <value>Airflow</value>
+  </data>
+  <data name="Airflow.Subtitle" xml:space="preserve">
+    <value>From the mounting positions: the pressure balance in the case and fitting curves per profile. When a position changes, everything is recomputed right away.</value>
+  </data>
+  <data name="Airflow.CaseTitle" xml:space="preserve">
+    <value>Case</value>
+  </data>
+  <data name="Airflow.CaseSub" xml:space="preserve">
+    <value>Click a fan to change its position.</value>
+  </data>
+  <data name="Airflow.CaseName" xml:space="preserve">
+    <value>Case schema with fans</value>
+  </data>
+  <data name="Airflow.Component" xml:space="preserve">
+    <value>Component</value>
+  </data>
+  <data name="Airflow.FanTooltip" xml:space="preserve">
+    <value>{0} · {1} - click to change the position</value>
+  </data>
+  <data name="Airflow.FanTooltipReadOnly" xml:space="preserve">
+    <value>{0} · {1} · not controllable - click to change the position</value>
+  </data>
+  <data name="Airflow.BalanceTitle" xml:space="preserve">
+    <value>Pressure balance</value>
+  </data>
+  <data name="Airflow.BasisRpm" xml:space="preserve">
+    <value>by speed</value>
+  </data>
+  <data name="Airflow.BasisRpmTooltip" xml:space="preserve">
+    <value>Sum of the calibrated top speed of all case fans - all of them are calibrated.</value>
+  </data>
+  <data name="Airflow.BasisCount" xml:space="preserve">
+    <value>by count</value>
+  </data>
+  <data name="Airflow.BasisCountTooltip" xml:space="preserve">
+    <value>Every case fan counts the same. It gets more precise once all of them are calibrated.</value>
+  </data>
+  <data name="Airflow.IntakeFans" xml:space="preserve">
+    <value>Intake · {0} fans</value>
+  </data>
+  <data name="Airflow.IntakeOneFan" xml:space="preserve">
+    <value>Intake · 1 fan</value>
+  </data>
+  <data name="Airflow.ExhaustFans" xml:space="preserve">
+    <value>Exhaust · {0} fans</value>
+  </data>
+  <data name="Airflow.ExhaustOneFan" xml:space="preserve">
+    <value>Exhaust · 1 fan</value>
+  </data>
+  <data name="Airflow.Share" xml:space="preserve">
+    <value>{0} %</value>
+  </data>
+  <data name="Airflow.ShareRpm" xml:space="preserve">
+    <value>{0} % · {1} RPM max.</value>
+  </data>
+  <data name="Airflow.BalanceName" xml:space="preserve">
+    <value>Pressure balance {0} % intake to {1} % exhaust</value>
+  </data>
+  <data name="Airflow.ScaleNegative" xml:space="preserve">
+    <value>Negative</value>
+  </data>
+  <data name="Airflow.ScaleBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="Airflow.ScalePositive" xml:space="preserve">
+    <value>Positive</value>
+  </data>
+  <data name="Airflow.VerdictUnknown" xml:space="preserve">
+    <value>Cannot be determined.</value>
+  </data>
+  <data name="Airflow.VerdictNotApplicable" xml:space="preserve">
+    <value>Open bench - without a case there is no pressure balance.</value>
+  </data>
+  <data name="Airflow.VerdictLaptop" xml:space="preserve">
+    <value>Laptop - the fans draw in and blow out directly; there is no pressure balance here.</value>
+  </data>
+  <data name="Airflow.VerdictFanWallOnly" xml:space="preserve">
+    <value>Fan wall only - it moves the air inside the case; without fans at the front or rear there is no pressure balance.</value>
+  </data>
+  <data name="Airflow.VerdictOnlyExhaust" xml:space="preserve">
+    <value>Exhaust only - strong negative pressure, fresh air only comes in through gaps.</value>
+  </data>
+  <data name="Airflow.VerdictOnlyIntake" xml:space="preserve">
+    <value>Intake only - strong positive pressure, warm air tends to build up.</value>
+  </data>
+  <data name="Airflow.VerdictNegative" xml:space="preserve">
+    <value>Negative pressure - pulls dust in through gaps and drive bays.</value>
+  </data>
+  <data name="Airflow.VerdictBalanced" xml:space="preserve">
+    <value>Balanced.</value>
+  </data>
+  <data name="Airflow.VerdictSlightPositive" xml:space="preserve">
+    <value>Slight positive pressure - good against dust.</value>
+  </data>
+  <data name="Airflow.VerdictStrongPositive" xml:space="preserve">
+    <value>Strong positive pressure - warm air tends to build up; raise the exhaust a little.</value>
+  </data>
+  <data name="Airflow.HintsName" xml:space="preserve">
+    <value>Notices</value>
+  </data>
+  <data name="Airflow.HintNoPosition" xml:space="preserve">
+    <value>“{0}” has no mounting position - until then the default curve applies.</value>
+  </data>
+  <data name="Airflow.HintNoPositionReadOnly" xml:space="preserve">
+    <value>“{0}” has no mounting position.</value>
+  </data>
+  <data name="Airflow.SetPosition" xml:space="preserve">
+    <value>Set position</value>
+  </data>
+  <data name="Airflow.SetPositionTooltip" xml:space="preserve">
+    <value>Opens “Choose position” with the case diagram.</value>
+  </data>
+  <data name="Airflow.HintUncalibratedOne" xml:space="preserve">
+    <value>“{0}” is not calibrated - the pressure balance is only estimated by count.</value>
+  </data>
+  <data name="Airflow.HintUncalibrated" xml:space="preserve">
+    <value>{0} case fans are not calibrated - the pressure balance is only estimated by count.</value>
+  </data>
+  <data name="Airflow.CalibrateFan" xml:space="preserve">
+    <value>Calibrate “{0}”</value>
+  </data>
+  <data name="Airflow.CalibrateTooltip" xml:space="preserve">
+    <value>Finds this fan's start point and speed - the progress shows under Fans › Advanced.</value>
+  </data>
+  <data name="Airflow.HintNoIntake" xml:space="preserve">
+    <value>No intake fan. Is one entered the wrong way round?</value>
+  </data>
+  <data name="Airflow.HintNoExhaust" xml:space="preserve">
+    <value>No exhaust fan. Is one entered the wrong way round?</value>
+  </data>
+  <data name="Airflow.CheckDirection" xml:space="preserve">
+    <value>Check direction</value>
+  </data>
+  <data name="Airflow.CheckDirectionTooltip" xml:space="preserve">
+    <value>Opens “Choose position” - intake ⇄ exhaust can be switched there.</value>
+  </data>
+  <data name="Airflow.HintNoCaseFans" xml:space="preserve">
+    <value>No case fan with a position yet - without them there is no pressure balance.</value>
+  </data>
+  <data name="Airflow.HintNotInCaseOne" xml:space="preserve">
+    <value>“{0}” has a position that “{1}” does not have - it does not count in the pressure balance.</value>
+  </data>
+  <data name="Airflow.HintNotInCase" xml:space="preserve">
+    <value>{0} fans have a position that “{1}” does not have - they do not count in the pressure balance.</value>
+  </data>
+  <data name="Airflow.HintNotInCaseOneOpen" xml:space="preserve">
+    <value>“{0}” has a position that “{1}” does not have - on an open bench only component fans count.</value>
+  </data>
+  <data name="Airflow.HintNotInCaseOpen" xml:space="preserve">
+    <value>{0} fans have a position that “{1}” does not have - on an open bench only component fans count.</value>
+  </data>
+  <data name="Airflow.HintNotInCaseOneLaptop" xml:space="preserve">
+    <value>“{0}” has a position that “{1}” does not have.</value>
+  </data>
+  <data name="Airflow.HintNotInCaseLaptop" xml:space="preserve">
+    <value>{0} fans have a position that “{1}” does not have.</value>
+  </data>
+  <data name="Airflow.SetPositionInCaseTooltip" xml:space="preserve">
+    <value>Opens “Choose position” with the diagram for “{0}”.</value>
+  </data>
+  <data name="Airflow.HintMixedSide" xml:space="preserve">
+    <value>{0}: {1} × intake and {2} × exhaust on the same side - part of the fresh air is drawn straight out again. The pressure balance counts each fan by its direction.</value>
+  </data>
+  <data name="Airflow.HintAgainstFlowOne" xml:space="preserve">
+    <value>“{0}” blows against the usual server direction (front → rear). Is it mounted the right way round?</value>
+  </data>
+  <data name="Airflow.HintAgainstFlow" xml:space="preserve">
+    <value>{0} fans blow against the usual server direction (front → rear). Are they mounted the right way round?</value>
+  </data>
+  <data name="Airflow.ToFans" xml:space="preserve">
+    <value>Go to fans</value>
+  </data>
+  <data name="Airflow.ProposalTitle" xml:space="preserve">
+    <value>Proposal for profile</value>
+  </data>
+  <data name="Airflow.TargetName" xml:space="preserve">
+    <value>Target profile of the proposal</value>
+  </data>
+  <data name="Airflow.TargetTooltip" xml:space="preserve">
+    <value>Which profile the proposal is for - the running one is preselected.</value>
+  </data>
+  <data name="Airflow.Running" xml:space="preserve">
+    <value>running</value>
+  </data>
+  <data name="Airflow.NotActive" xml:space="preserve">
+    <value>not active</value>
+  </data>
+  <data name="Airflow.OneChange" xml:space="preserve">
+    <value>1 change</value>
+  </data>
+  <data name="Airflow.Changes" xml:space="preserve">
+    <value>{0} changes</value>
+  </data>
+  <data name="Airflow.Picked" xml:space="preserve">
+    <value> · {0} picked</value>
+  </data>
+  <data name="Airflow.New" xml:space="preserve">
+    <value>new</value>
+  </data>
+  <data name="Airflow.OneUnchanged" xml:space="preserve">
+    <value>1 fan stays the same</value>
+  </data>
+  <data name="Airflow.Unchanged" xml:space="preserve">
+    <value>{0} fans stay the same</value>
+  </data>
+  <data name="Airflow.UnchangedEntry" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="Airflow.Follows" xml:space="preserve">
+    <value>“{0}” already follows the proposal.</value>
+  </data>
+  <data name="Airflow.OpenInEditor" xml:space="preserve">
+    <value>Open in editor</value>
+  </data>
+  <data name="Airflow.Emptied" xml:space="preserve">
+    <value>Without fans afterwards (they stay in the profile): {0}.</value>
+  </data>
+  <data name="Airflow.EmptiedCurve" xml:space="preserve">
+    <value>“{0}”</value>
+  </data>
+  <data name="Airflow.ApplyTo" xml:space="preserve">
+    <value>Apply to “{0}”</value>
+  </data>
+  <data name="Airflow.ApplyTooltip" xml:space="preserve">
+    <value>Writes the ticked changes into “{0}” - save afterwards.</value>
+  </data>
+  <data name="Airflow.NothingPicked" xml:space="preserve">
+    <value>Nothing ticked.</value>
+  </data>
+  <data name="Airflow.TooManyCurves" xml:space="preserve">
+    <value>The profile would then have more than {0} curves.</value>
+  </data>
+  <data name="Airflow.TooManyProfiles" xml:space="preserve">
+    <value>There are already {0} profiles - no more are possible.</value>
+  </data>
+  <data name="Airflow.CreateProfile" xml:space="preserve">
+    <value>Create as new profile</value>
+  </data>
+  <data name="Airflow.CreateTooltip" xml:space="preserve">
+    <value>A copy of the profile with the ticked changes - the original stays unchanged.</value>
+  </data>
+  <data name="Airflow.NewProfileName" xml:space="preserve">
+    <value>{0} · Airflow</value>
+  </data>
+  <data name="Airflow.NotRunning" xml:space="preserve">
+    <value>“{0}” is not running - takes effect only after switching to it. </value>
+  </data>
+  <data name="Airflow.SaveToApply" xml:space="preserve">
+    <value>Goes into the editor; only saving applies it.</value>
+  </data>
+  <data name="Airflow.Applied" xml:space="preserve">
+    <value>Airflow proposal applied to “{0}” - save now.</value>
+  </data>
+  <data name="Airflow.Created" xml:space="preserve">
+    <value>Profile “{0}” created - save now.</value>
+  </data>
+  <data name="Airflow.RolesTitle" xml:space="preserve">
+    <value>Role curves</value>
+  </data>
+  <data name="Airflow.RolesSub" xml:space="preserve">
+    <value>Every position gets a role. If the profile lacks the curve, the proposal creates it from the template.</value>
+  </data>
+  <data name="Airflow.RoleCpu" xml:space="preserve">
+    <value>CPU / radiator</value>
+  </data>
+  <data name="Airflow.RoleCpuWho" xml:space="preserve">
+    <value>CPU cooler, radiator</value>
+  </data>
+  <data name="Airflow.RoleGpu" xml:space="preserve">
+    <value>GPU</value>
+  </data>
+  <data name="Airflow.RoleGpuWho" xml:space="preserve">
+    <value>GPU cooler</value>
+  </data>
+  <data name="Airflow.RoleIntake" xml:space="preserve">
+    <value>Intake</value>
+  </data>
+  <data name="Airflow.RoleIntakeWho" xml:space="preserve">
+    <value>all intake positions</value>
+  </data>
+  <data name="Airflow.RoleExhaust" xml:space="preserve">
+    <value>Exhaust</value>
+  </data>
+  <data name="Airflow.RoleExhaustWho" xml:space="preserve">
+    <value>all exhaust positions</value>
+  </data>
+  <data name="Airflow.RoleDefault" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Airflow.RoleDefaultWho" xml:space="preserve">
+    <value>fans without a position or “Other”</value>
+  </data>
+  <data name="Airflow.CurveExists" xml:space="preserve">
+    <value>exists</value>
+  </data>
+  <data name="Airflow.CurveFromTemplate" xml:space="preserve">
+    <value>new from template</value>
+  </data>
+  <data name="Airflow.CurveOff" xml:space="preserve">
+    <value>switched off</value>
+  </data>
+  <data name="Airflow.CurveOffTooltip" xml:space="preserve">
+    <value>The profile has this curve, but it is switched off - its fans run on hardware auto until you switch it on in the curve editor.</value>
+  </data>
+  <data name="Airflow.NoSensor" xml:space="preserve">
+    <value>no sensor</value>
+  </data>
+  <data name="Airflow.SensorsAvg" xml:space="preserve">
+    <value>{0} sensors · average</value>
+  </data>
+  <data name="Airflow.SensorsMax" xml:space="preserve">
+    <value>{0} sensors · maximum</value>
+  </data>
+  <data name="Airflow.NoFan" xml:space="preserve">
+    <value>no fan</value>
+  </data>
   <data name="Settings.SectionAppearance" xml:space="preserve">
     <value>Appearance</value>
   </data>
-  <data name="Settings.SectionLanguage" xml:space="preserve">
-    <value>Language</value>
-  </data>
   <data name="Settings.SectionBackground" xml:space="preserve">
-    <value>Background</value>
+    <value>Startup &amp; background</value>
   </data>
   <data name="Settings.SectionBackup" xml:space="preserve">
-    <value>Backup &amp; restore</value>
+    <value>Backup &amp; setup</value>
   </data>
-  <data name="Settings.SectionOnboarding" xml:space="preserve">
+  <data name="Settings.OnboardingTitle" xml:space="preserve">
     <value>Setup assistant</value>
   </data>
-  <data name="Settings.SensorsDesc" xml:space="preserve">
-    <value>Rename temperature sensors, group them and hide unused ones.</value>
-  </data>
-  <data name="Settings.FansDesc" xml:space="preserve">
-    <value>Name fans, set their position, calibrate and adjust min/max power.</value>
-  </data>
-  <data name="Settings.AirflowDesc" xml:space="preserve">
-    <value>Suggest a pressure balance and matching curves from the installed positions.</value>
-  </data>
   <data name="Settings.AppearanceDesc" xml:space="preserve">
-    <value>Choose the color scheme.</value>
+    <value>Color scheme, accent color and language of the interface.</value>
   </data>
   <data name="Theme.System" xml:space="preserve">
     <value>System</value>
@@ -1141,20 +2646,137 @@
   <data name="Theme.Dark" xml:space="preserve">
     <value>Dark</value>
   </data>
-  <data name="Settings.LanguageDesc" xml:space="preserve">
-    <value>Choose the display language.</value>
+  <data name="Theme.SystemHint" xml:space="preserve">
+    <value>Follows the operating system</value>
+  </data>
+  <data name="Theme.LightHint" xml:space="preserve">
+    <value>Light surfaces, dark text</value>
+  </data>
+  <data name="Theme.DarkHint" xml:space="preserve">
+    <value>Dark surfaces, light text</value>
+  </data>
+  <data name="Theme.Terminal" xml:space="preserve">
+    <value>Terminal</value>
+  </data>
+  <data name="Theme.TerminalHint" xml:space="preserve">
+    <value>Phosphor green, monospace, square</value>
+  </data>
+  <data name="Theme.HighContrast" xml:space="preserve">
+    <value>High contrast</value>
+  </data>
+  <data name="Theme.HighContrastHint" xml:space="preserve">
+    <value>Black and white, strong outlines</value>
+  </data>
+  <data name="Settings.ThemeGroupName" xml:space="preserve">
+    <value>Color scheme</value>
+  </data>
+  <data name="Settings.Accent" xml:space="preserve">
+    <value>Accent color</value>
+  </data>
+  <data name="Settings.AccentHint" xml:space="preserve">
+    <value>For buttons, switches, selections and curves. Every theme gets a readable variant of it - light themes a little darker, dark ones a little lighter.</value>
+  </data>
+  <data name="Accent.Standard" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Accent.Indigo" xml:space="preserve">
+    <value>Indigo</value>
+  </data>
+  <data name="Accent.Violet" xml:space="preserve">
+    <value>Violet</value>
+  </data>
+  <data name="Accent.Pink" xml:space="preserve">
+    <value>Pink</value>
+  </data>
+  <data name="Accent.Orange" xml:space="preserve">
+    <value>Orange</value>
+  </data>
+  <data name="Accent.Emerald" xml:space="preserve">
+    <value>Emerald</value>
+  </data>
+  <data name="Accent.Gray" xml:space="preserve">
+    <value>Gray</value>
+  </data>
+  <data name="Accent.Custom" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="Accent.StandardTooltip" xml:space="preserve">
+    <value>The own accent of the theme “{0}”</value>
+  </data>
+  <data name="Accent.PresetTooltip" xml:space="preserve">
+    <value>{0} - in the theme “{1}” {2}</value>
+  </data>
+  <data name="Accent.CustomTooltip" xml:space="preserve">
+    <value>A color of your own, as a hex value</value>
+  </data>
+  <data name="Accent.Hex" xml:space="preserve">
+    <value>Hex</value>
+  </data>
+  <data name="Accent.HexName" xml:space="preserve">
+    <value>Own accent color as a hex value</value>
+  </data>
+  <data name="Accent.HexHint" xml:space="preserve">
+    <value>Six hex digits, e.g. #38BDF8</value>
+  </data>
+  <data name="Accent.Derived" xml:space="preserve">
+    <value>In the theme “{0}”: lines</value>
+  </data>
+  <data name="Accent.DerivedButtons" xml:space="preserve">
+    <value>· buttons</value>
+  </data>
+  <data name="Accent.Adjusted" xml:space="preserve">
+    <value>adjusted for readability</value>
+  </data>
+  <data name="Accent.AdjustedTooltip" xml:space="preserve">
+    <value>The chosen color would lack contrast in this theme - LinFan lightens or darkens it.</value>
+  </data>
+  <data name="Accent.ClashWarning" xml:space="preserve">
+    <value>Close to the warning and exhaust orange - notices and exhaust areas stand out less.</value>
+  </data>
+  <data name="Accent.ClashDanger" xml:space="preserve">
+    <value>Close to the error red - critical notices stand out less.</value>
+  </data>
+  <data name="Accent.ClashSuccess" xml:space="preserve">
+    <value>Close to the success green - “OK” marks stand out less.</value>
+  </data>
+  <data name="Accent.PreviewSelected" xml:space="preserve">
+    <value>Selected</value>
+  </data>
+  <data name="Accent.PreviewLink" xml:space="preserve">
+    <value>Open curve ›</value>
+  </data>
+  <data name="Settings.LanguageHint" xml:space="preserve">
+    <value>“System” follows the language of the operating system.</value>
+  </data>
+  <data name="Settings.LanguageChipName" xml:space="preserve">
+    <value>Language: {0}</value>
+  </data>
+  <data name="Settings.LanguageSystemDetail" xml:space="preserve">
+    <value>operating system · {0}</value>
   </data>
   <data name="Settings.BackgroundDesc" xml:space="preserve">
-    <value>Behaviour when the window is closed.</value>
+    <value>Behaviour when the window is closed and at startup.</value>
   </data>
   <data name="Settings.BackupDesc" xml:space="preserve">
-    <value>Export, import or reset your configuration.</value>
+    <value>Back up your configuration, run the setup again or reset everything.</value>
+  </data>
+  <data name="Settings.ActionsOffline" xml:space="preserve">
+    <value>Locked while the background service is unreachable.</value>
+  </data>
+  <data name="Settings.BackupTitle" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="Settings.BackupRowDesc" xml:space="preserve">
+    <value>Sensors, fans, profiles, curves and calibration plus theme and language in one file. Importing replaces the current configuration.</value>
   </data>
   <data name="Settings.OnboardingDesc" xml:space="preserve">
-    <value>Run the guided first-time setup again.</value>
+    <value>Calibration, devices and profile choice again, step by step. Names, groups and calibration are kept; the assistant replaces your profiles and curves with new ones.</value>
   </data>
   <data name="Settings.Export" xml:space="preserve">
     <value>Export backup…</value>
+  </data>
+  <data name="Settings.ExportButton" xml:space="preserve">
+    <value>Export …</value>
   </data>
   <data name="Settings.ExportTooltip" xml:space="preserve">
     <value>Save all settings (sensors, fans, profiles, curves) plus theme/language to a file.</value>
@@ -1162,17 +2784,37 @@
   <data name="Settings.Import" xml:space="preserve">
     <value>Import backup…</value>
   </data>
+  <data name="Settings.ImportButton" xml:space="preserve">
+    <value>Import …</value>
+  </data>
   <data name="Settings.ImportTooltip" xml:space="preserve">
     <value>Restore settings from a backup file - replaces the current configuration.</value>
   </data>
-  <data name="Settings.DangerZone" xml:space="preserve">
-    <value>Danger zone</value>
+  <data name="Settings.ImportConfirmTitle" xml:space="preserve">
+    <value>Import the backup?</value>
+  </data>
+  <data name="Settings.ImportConfirmMessage" xml:space="preserve">
+    <value>The backup replaces the current configuration completely - names, groups, profiles, curves and calibrations. This cannot be undone.
+
+In the backup - fans: {0} · profiles: {1} · curves: {2}</value>
+  </data>
+  <data name="Settings.ImportConfirm" xml:space="preserve">
+    <value>Import</value>
   </data>
   <data name="Settings.Reset" xml:space="preserve">
     <value>Reset to factory defaults</value>
   </data>
-  <data name="Settings.ResetTooltip" xml:space="preserve">
-    <value>Delete all sensors, fans, profiles, curves and calibration.</value>
+  <data name="Settings.ResetButton" xml:space="preserve">
+    <value>Reset …</value>
+  </data>
+  <data name="Settings.BackupFirst" xml:space="preserve">
+    <value>Back up first …</value>
+  </data>
+  <data name="Settings.BackupFirstTooltip" xml:space="preserve">
+    <value>Save everything to a file before resetting.</value>
+  </data>
+  <data name="Settings.ResetDesc" xml:space="preserve">
+    <value>Deletes all names, groups, profiles, curves and calibration. This cannot be undone - export a backup first.</value>
   </data>
   <data name="Settings.ResetConfirmTitle" xml:space="preserve">
     <value>Reset configuration?</value>
@@ -1184,7 +2826,7 @@
     <value>Reset</value>
   </data>
   <data name="Settings.StartOnboarding" xml:space="preserve">
-    <value>Start setup assistant</value>
+    <value>Start assistant</value>
   </data>
   <data name="Settings.StartOnboardingTooltip" xml:space="preserve">
     <value>Run the guided calibration and profile selection again.</value>
@@ -1198,6 +2840,12 @@
   <data name="Settings.BackupImported" xml:space="preserve">
     <value>Backup imported.</value>
   </data>
+  <data name="Settings.BackupImporting" xml:space="preserve">
+    <value>Importing the backup … waiting for the service to confirm it.</value>
+  </data>
+  <data name="Settings.BackupAlreadyCurrent" xml:space="preserve">
+    <value>Backup imported - it already matched the current configuration.</value>
+  </data>
   <data name="Settings.ImportFailedParse" xml:space="preserve">
     <value>The file is not a valid LinFan backup.</value>
   </data>
@@ -1206,6 +2854,9 @@
   </data>
   <data name="Settings.ImportFailedDaemon" xml:space="preserve">
     <value>Service unreachable - import failed.</value>
+  </data>
+  <data name="Settings.ImportNotConfirmed" xml:space="preserve">
+    <value>The background service did not confirm the import - its configuration may be unchanged. Check it, and the service's log.</value>
   </data>
   <data name="Settings.ConfigReset" xml:space="preserve">
     <value>Reset to factory defaults.</value>
@@ -1227,6 +2878,18 @@
   </data>
   <data name="Settings.CheckForUpdatesTooltip" xml:space="preserve">
     <value>Queries GitHub for a newer release each time the app starts.</value>
+  </data>
+  <data name="Settings.OpenRepository" xml:space="preserve">
+    <value>LinFan on GitHub</value>
+  </data>
+  <data name="Settings.VersionService" xml:space="preserve">
+    <value>Service {0}</value>
+  </data>
+  <data name="Settings.VersionServiceOlder" xml:space="preserve">
+    <value>Service: older version</value>
+  </data>
+  <data name="Settings.VersionMismatchTooltip" xml:space="preserve">
+    <value>The service runs a different version than this app. After an update, one of the two keeps the old version until it restarts.</value>
   </data>
   <data name="CurveEditorCtrl.AirflowCurveCpu" xml:space="preserve">
     <value>Airflow · CPU/Radiator</value>
@@ -1255,9 +2918,6 @@
   <data name="CurveEditorCtrl.AirflowHintNoSensors" xml:space="preserve">
     <value>No sensors configured - pick the source sensor of the suggested curves manually.</value>
   </data>
-  <data name="CurveEditorCtrl.AirflowHintNoCaseFans" xml:space="preserve">
-    <value>No case fans with an intake/exhaust position - the pressure balance cannot be determined.</value>
-  </data>
   <data name="CurveEditorCtrl.AirflowHintCountEstimate" xml:space="preserve">
     <value>Without full calibration the balance is estimated by fan count only (no RPM proxy).</value>
   </data>
@@ -1272,5 +2932,158 @@
   </data>
   <data name="CurveEditorCtrl.AirflowHintNoCpuSensor" xml:space="preserve">
     <value>No CPU sensor recognized by name - check the source of the CPU curve.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintNotInCase" xml:space="preserve">
+    <value>A fan has a position the chosen case type does not have - it does not count in the pressure balance.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintMixedSide" xml:space="preserve">
+    <value>Intake and exhaust on the same side - part of the fresh air is drawn straight out again.</value>
+  </data>
+  <data name="CurveEditorCtrl.AirflowHintAgainstFlow" xml:space="preserve">
+    <value>A fan blows against the usual server direction (front → rear).</value>
+  </data>
+  <data name="Overview.HintHardwareReplacedFansOne" xml:space="preserve">
+    <value>“{0}” was replaced by another device - start point unverified, recalibrating is recommended.</value>
+  </data>
+  <data name="Overview.HintHardwareReplacedFans" xml:space="preserve">
+    <value>{0} devices were replaced - start points unverified, recalibrating is recommended.</value>
+  </data>
+  <data name="Overview.HintHardwareReplacedOne" xml:space="preserve">
+    <value>“{0}” was replaced by another device - check the saved sensor names.</value>
+  </data>
+  <data name="Overview.HintHardwareReplaced" xml:space="preserve">
+    <value>{0} devices were replaced - check the saved sensor names.</value>
+  </data>
+  <data name="Overview.HintHardwareMissingOne" xml:space="preserve">
+    <value>1 saved entry belongs to hardware that is not detected right now.</value>
+  </data>
+  <data name="Overview.HintHardwareMissing" xml:space="preserve">
+    <value>{0} saved entries belong to hardware that is not detected right now.</value>
+  </data>
+  <data name="Overview.ActionReview" xml:space="preserve">
+    <value>Review …</value>
+  </data>
+  <data name="Overview.HintCalibrationSlower" xml:space="preserve">
+    <value>{0} turns much slower than its calibration suggests - was the fan replaced? Recalibrating is recommended.</value>
+  </data>
+  <data name="Overview.HintCalibrationFaster" xml:space="preserve">
+    <value>{0} turns much faster than its calibration suggests - was the fan replaced? Recalibrating is recommended.</value>
+  </data>
+  <data name="Overview.HintCalibrationOtherSensor" xml:space="preserve">
+    <value>{0}: the calibration was measured with another speed sensor than the current one - recalibrating is recommended.</value>
+  </data>
+  <data name="Overview.HintCalibrationStalls" xml:space="preserve">
+    <value>{0} barely turns at {1} % although its calibration expects it to - recalibrating is recommended.</value>
+  </data>
+  <data name="HardwareDialog.WindowTitle" xml:space="preserve">
+    <value>Changed hardware</value>
+  </data>
+  <data name="HardwareDialog.Heading" xml:space="preserve">
+    <value>Saved entries no longer match the hardware</value>
+  </data>
+  <data name="HardwareDialog.Hint" xml:space="preserve">
+    <value>Decide for each device what happens to its names, calibration and curve assignment. None of it happens on its own.</value>
+  </data>
+  <data name="HardwareDialog.UnknownDevice" xml:space="preserve">
+    <value>Unknown device</value>
+  </data>
+  <data name="HardwareDialog.KindReplaced" xml:space="preserve">
+    <value>Replaced</value>
+  </data>
+  <data name="HardwareDialog.KindMissing" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="HardwareDialog.ReplacedSummary" xml:space="preserve">
+    <value>Another device answers to the same ids - the saved settings come from the previous one.</value>
+  </data>
+  <data name="HardwareDialog.MissingSummary" xml:space="preserve">
+    <value>These saved entries belong to hardware that is not detected right now.</value>
+  </data>
+  <data name="HardwareDialog.CardName" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="HardwareDialog.Before" xml:space="preserve">
+    <value>Before</value>
+  </data>
+  <data name="HardwareDialog.Now" xml:space="preserve">
+    <value>Now</value>
+  </data>
+  <data name="HardwareDialog.StartPointNote" xml:space="preserve">
+    <value>Start point unverified - the calibration was measured on the previous device. Recalibrating is recommended.</value>
+  </data>
+  <data name="HardwareDialog.RecalibrateName" xml:space="preserve">
+    <value>Recalibrate {0}</value>
+  </data>
+  <data name="HardwareDialog.ResetSensorNames" xml:space="preserve">
+    <value>Reset sensor names to the hardware names</value>
+  </data>
+  <data name="HardwareDialog.ResetSensorNamesTooltip" xml:space="preserve">
+    <value>The own names of this device's sensors are dropped; they are called what the hardware calls them afterwards.</value>
+  </data>
+  <data name="HardwareDialog.Accept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="HardwareDialog.AcceptTooltip" xml:space="preserve">
+    <value>Names, calibration and curve assignment stay and apply to this device from now on.</value>
+  </data>
+  <data name="HardwareDialog.ForgetReplaced" xml:space="preserve">
+    <value>Set up as a new device …</value>
+  </data>
+  <data name="HardwareDialog.ForgetReplacedTooltip" xml:space="preserve">
+    <value>Removes the saved entries - the device starts out like newly detected hardware.</value>
+  </data>
+  <data name="HardwareDialog.ForgetMissing" xml:space="preserve">
+    <value>Remove entries …</value>
+  </data>
+  <data name="HardwareDialog.ForgetMissingTooltip" xml:space="preserve">
+    <value>Removes this device's saved entries.</value>
+  </data>
+  <data name="HardwareDialog.Keep" xml:space="preserve">
+    <value>Keep</value>
+  </data>
+  <data name="HardwareDialog.KeepTooltip" xml:space="preserve">
+    <value>The entries stay in case the device comes back.</value>
+  </data>
+  <data name="HardwareDialog.Waiting" xml:space="preserve">
+    <value>Waiting for the background service …</value>
+  </data>
+  <data name="HardwareDialog.SendFailed" xml:space="preserve">
+    <value>Background service unreachable - nothing changed.</value>
+  </data>
+  <data name="HardwareDialog.NotTaken" xml:space="preserve">
+    <value>The background service did not take the change - details in the service log.</value>
+  </data>
+  <data name="HardwareDialog.ForgetReplacedTitle" xml:space="preserve">
+    <value>Set up as a new device?</value>
+  </data>
+  <data name="HardwareDialog.ForgetReplacedMessage" xml:space="preserve">
+    <value>Names, curve assignments and calibrations of these entries are removed. The fans run on hardware auto until they get a curve again - calibrate them afterwards. This cannot be undone.</value>
+  </data>
+  <data name="HardwareDialog.ForgetReplacedSensorsMessage" xml:space="preserve">
+    <value>The saved names and groups of these sensors are removed - they are called what the hardware calls them afterwards. This cannot be undone.</value>
+  </data>
+  <data name="HardwareDialog.ForgetReplacedConfirm" xml:space="preserve">
+    <value>Set up as new</value>
+  </data>
+  <data name="HardwareDialog.ForgetMissingTitle" xml:space="preserve">
+    <value>Remove entries?</value>
+  </data>
+  <data name="HardwareDialog.ForgetMissingMessage" xml:space="preserve">
+    <value>Names, curve assignments and calibrations of these entries are removed. If the device is only missing for now - for instance because another program blocks hardware access on Windows - they are lost all the same. This cannot be undone.</value>
+  </data>
+  <data name="HardwareDialog.ForgetMissingConfirm" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="HardwareDialog.ResetNamesTitle" xml:space="preserve">
+    <value>Reset sensor names?</value>
+  </data>
+  <data name="HardwareDialog.ResetNamesMessage" xml:space="preserve">
+    <value>This device's sensors lose their own names and are called what the hardware calls them.</value>
+  </data>
+  <data name="HardwareDialog.ResetNamesConfirm" xml:space="preserve">
+    <value>Discard &amp; keep</value>
+  </data>
+  <data name="HardwareDialog.DiscardsUnsaved" xml:space="preserve">
+    <value>Your unsaved changes are discarded with it.</value>
   </data>
 </root>

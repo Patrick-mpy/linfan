@@ -28,4 +28,13 @@ public enum AirflowHint
 
     /// <summary>Kein CPU-Sensor per Namens-Heuristik erkannt - Quelle der CPU-Kurve prüfen.</summary>
     NoCpuSensorDetected,
+
+    /// <summary>A fan has a case position the case type does not have - it stays out of the pressure balance.</summary>
+    PositionNotInCase,
+
+    /// <summary>Intake and exhaust on the same side - part of the fresh air goes straight out again.</summary>
+    MixedSide,
+
+    /// <summary>Server: a case fan blows against the usual front-to-rear flow.</summary>
+    AgainstCaseFlow,
 }

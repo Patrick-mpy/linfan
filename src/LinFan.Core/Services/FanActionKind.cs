@@ -22,4 +22,11 @@ public enum FanActionKind
 
     /// <summary>Schreiben fehlgeschlagen (z. B. fehlende Rechte).</summary>
     Failed,
+
+    /// <summary>
+    /// A fan the loop drove was to go back to firmware auto, but the channel has no auto mode (or setting it failed):
+    /// set to full speed instead, as <see cref="LinFan.Core.Abstractions.IFanController.RestoreDefaults"/> does for
+    /// such a channel - once without an auto mode, after a transient failure until auto can be set again.
+    /// </summary>
+    FullSpeed,
 }

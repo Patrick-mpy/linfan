@@ -10,8 +10,10 @@ namespace LinFan.Hardware.Mac.Smc;
 /// Strings, Werte rohe <see cref="SmcValue"/> - sonst zöge das Test-Projekt Plattform-Interop und der
 /// CI-Lauf auf Nicht-macOS risse.
 /// <para>
-/// Der Aufrufer (<see cref="MacSmcBackend"/>) serialisiert jeden Zugriff; Implementierungen müssen
-/// <b>nicht</b> selbst thread-sicher sein, aber schnell/nicht-blockierend (Poll-/Watchdog-Tick).
+/// Calls may overlap: the daemon serializes fan writes, but sensor reads run outside that gate on purpose (the
+/// watchdog must not wait behind a write), and <see cref="MacSmcBackend"/> adds no lock of its own. Implementations
+/// must therefore tolerate concurrent calls - <see cref="AppleSmc"/> keeps no shared per-call state - and be
+/// fast/non-blocking (poll/watchdog tick).
 /// </para>
 /// </summary>
 internal interface ISmc : IDisposable

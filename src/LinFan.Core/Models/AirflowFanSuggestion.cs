@@ -4,8 +4,9 @@ namespace LinFan.Core.Models;
 
 /// <summary>
 /// Vorschlag des Airflow-Auto-Tune für einen einzelnen Lüfter: welche Rolle/Richtung erkannt wurde
-/// und welche Kurve er bekommen soll. Rein beschreibend - erst <see cref="LinFan.Core.Services.AirflowTuneService.Apply"/>
-/// schreibt das in eine <see cref="AppConfig"/>.
+/// und welche Kurve er bekommen soll. Purely descriptive - the setup assistant builds its profiles from it
+/// (<see cref="LinFan.Core.Services.AirflowTuneService.BuildProfiles"/>), the settings page proposes per profile
+/// (<see cref="LinFan.Core.Services.AirflowTuneService.Propose"/>).
 /// </summary>
 public sealed record AirflowFanSuggestion
 {

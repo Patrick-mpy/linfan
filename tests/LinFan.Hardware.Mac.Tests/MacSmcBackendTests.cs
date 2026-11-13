@@ -38,6 +38,8 @@ public sealed class MacSmcBackendTests
         Assert.Equal(2, fans.Count);
         Assert.Single(fans, f => f.CanControl);         // F0 steuerbar
         Assert.Single(fans, f => !f.CanControl);         // F1 read-only
+        Assert.Null(fans.First(f => f.CanControl).ReadOnlyReason);
+        Assert.Equal(FanReadOnlyReason.NoControlInterface, fans.First(f => !f.CanControl).ReadOnlyReason); // no Tg/Md keys
 
         var sensors = b.DiscoverSensors();
         Assert.Contains(sensors, s => s.Kind == SensorKind.Temperature && s.Name == "CPU Proximity");
@@ -48,6 +50,17 @@ public sealed class MacSmcBackendTests
         Assert.NotNull(controllable.Tachometer);
     }
 
+    /// <summary>Every channel belongs to the SMC, which offers no fingerprint short of a serial number.</summary>
+    [Fact]
+    public void Discovery_NamesTheSmc_AsTheDeviceOfEveryChannel_WithoutAFingerprint()
+    {
+        using var b = Backend(TwoFanBoard(), control: true);
+
+        var smc = new HardwareDevice("SMC", null);
+        Assert.All(b.DiscoverFans(), f => Assert.Equal(smc, f.Device));
+        Assert.All(b.DiscoverSensors(), s => Assert.Equal(smc, s.Device));
+    }
+
     [Fact]
     public void Control_IsGated_WhenPlatformDisallows()
     {
@@ -55,6 +68,10 @@ public sealed class MacSmcBackendTests
         using var b = Backend(smc, control: false); // Apple Silicon / ohne Root
 
         Assert.All(b.DiscoverFans(), f => Assert.False(f.CanControl));
+        var fans = b.DiscoverFans();
+        Assert.Equal(FanReadOnlyReason.NoWriteAccess, fans.Single(f => f.Id.Value == "smc/F0").ReadOnlyReason);
+        // F1 has no control keys: root would not help either.
+        Assert.Equal(FanReadOnlyReason.NoControlInterface, fans.Single(f => f.Id.Value == "smc/F1").ReadOnlyReason);
 
         var id = b.DiscoverFans().First().Id;
         Assert.Throws<NotSupportedException>(() => b.SetPwm(id, 128));
@@ -81,6 +98,17 @@ public sealed class MacSmcBackendTests
     }
 
     [Fact]
+    public void GetMode_OfAnUnreadableModeKey_Throws_InsteadOfReportingAuto()
+    {
+        var smc = TwoFanBoard();
+        using var b = Backend(smc, control: true);
+        var id = b.DiscoverFans().First(f => f.CanControl).Id;
+        smc.FailReadsFor("F0Md");
+
+        Assert.Throws<IOException>(() => b.GetMode(id));
+    }
+
+    [Fact]
     public void RestoreDefaults_ReturnsControllableFanToAuto()
     {
         var smc = TwoFanBoard();
@@ -95,6 +123,34 @@ public sealed class MacSmcBackendTests
         Assert.Equal(FanMode.Auto, b.GetMode(id));
         Assert.True(smc.TryReadKey("F0Md", out var md));
         Assert.Equal(0.0, SmcCodec.Decode(md), 3); // Firmware-Auto
+    }
+
+    /// <summary>The CLI's read-only commands dispose the backend as root too - next to a daemon driving the fans.</summary>
+    [Fact]
+    public void Dispose_WithoutAWrite_LeavesTheFansAlone()
+    {
+        var smc = TwoFanBoard();
+        smc.SetUi8("F0Md", 1); // manual, set by another process
+        var b = Backend(smc, control: true);
+
+        b.Dispose();
+
+        Assert.True(smc.TryReadKey("F0Md", out var md));
+        Assert.Equal(1.0, SmcCodec.Decode(md), 3);
+        Assert.True(smc.Disposed);
+    }
+
+    [Fact]
+    public void Dispose_AfterAWrite_HandsTheFansBack()
+    {
+        var smc = TwoFanBoard();
+        var b = Backend(smc, control: true);
+        b.SetPwm(b.DiscoverFans().First(f => f.CanControl).Id, 50);
+
+        b.Dispose();
+
+        Assert.True(smc.TryReadKey("F0Md", out var md));
+        Assert.Equal(0.0, SmcCodec.Decode(md), 3);
     }
 
     [Fact]
@@ -115,6 +171,44 @@ public sealed class MacSmcBackendTests
         var fan = Assert.Single(b.DiscoverFans());
         Assert.False(fan.CanControl);
         Assert.Throws<NotSupportedException>(() => b.SetPwm(fan.Id, 128));
+    }
+
+    [Theory]
+    [InlineData("F0Md")]
+    [InlineData("F0Tg")]
+    public void SetPwm_Throws_WhenTheSmcRefusesAWrite_AndHandsTheFanBack(string refusedKey)
+    {
+        // A refused write must not pass for done: the loop would report the fan as driven by its curve. With only the
+        // target refused the fan was already switched to manual - it must not stay there on its old target.
+        var smc = TwoFanBoard();
+        smc.FailWritesFor(refusedKey);
+        using var b = Backend(smc, control: true);
+        var id = b.DiscoverFans().First(f => f.CanControl).Id;
+
+        Assert.Throws<IOException>(() => b.SetPwm(id, 128));
+
+        Assert.True(smc.TryReadKey("F0Md", out var md));
+        Assert.True(smc.TryReadKey("F0Tg", out var tg));
+        Assert.True(SmcCodec.Decode(md) == 0 || SmcCodec.Decode(tg) >= 5000,
+            $"weder Firmware-Auto (Md {SmcCodec.Decode(md)}) noch Volllast (Tg {SmcCodec.Decode(tg)})");
+    }
+
+    [Theory]
+    [InlineData(FanMode.Manual)]
+    [InlineData(FanMode.Auto)]
+    public void SetMode_Throws_WhenTheSmcRefusesTheModeWrite(FanMode mode)
+    {
+        var smc = TwoFanBoard();
+        smc.FailWritesFor("F0Md");
+        using var b = Backend(smc, control: true);
+        var id = b.DiscoverFans().First(f => f.CanControl).Id;
+
+        Assert.Throws<IOException>(() => b.SetMode(id, mode));
+
+        Assert.True(smc.TryReadKey("F0Md", out var md));
+        Assert.True(smc.TryReadKey("F0Tg", out var tg));
+        Assert.True(SmcCodec.Decode(md) == 0 || SmcCodec.Decode(tg) >= 5000,
+            $"weder Firmware-Auto (Md {SmcCodec.Decode(md)}) noch Volllast (Tg {SmcCodec.Decode(tg)})");
     }
 
     [Fact]

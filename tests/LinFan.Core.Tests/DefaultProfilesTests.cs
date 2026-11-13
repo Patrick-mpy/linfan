@@ -224,6 +224,23 @@ public sealed class DefaultProfilesTests
     }
 
     [Fact]
+    public void Build_CurvePoints_AreTheOnboardingTables()
+    {
+        // The tables moved to CurvePresets; onboarding must keep writing exactly these points.
+        var profiles = DefaultProfiles.Build(TwoFans, PrimaryId);
+
+        Assert.Equal(
+            new CurvePoint[] { new(35, 0), new(55, 0), new(65, 25), new(78, 55), new(86, 100) },
+            profiles[0].Curves[0].Points);
+        Assert.Equal(
+            new CurvePoint[] { new(30, 20), new(50, 35), new(65, 55), new(80, 90), new(86, 100) },
+            profiles[1].Curves[0].Points);
+        Assert.Equal(
+            new CurvePoint[] { new(30, 35), new(45, 55), new(60, 80), new(72, 100) },
+            profiles[2].Curves[0].Points);
+    }
+
+    [Fact]
     public void Build_IsDeterministic_SameInputSameOutput()
     {
         var first = DefaultProfiles.Build(TwoFans, PrimaryId);

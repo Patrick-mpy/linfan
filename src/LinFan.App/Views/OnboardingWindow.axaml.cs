@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using LinFan.App.Controllers;
-using LinFan.Core.Models;
 
 namespace LinFan.App.Views;
 
@@ -16,25 +16,25 @@ public partial class OnboardingWindow : Window
 {
     private bool _closeConfirmed;
 
-    public OnboardingWindow() => InitializeComponent();
+    public OnboardingWindow()
+    {
+        InitializeComponent();
+        // The primary-sensor menu is built as it opens, so its live values are current.
+        if (PrimarySensorChip.Flyout is PopupFlyoutBase primaryMenu)
+            primaryMenu.Opening += (_, _) => (DataContext as OnboardingController)?.RefreshPrimarySensorMenu();
+    }
 
-    // Positions-Modal je Lüfterzeile: die Zeile kommt aus dem DataContext des Buttons; das Ergebnis wird zurück
-    // in die gebundene Location geschrieben (reine UI - wie im Geräte-Tab). Abbrechen lässt sie unberührt.
+    // „Position wählen" per fan row: the row comes from the button's DataContext; the controller takes the result over
+    // (position and case type, as in the settings). Cancel leaves both alone.
     private async void OnPickLocation(object? sender, RoutedEventArgs e)
     {
-        if ((sender as Control)?.DataContext is not OnboardingFanRow row)
+        if ((sender as Control)?.DataContext is not OnboardingFanRow row || DataContext is not OnboardingController controller)
             return;
-        try
-        {
-            FanLocation? picked = await new FanLocationDialog(row.Name, row.Location.Value, row.Manual)
-                .ShowDialog<FanLocation?>(this);
-            if (picked is { } loc)
-                row.Location = FanLocationOption.For(loc);
-        }
-        catch
-        {
-            // Defensive: ein Dialog-Fehler darf diesen async-void-Handler nicht in einen Crash kippen.
-        }
+        // A failing dialog reaches the app's error barrier (recorded, and the user told).
+        LocationPickController pick = controller.CreateLocationPick(row);
+        LocationPick? picked = await new FanLocationDialog(pick).ShowDialog<LocationPick?>(this);
+        if (picked is not null)
+            controller.ApplyLocationPick(row, picked);
     }
 
     protected override async void OnClosing(WindowClosingEventArgs e)

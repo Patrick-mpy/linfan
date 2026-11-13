@@ -8,14 +8,16 @@
         WindowStartupLocation="CenterOwner" CanResize="False"
         Background="{DynamicResource BgWindow}">
     <StackPanel Margin="24" Spacing="{StaticResource SpacingXl}">
-        <TextBlock Text="{l:Tr UnsavedChanges.Message}" FontSize="15" FontWeight="SemiBold"
-                   Foreground="{DynamicResource TextPrimary}" />
-        <TextBlock Text="{l:Tr UnsavedChanges.Question}" Foreground="{DynamicResource TextMuted}"
+        <TextBlock x:Name="HeadingText" Text="{l:Tr UnsavedChanges.Message}" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" />
+        <TextBlock x:Name="MessageText" Text="{l:Tr UnsavedChanges.Question}" Foreground="{DynamicResource TextMuted}"
                    TextWrapping="Wrap" />
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource SpacingMd}">
-            <Button Content="{l:Tr UnsavedChanges.Cancel}" Click="OnCancel" />
-            <Button Classes="danger" Content="{l:Tr UnsavedChanges.Discard}" Click="OnDiscard" />
-            <Button Classes="primary" Content="{l:Tr UnsavedChanges.Save}" Click="OnSave" />
-        </StackPanel>
+        <!-- Cancel is the safe default (Esc / window X) - nothing gets lost by accident. -->
+        <WrapPanel HorizontalAlignment="Right" ItemSpacing="{StaticResource SpacingMd}" LineSpacing="{StaticResource SpacingMd}">
+            <Button x:Name="CancelButton" Content="{l:Tr UnsavedChanges.Cancel}" Click="OnCancel" IsCancel="True" />
+            <Button x:Name="DiscardButton" Classes="danger" Content="{l:Tr UnsavedChanges.Discard}" Click="OnDiscard"
+                    ToolTip.ShowOnDisabled="True" />
+            <Button x:Name="SaveButton" Classes="primary" Content="{l:Tr UnsavedChanges.Save}" Click="OnSave" />
+        </WrapPanel>
     </StackPanel>
 </Window>

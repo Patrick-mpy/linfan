@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using System.Runtime.Versioning;
+using LinFan.Core.Models;
+using LinFan.Core.Services;
 using LinFan.Hardware.Linux;
 using Xunit;
 using ChipDir = LinFan.Hardware.Linux.LinuxHwmonBackend.ChipDir;
@@ -31,6 +33,28 @@ public class ChipKeyTests
         Assert.Equal("k10temp", keys["hwmon6"]);
         Assert.Equal("nct6797", keys["hwmon3"]);
         Assert.Equal("amdgpu", keys["hwmon1"]);
+    }
+
+    [Fact]
+    public void ChipKeys_KeepTheDriverInFront_WhereTheSensorClassifierReadsIt()
+    {
+        // Sensor ids are "<chip key>/<channel>" (AddSensor); the GUI groups sensors by the driver before '@' or '/'.
+        var keys = LinuxHwmonBackend.ResolveChipKeys(new[]
+        {
+            Dir("hwmon2", "coretemp", "0000:00:00.0"),
+            Dir("hwmon5", "coretemp", "0000:80:00.0"),
+            Dir("hwmon1", "amdgpu", "0000:03:00.0"),
+            Dir("hwmon4", "nvme", "nvme0"),
+            Dir("hwmon3", "nct6797", "nct6775.2592"),
+        });
+
+        SensorCategory Classify(string hwmon) => SensorClassifier.Classify($"{keys[hwmon]}/temp1");
+
+        Assert.Equal(SensorCategory.Cpu, Classify("hwmon2")); // coretemp@0000:00:00.0
+        Assert.Equal(SensorCategory.Cpu, Classify("hwmon5"));
+        Assert.Equal(SensorCategory.Gpu, Classify("hwmon1"));
+        Assert.Equal(SensorCategory.Storage, Classify("hwmon4"));
+        Assert.Equal(SensorCategory.Mainboard, Classify("hwmon3"));
     }
 
     [Fact]
@@ -94,32 +118,5 @@ public class ChipKeyTests
         Assert.Equal(
             LinuxHwmonBackend.ResolveChipKeys(a)["hwmon2"],
             LinuxHwmonBackend.ResolveChipKeys(b)["hwmon2"]);
-    }
-}
-
-/// <summary>
-/// Invarianten der Legacy-Alias-Map auf echter Hardware (übersprungen ohne hwmon): die Map dient der
-/// Config-Migration und muss alte <c>hwmonN/…</c>-Ids auf real existierende stabile Ids zeigen.
-/// </summary>
-[SupportedOSPlatform("linux")]
-public class LegacyIdMapInvariantTests
-{
-    [Fact]
-    public void LegacyAliases_MapHwmonNamesToActualDiscoveredIds()
-    {
-        if (!OperatingSystem.IsLinux())
-            return;
-
-        using var backend = new LinuxHwmonBackend();
-        var ids = backend.DiscoverSensors().Select(s => s.Id.Value)
-            .Concat(backend.DiscoverFans().Select(f => f.Id.Value))
-            .ToHashSet(StringComparer.Ordinal);
-
-        foreach (var (legacy, stable) in backend.LegacyToStableIds())
-        {
-            Assert.StartsWith("hwmon", legacy);            // alter Schlüssel ist hwmonN-basiert
-            Assert.NotEqual(legacy, stable);               // nur echte Umbenennungen werden gemerkt
-            Assert.Contains(stable, ids);                  // Ziel ist eine real auflösbare Id
-        }
     }
 }

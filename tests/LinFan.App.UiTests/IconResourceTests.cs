@@ -26,24 +26,48 @@ public class IconResourceTests
     [InlineData("IconFan")]
     [InlineData("IconSearch")]
     [InlineData("IconChevronDown")]
+    [InlineData("IconChevronUp")]
+    [InlineData("IconMinus")]
+    [InlineData("IconUndo")]
+    [InlineData("IconRedo")]
+    [InlineData("IconRestore")]
+    [InlineData("IconGrip")]
+    [InlineData("IconInfo")]
+    [InlineData("IconAlert")]
+    [InlineData("IconMore")]
+    [InlineData("IconGitHub")]
     [InlineData("IconGauge")]
     [InlineData("IconCheckCircle")]
     [InlineData("IconAlertCircle")]
-    [InlineData("IconDashboard")]
+    [InlineData("IconPulse")]
+    [InlineData("IconSwap")]
+    [InlineData("IconCheck")]
+    [InlineData("IconGlobe")]
     [InlineData("IconChartLine")]
     [InlineData("IconCog")]
     [InlineData("IconWind")]
     [InlineData("IconPalette")]
-    [InlineData("IconGlobe")]
     [InlineData("IconWindow")]
     [InlineData("IconArchive")]
     [InlineData("IconClose")]
     [InlineData("IconSparkle")]
+    [InlineData("IconInterpolationLinear")]
+    [InlineData("IconInterpolationSpline")]
+    [InlineData("IconInterpolationStep")]
     public void Icon_geometry_resolves(string key)
     {
         Assert.NotNull(Application.Current);
         bool found = Application.Current!.TryGetResource(key, null, out object? value);
         Assert.True(found, $"Icon-Ressource '{key}' nicht gefunden.");
         Assert.IsAssignableFrom<Geometry>(value);
+    }
+
+    /// <summary>Every interpolation option names an icon that exists (the key is built from the enum value).</summary>
+    [AvaloniaFact]
+    public void Every_interpolation_option_has_its_icon()
+    {
+        foreach (LinFan.App.Controllers.InterpolationOption option in LinFan.App.Controllers.InterpolationOption.All)
+            Assert.True(Application.Current!.TryGetResource(option.IconKey, null, out object? value) && value is Geometry,
+                option.IconKey);
     }
 }

@@ -60,53 +60,46 @@ public sealed class FanAssignRowTests
         Assert.Equal("CPU-Lüfter", row.ToConfig().Name);
     }
 
+    /// <summary>
+    /// An emptied field is no own name in the draft - a change against the loaded name, which saving turns into the
+    /// placeholder's „Lüfter N". It used to fall back to the loaded name, so a name could never be removed again. Never
+    /// the FanId either, which once turned the raw hardware path into the display name.
+    /// </summary>
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("\t")]
-    public void ToConfig_EmptyName_FallsBackToPreviousDisplayName(string emptied)
+    public void ToConfig_EmptyName_IsNoOwnName(string emptied)
     {
-        // baseFan.Name = "Test Fan" - der zuletzt geladene Anzeigename bleibt erhalten.
-        var row = MakeRow();
+        var row = MakeRow(); // baseFan.Name = "Test Fan"
         row.Name = emptied;
-
-        Assert.Equal("Test Fan", row.ToConfig().Name);
-    }
-
-    /// <summary>
-    /// Empty means "no own name" - then the hardware label applies everywhere. This used to yield the FanId,
-    /// which turned the raw hardware path ("/lpc/nct6797d/0/control/1") into the display name.
-    /// </summary>
-    [Fact]
-    public void ToConfig_EmptyName_AndEmptyBaseName_StaysEmpty()
-    {
-        var row = new FanAssignRow(
-            new FanConfig { FanId = "hwmon1/pwm1", Name = "" },
-            selected: null, availableCurves: new ObservableCollection<CurveEditRow>());
-        row.Name = "   ";
 
         Assert.Equal("", row.ToConfig().Name);
     }
 
     /// <summary>
-    /// Without an own name the row shows the hardware label as a <b>placeholder</b>, not as a value.
-    /// Otherwise an untouched field would freeze it as a user-defined name on the next save, and the
-    /// daemon-side "no pseudo name" fix would come to nothing.
+    /// Without an own name the row shows „Lüfter N" as a <b>placeholder</b>, as the setup assistant does - not as a value,
+    /// so switching the language or the numbering is no edit. Saving fills it in (the editor's FillEmptyNames).
     /// </summary>
     [Fact]
-    public void HardwareLabel_IsPlaceholderOnly_AndNotPersisted()
+    public void DefaultName_IsThePlaceholder_AndAnEmptyFieldIsNoOwnName()
     {
         var row = new FanAssignRow(
             new FanConfig { FanId = "/lpc/nct6797d/0/control/1", Name = "" },
-            selected: null, availableCurves: new ObservableCollection<CurveEditRow>(),
-            hardwareLabel: "Nuvoton NCT6797D Fan #2");
+            selected: null, availableCurves: new ObservableCollection<CurveEditRow>())
+        {
+            DefaultName = "Lüfter 2",
+        };
 
-        Assert.Equal("Nuvoton NCT6797D Fan #2", row.NamePlaceholder);
+        Assert.Equal("Lüfter 2", row.DefaultName);
+        Assert.Equal("Lüfter 2", row.DisplayName);
         Assert.Equal("", row.Name);
         Assert.Equal("", row.ToConfig().Name);
 
         row.Name = "CPU";
         Assert.Equal("CPU", row.ToConfig().Name);   // a real own name is of course kept
+        row.Name = "  ";
+        Assert.Equal("", row.ToConfig().Name);      // cleared again: no own name, the placeholder stands for it
     }
 
     [Fact]
@@ -141,56 +134,21 @@ public sealed class FanAssignRowTests
         Assert.Equal(50, row.MinPwm); // Min should be lowered to Max
     }
 
-    // --- PWM-Auto-Swap-Hinweis (Punkt 3) --------------------------------------------------------
-
+    /// <summary>
+    /// The thumbs and steppers cannot cross, so a clamp only happens on other paths (a start point the daemon adopted
+    /// above Max) - and then silently: the other bound follows, no correction hint any more.
+    /// </summary>
     [Fact]
-    public void NewRow_NoPwmAdjustHint()
-    {
-        var row = MakeRow(minPwm: 30, maxPwm: 200);
-        Assert.Equal("", row.PwmAdjustHint);
-    }
-
-    [Fact]
-    public void MinExceedsMax_RaisesMax_AndSetsHint()
+    public void MinAboveMax_PullsMaxAlong_Silently()
     {
         var row = MakeRow(minPwm: 50, maxPwm: 100);
-        row.MinPwm = 150; // > Max=100
+        var changed = new List<string>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName!);
+
+        row.MinPwm = 150;
 
         Assert.Equal(150, row.MaxPwm);
-        Assert.Contains("59 %", row.PwmAdjustHint); // 150/255 ≈ 59 % - der Hinweis spricht Prozent
-        Assert.Contains("angehoben", row.PwmAdjustHint);
-    }
-
-    [Fact]
-    public void MaxBelowMin_LowersMin_AndSetsHint()
-    {
-        var row = MakeRow(minPwm: 100, maxPwm: 200);
-        row.MaxPwm = 50; // < Min=100
-
-        Assert.Equal(50, row.MinPwm);
-        Assert.Contains("20 %", row.PwmAdjustHint); // 50/255 ≈ 20 %
-        Assert.Contains("gesenkt", row.PwmAdjustHint);
-    }
-
-    [Fact]
-    public void ValidChange_AfterAdjust_ClearsHint()
-    {
-        var row = MakeRow(minPwm: 50, maxPwm: 100);
-        row.MinPwm = 150; // löst Anheben + Hinweis aus
-        Assert.NotEqual("", row.PwmAdjustHint);
-
-        row.MinPwm = 80; // jetzt gültig (≤ Max=150), kein Nachziehen
-        Assert.Equal("", row.PwmAdjustHint);
-    }
-
-    [Fact]
-    public void ValidMaxChange_DoesNotSetHint()
-    {
-        var row = MakeRow(minPwm: 30, maxPwm: 100);
-        row.MaxPwm = 200; // ≥ Min, kein Nachziehen
-
-        Assert.Equal("", row.PwmAdjustHint);
-        Assert.Equal(30, row.MinPwm);
+        Assert.Contains(nameof(FanAssignRow.MaxPercent), changed);
     }
 
     // --- PWM-Anzeige in Prozent (Geräte-Tab) ----------------------------------------------------
@@ -234,14 +192,12 @@ public sealed class FanAssignRowTests
     }
 
     [Fact]
-    public void SettingMinPercent_AboveMax_RaisesMaxPercent_AndHintInPercent()
+    public void SettingMinPercent_AboveMax_RaisesMaxPercent()
     {
         var row = MakeRow(minPwm: 0, maxPwm: 0);
         row.MinPercent = 80; // > Max=0 %
 
         Assert.Equal(80, row.MaxPercent); // Max wird auf Min nachgezogen
-        Assert.Contains("%", row.PwmAdjustHint);
-        Assert.Contains("angehoben", row.PwmAdjustHint);
     }
 
     [Fact]
@@ -655,7 +611,7 @@ public sealed class FanAssignRowTests
 
     private static ObservableCollection<TachSensorOption> TachOptions() => new()
     {
-        new TachSensorOption(null, "- (keiner) -"),
+        new TachSensorOption(null, "Automatisch (Hardware)"),
         new TachSensorOption("hwmon7/fan1", "Fan 1"),
         new TachSensorOption("hwmon7/fan2", "Fan 2"),
     };
@@ -863,7 +819,7 @@ public sealed class FanAssignRowTests
         ObservableCollection<TachSensorOption> tachs = TachOptions();
         FanAssignRow row = TachRow(canControl: true, tachs: tachs); // rpmSource null
 
-        Assert.Same(tachs[0], row.SelectedTach); // „- (keiner) -"
+        Assert.Same(tachs[0], row.SelectedTach); // automatic
     }
 
     [Fact]
@@ -887,7 +843,7 @@ public sealed class FanAssignRowTests
         // Mit vorhandener Zuordnung starten, damit der Wechsel auf „keiner" eine echte Änderung ist.
         FanAssignRow row = TachRow(canControl: true, sets: sets, tachs: tachs, rpmSource: "hwmon7/fan1");
 
-        row.SelectedTach = tachs[0]; // „- (keiner) -" → null
+        row.SelectedTach = tachs[0]; // automatic → null
 
         Assert.Single(sets);
         Assert.Equal(("hwmon7/pwm1", (string?)null), sets[0]);

@@ -130,4 +130,91 @@ public sealed class SettingsControllerTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void Navigation_HasOneAppearancePage_ForThemeAndLanguage_AndStartupAndBackground()
+    {
+        string path = TempPath();
+        try
+        {
+            using var controller = new SettingsController(new UiSettingsStore(path));
+
+            Assert.Equal(
+                new[]
+                {
+                    SettingsSection.Sensors, SettingsSection.Fans, SettingsSection.Airflow,
+                    SettingsSection.Appearance, SettingsSection.Background, SettingsSection.Backup,
+                },
+                controller.Sections.Select(s => s.Section));
+            SettingsSectionItem appearance = controller.Sections.Single(s => s.Section == SettingsSection.Appearance);
+            Assert.Equal("Darstellung", appearance.Label);
+            Assert.True(appearance.IsFirstInGroup);
+            Assert.Equal("Start & Hintergrund", controller.Sections.Single(s => s.Section == SettingsSection.Background).Label);
+
+            // Backup and the setup assistant share one page in the application group - no third group.
+            SettingsSectionItem backup = controller.Sections.Single(s => s.Section == SettingsSection.Backup);
+            Assert.Equal("Sicherung & Einrichtung", backup.Label);
+            Assert.Equal(appearance.Group, backup.Group);
+            Assert.False(backup.IsFirstInGroup);
+            Assert.Equal(2, controller.Sections.Count(s => s.IsFirstInGroup));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ThemeTiles_CarryHint_AndWhichVariantsTheirPreviewShows()
+    {
+        IReadOnlyList<ThemeOption> options = ThemeOption.Build();
+
+        Assert.Equal(new[] { ThemeChoice.System, ThemeChoice.Light, ThemeChoice.Dark, ThemeChoice.Terminal, ThemeChoice.HighContrast },
+            options.Select(o => o.Value));
+        Assert.Equal(new[]
+            {
+                "Folgt dem Betriebssystem", "Helle Flächen, dunkle Schrift", "Dunkle Flächen, helle Schrift",
+                "Phosphor-Grün, Monospace, eckig", "Schwarz/Weiß, kräftige Ränder",
+            },
+            options.Select(o => o.Hint));
+        Assert.Equal(new[] { true, true, false, false, false }, options.Select(o => o.ShowsLight));  // System shows both halves
+        Assert.Equal(new[] { true, false, true, false, false }, options.Select(o => o.ShowsDark));
+        Assert.Equal(new[] { false, false, false, true, false }, options.Select(o => o.ShowsTerminal));
+        Assert.Equal(new[] { false, false, false, false, true }, options.Select(o => o.ShowsHighContrast));
+    }
+
+    [Fact]
+    public void LanguageMenu_MarksTheCurrentLanguage_AndPickingOneSetsIt()
+    {
+        string path = TempPath();
+        try
+        {
+            using var controller = new SettingsController(new UiSettingsStore(path));
+            Assert.Equal(new[] { "System", "Deutsch", "English" }, controller.LanguageMenu.Select(m => m.Header));
+            Assert.True(controller.LanguageMenu[0].IsCurrent);
+            Assert.StartsWith("Betriebssystem · ", controller.LanguageMenu[0].Detail);
+
+            controller.LanguageMenu[2].Command!.Execute(null);
+
+            Assert.Equal(LanguageChoice.English, controller.Language);
+            Assert.Equal(new[] { false, false, true }, controller.LanguageMenu.Select(m => m.IsCurrent));
+            Assert.Equal(LanguageChoice.English, new UiSettingsStore(path).Load().Language);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData(LanguageChoice.German, "System (Deutsch)")]
+    [InlineData(LanguageChoice.English, "System (English)")]
+    public void LanguageSystemOption_NamesTheLanguageItResolvesTo(LanguageChoice system, string label)
+    {
+        IReadOnlyList<LanguageOption> options = LanguageOption.Build(system);
+
+        Assert.Equal(label, options[0].Display);
+        Assert.Equal(new[] { "Deutsch", "English" }, options.Skip(1).Select(o => o.Display));
+        Assert.Equal(LanguageChoice.System, options[0].Value);
+    }
 }
